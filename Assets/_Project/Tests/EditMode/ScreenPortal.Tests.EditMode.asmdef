@@ -1,0 +1,19 @@
+{
+    "name": "ScreenPortal.Tests.EditMode",
+    "rootNamespace": "ScreenPortal.Tests",
+    "references": [
+        "ScreenPortal.Domain",
+        "ScreenPortal.Application",
+        "UnityEngine.TestRunner",
+        "UnityEditor.TestRunner"
+    ],
+    "includePlatforms": ["Editor"],
+    "excludePlatforms": [],
+    "allowUnsafeCode": false,
+    "overrideReferences": true,
+    "precompiledReferences": ["nunit.framework.dll"],
+    "autoReferenced": false,
+    "defineConstraints": ["UNITY_INCLUDE_TESTS"],
+    "versionDefines": [],
+    "noEngineReferences": false
+}

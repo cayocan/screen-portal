@@ -1,0 +1,14 @@
+{
+    "name": "ScreenPortal.Domain",
+    "rootNamespace": "ScreenPortal.Domain",
+    "references": [],
+    "includePlatforms": [],
+    "excludePlatforms": [],
+    "allowUnsafeCode": false,
+    "overrideReferences": false,
+    "precompiledReferences": [],
+    "autoReferenced": false,
+    "defineConstraints": [],
+    "versionDefines": [],
+    "noEngineReferences": true
+}

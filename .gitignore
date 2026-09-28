@@ -54,3 +54,7 @@ Thumbs.db
 /.utmp/
 /Assets/Resources/PerformanceTestRun*
 /Assets/StreamingAssets/RuntimeActionBindings.json*
+
+# ---------- Harness dotnet dos testes puros da Unity ----------
+tests-dotnet/**/bin/
+tests-dotnet/**/obj/
