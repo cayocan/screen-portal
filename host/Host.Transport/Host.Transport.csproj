@@ -1,6 +1,7 @@
 ﻿<Project Sdk="Microsoft.NET.Sdk">
   <ItemGroup>
     <ProjectReference Include="..\Host.Domain\Host.Domain.csproj" />
+    <ProjectReference Include="..\Host.Shared\Host.Shared.csproj" />
   </ItemGroup>
   <PropertyGroup>
     <TargetFramework>$(WindowsTfm)</TargetFramework>

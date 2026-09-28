@@ -1,0 +1,20 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <!-- Compila o código PURO do headset (Assets/_Project) para o host: um só codec, mensagens e máquina de estados.
+       Mesmas regras da Unity: C# 9, sem ImplicitUsings/Nullable. -->
+  <PropertyGroup>
+    <TargetFramework>$(PortableTfm)</TargetFramework>
+    <LangVersion>9.0</LangVersion>
+    <Nullable>disable</Nullable>
+    <ImplicitUsings>disable</ImplicitUsings>
+    <EnableDefaultCompileItems>false</EnableDefaultCompileItems>
+    <RootNamespace>ScreenPortal</RootNamespace>
+  </PropertyGroup>
+  <ItemGroup>
+    <Compile Include="../../Assets/_Project/Domain/**/*.cs" Link="Unity/Domain/%(RecursiveDir)%(Filename)%(Extension)" />
+    <Compile Include="../../Assets/_Project/Application/**/*.cs" Link="Unity/Application/%(RecursiveDir)%(Filename)%(Extension)" />
+    <Compile Include="../../Assets/_Project/Infrastructure/Shared/**/*.cs" Link="Unity/Infrastructure/%(RecursiveDir)%(Filename)%(Extension)" />
+  </ItemGroup>
+  <ItemGroup>
+    <PackageReference Include="Google.FlatBuffers" Version="25.2.10" />
+  </ItemGroup>
+</Project>

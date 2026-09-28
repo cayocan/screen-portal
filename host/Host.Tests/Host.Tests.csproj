@@ -1,6 +1,6 @@
 <Project Sdk="Microsoft.NET.Sdk">
   <PropertyGroup>
-    <TargetFramework>$(PortableTfm)</TargetFramework>
+    <TargetFramework>$(WindowsTfm)</TargetFramework>
     <RootNamespace>ScreenPortal.Host.Tests</RootNamespace>
     <IsPackable>false</IsPackable>
   </PropertyGroup>
@@ -12,5 +12,7 @@
   <ItemGroup>
     <Using Include="Xunit" />
     <ProjectReference Include="..\Host.Domain\Host.Domain.csproj" />
+    <ProjectReference Include="..\Host.Shared\Host.Shared.csproj" />
+    <ProjectReference Include="..\Host.Transport\Host.Transport.csproj" />
   </ItemGroup>
 </Project>
