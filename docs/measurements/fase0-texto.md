@@ -32,7 +32,7 @@ Exemplo: `T2: A=10, B=11, Il1 sim, tremula pouco, sem blocos, vira pouco`.
 ## Resultados
 | ID | A (pt) | B (pt) | Il1/O0 12pt | Tremulação | Artefatos | Conforto | Notas |
 |---|---|---|---|---|---|---|---|
-| T1 | | | | | | | |
+| T1 | 12 | 12 | 12 pt ok · 10 pt com esforço (tema escuro) | nada | não | vira pouco | 28/09/2026 05:35, 60 fps, ~33 ms |
 | T2 | | | | | | | |
 | T3 | | | | | | | |
 | T4 | | | | | | | |
@@ -40,4 +40,9 @@ Exemplo: `T2: A=10, B=11, Il1 sim, tremula pouco, sem blocos, vira pouco`.
 | T6 | | | | | | | |
 
 ## Conclusão
-_Distância e tamanho padrão sugeridos para a criação de monitor; filtros padrão da layer; bitrate mínimo para texto._
+- **Critério do brief §4.2 atendido na configuração padrão (T1):** fonte 12 legível (texto e código),
+  sem tremulação nem artefatos de compressão a 20 Mbps, com o conforto "vira pouco".
+- T2–T6 não foram executados (decisão do Cayo: o resultado de T1 basta para a Fase 0).
+- Padrão sugerido para a criação de monitor (Fase 2): **2560 px de largura ≈ 140 cm a 1,3 m**, layer
+  com filtro bicúbico, 20 Mbps. Ajustes finos (sharpen/supersample, telas maiores) ficam para o
+  assistente de legibilidade (v1.1).
