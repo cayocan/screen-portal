@@ -1,7 +1,8 @@
 # Superfície de layout (Cilindro / Esfera) — Design
 
 - **Status:** aprovado pelo Cayo em 28/09/2026 (brainstorming). Entra no **escopo do MVP** (pilar A).
-- **Documentos a atualizar na implementação:** ADR 0005, brief v1.3.2 (§3, §4.1, §4.2, §10.9, §10.10), CLAUDE.md.
+- **Documentação:** ADR 0005, brief v1.3.2 (§3, §4.1, §4.2, §8.2, §10.9, §10.10, §10.12, §14, D12), CLAUDE.md — feita em 28/09/2026.
+- **Ordem de implementação:** não altera o roadmap. Próxima fase continua sendo a 1B; esta feature entra na Fase 2 e 3.
 - **Princípio de produto registrado aqui:** **Liberdade.** Encaixes e regras ajudam, nunca prendem: tudo que gruda
   pode ser desgrudado, e toda tela pode sair da superfície.
 
@@ -135,7 +136,8 @@ Os mesmos controles ficam no menu do app (cursor 3D, mouse-first).
 
 | Parte | Fase |
 |---|---|
-| Domínio completo (modelo, `ToPose`, comandos, `CylinderMath`, `SurfaceSnapper`, migração de `VirtualScreen`/`CreateScreen`/views) + ADR 0005 + brief v1.3.2 | **Agora (Fase 1A.1), antes da 1B** |
+| ADR 0005 + brief v1.3.2 (documentação) | Agora (28/09/2026) |
+| Domínio completo (modelo, `ToPose`, comandos, `CylinderMath`, `SurfaceSnapper`, migração de `VirtualScreen`/`CreateScreen`/views) | **Fase 2**, primeiro item da manipulação (a ordem do roadmap não muda; a 1B não transporta layout) |
 | Arrastar/roda/`Alt` por controle e mãos, recentrar (atalho e evento do sistema), alinhar postura, guias | Fase 2 |
 | Mesmo pelo mouse + atalhos `Ctrl+Alt+L/R/T/G` + menu do app | Fase 3 |
 | Mapa angular do host (`SpatialMap`) usando a superfície | Fase 3 |

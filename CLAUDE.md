@@ -32,6 +32,8 @@ O projeto Unity fica **na raiz** do repositório (não em `headset-unity/`). Ond
 - O callback do hook de mouse nunca faz trabalho pesado.
 - **`ResizeScreen` nunca altera a resolução.** O host nunca troca o modo de um monitor virtual vivo; só `RecreateScreen`.
 - **Mouse-first:** toda ação executável só com mouse + teclado. Mãos são um adapter a mais.
+- **Liberdade (princípio do produto):** encaixes, grades e regras de layout ajudam, nunca prendem. Todo "ímã" tem
+  limiar e desliga com `Shift`; toda tela pode sair da superfície de layout (brief §10.12, ADR 0005).
 - Cliques de manipulação nunca vazam pro Windows, e cliques normais nunca são engolidos.
 - **Escopo:** nada fora dos três pilares do MVP antes da v1.0.
 - **Pacotes Unity:** Meta XR (core, interaction.ovr, mrutilitykit — mesma versão exata) + `com.unity.ai.assistant` + `com.unity.pipeline`. Nunca adicionar XR Interaction Toolkit nem templates VR/MR da Unity.

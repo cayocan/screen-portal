@@ -3,6 +3,9 @@
 > Documento de partida para o Claude Code. Descreve o produto, a arquitetura, os design patterns e a ordem de execução. Em caso de dúvida entre velocidade e qualidade do núcleo de vídeo, a qualidade do núcleo vence. Em caso de dúvida na UI/UX, entregue rápido e itere.
 >
 > **Revisões:** v1.3.1 (28/09/2026) — ADR 0002 (alvo de 72 Hz) e ADR 0003 (zona de passthrough desenhada pelo usuário, sem detecção de teclado).
+> v1.3.2 (28/09/2026) — ADR 0005: **superfície de layout Cilindro/Esfera** (seção 10.12) e o princípio **Liberdade**. Entra nas Fases 2 e 3, sem mudar a ordem do roadmap.
+>
+> **Princípio de produto — Liberdade:** encaixes, grades e regras de layout **ajudam, nunca prendem**. Tudo que gruda pode ser desgrudado e toda tela pode sair da superfície de layout.
 >
 > **Status: v1.3 do brief, escopo do MVP FECHADO em 27/09/2026** (inclui a manipulação com o mouse da seção 10.10, os monitores em retrato da seção 10.3 e as telas curvas com curvatura ajustável da seção 10.2). A partir daqui, mudanças de escopo só com: (1) atualização deste documento, (2) ADR em `docs/adr/` explicando o porquê e o que sai para compensar. Ideias novas vão direto para o backlog (seção 4.3).
 
@@ -59,6 +62,7 @@ Requisitos que não se negociam: **leve** (sem travadas e sem desperdício de ba
 8. **Cursor espacial**: o mouse vai para onde a tela **está no espaço 3D**, não para onde o Windows acha que ela está. Janela à esquerda, mouse pra esquerda, entra nela. Janela acima do desktop, mouse pra cima, entra nela (seção 10)
 9. **Controle total pelo teclado**: atalhos globais para mover, redimensionar, destacar, trocar perfil, mudar fps e mostrar a zona de passthrough, sem tirar a mão do teclado (seção 10.9)
 10. **Mouse-first**: mover, **afastar/aproximar (segurando o clique e girando a roda)** e redimensionar as telas **com o mouse**, pela moldura da tela ou segurando uma tecla. Fora das telas, o mouse vira um **cursor 3D** que opera toda a interface do app. As mãos são uma alternativa, nunca obrigatórias (seção 10.10)
+11. **Superfície de layout Cilindro/Esfera**: uma "grade invisível" em volta do usuário define onde as telas ficam e para onde olham. **Cilindro** (padrão): telas sempre em pé, viradas para o eixo. **Esfera**: telas viradas para o centro nos dois eixos, podendo inclinar inteira para usar reclinado. Por perfil, com encaixe que desgruda e telas "soltas" como exceção (seção 10.12)
 
 ---
 
@@ -70,7 +74,7 @@ Requisitos que não se negociam: **leve** (sem travadas e sem desperdício de ba
 
 | Pilar | O que entra | Seções |
 |---|---|---|
-| **A. Telas nítidas e livres** | N monitores virtuais (IddCx) · **seletor de proporção/resolução na criação, com orientação paisagem ou retrato** · **janela destacada** · mover livre + resize proporcional (zoom) · **tela plana ou curva com curvatura ajustável** (atalho, mouse, menu) · frame rate por tela (Auto + manual: Fixed/Video/Eco) · áudio do PC · perfis de layout + retomar a última sessão ao colocar o headset | 8.8, 10 |
+| **A. Telas nítidas e livres** | N monitores virtuais (IddCx) · **seletor de proporção/resolução na criação, com orientação paisagem ou retrato** · **janela destacada** · mover livre + resize proporcional (zoom) · **superfície de layout Cilindro/Esfera** (seção 10.12) · **tela plana ou curva com curvatura ajustável** (atalho, mouse, menu) · frame rate por tela (Auto + manual: Fixed/Video/Eco) · áudio do PC · perfis de layout + retomar a última sessão ao colocar o headset | 8.8, 10 |
 | **B. Zona de passthrough "você desenha, o app lembra"** | Criação manual (mouse · 2 cantos com controle/mãos) · modo edição completo · ancorada na mesa (spatial anchor) · zona por perfil · restauração automática · invariante "tela não invade zona" | 9 |
 | **C. Mouse e teclado em primeiro lugar** | **Cursor espacial** (roteamento 3D) · cursor desenhado localmente no headset (latência baixa) · **manipulação das telas com o mouse** (moldura + tecla modificadora: mover, afastar com a roda, redimensionar, menu da tela) · **cursor 3D livre** operando toda a UI do app · atalhos globais de teclado · mãos como alternativa · Windows organizado como plano B | 10 |
 
@@ -84,6 +88,7 @@ Requisitos que não se negociam: **leve** (sem travadas e sem desperdício de ba
 - **Janela destacada:** destacar e reanexar sem perder nem deslocar a janela em 100% dos testes (apps comuns: navegador, IDE, terminal, Spotify, Slack)
 - **Resolução:** nenhuma ação de resize ou de curvatura no headset altera a resolução de um monitor (teste de domínio + teste em hardware)
 - **Curvatura:** ligar/desligar e ajustar por atalho e pelo mouse com resposta imediata; troca da layer cilíndrica entre telas curvas sem piscada perceptível
+- **Superfície de layout:** trocar Cilindro ↔ Esfera não move nenhuma tela (≤ 1 mm) e pode ser desfeito; no Cilindro nenhuma tela inclina (pitch/roll = 0); na Esfera toda tela olha para o centro; todo encaixe pode ser desfeito continuando o arraste ou com `Shift`
 - **Sem as mãos:** um usuário consegue fazer tudo **só com mouse e teclado**: criar monitor, mover, afastar, redimensionar, destacar janela, editar a zona de passthrough, trocar perfil e usar os menus
 - **Sem vazamento:** nenhum clique ou scroll de manipulação chega ao app do Windows (0 ocorrências na bateria de testes)
 
@@ -258,7 +263,7 @@ O projeto Unity (`headset-unity/`, criado a partir do template **Universal 3D** 
 
 ### 8.2 Estado: Unidirectional Data Flow + Command
 - `WorkspaceStore` é a **fonte única da verdade** (estado imutável ou com mudanças controladas).
-- Toda alteração é um **Command**: `CreateScreen`, `RecreateScreen`, `MoveScreen`, `SetScreenDistance`, `ResizeScreen` (só escala), `SetScreenCurvature`, `ToggleScreenCurvature`, `ToggleScreenFrontAndCenter`, `RemoveScreen`, `ApplyProfile`, `SetFocus`, `SetFrameRateMode`, `DetachWindow`, `ReattachWindow`, `SetEdgeBehavior` + os Commands da zona de passthrough (seção 9.7).
+- Toda alteração é um **Command**: `CreateScreen`, `RecreateScreen`, `MoveScreen` (Fase 1A; substituído por `MoveScreenOnSurface`/`SetScreenLoose`/`ReturnScreenToSurface` na Fase 2), `SetLayoutMode`, `RecenterLayout`, `AlignSurfaceToPosture`, `SetSurfaceTilt`, `SetSnapOptions`, `SetScreenDistance`, `ResizeScreen` (só escala), `SetScreenCurvature`, `ToggleScreenCurvature`, `ToggleScreenFrontAndCenter`, `RemoveScreen`, `ApplyProfile`, `SetFocus`, `SetFrameRateMode`, `DetachWindow`, `ReattachWindow`, `SetEdgeBehavior` + os Commands da zona de passthrough (seção 9.7).
 - Commands passam pelo `CommandBus` → reducer/handler → novo estado → evento `StateChanged`.
 - **Ganhos:** **undo/redo** de graça, log/replay para debug, perfis de layout = snapshot do estado (**Memento**), sincronização fácil com o host (o comando vira mensagem).
 
@@ -627,6 +632,10 @@ O host registra atalhos globais (`RegisterHotKey`) e os envia ao headset como Co
 | `Ctrl+Alt+C` | Tela focada: alternar **plana ↔ curva** (volta à última curvatura usada) |
 | `Ctrl+Alt+[` / `Ctrl+Alt+]` | Diminuir / aumentar a curvatura da tela focada (10% por passo; com `Shift`, pula entre os presets) |
 | `Ctrl+Alt+M` | Abrir o menu do app (onde o cursor 3D estiver) |
+| `Ctrl+Alt+L` | Alternar a superfície de layout do perfil: Cilindro ↔ Esfera (seção 10.12) |
+| `Ctrl+Alt+R` | Recentrar o layout na posição atual da cabeça |
+| `Ctrl+Alt+T` | Esfera: alinhar à postura atual; segurar + roda = ajuste fino da inclinação |
+| `Ctrl+Alt+G` | Ligar/desligar a grade angular |
 | `Ctrl+Alt` **segurado** + mouse | Modo manipulação: arrastar move, roda afasta/aproxima, `+Shift`+roda redimensiona, botão direito arrastando redimensiona (seção 10.10) |
 | `Ctrl+Alt+Espaço` | (v1.1) Olhar e pular: cursor vai para a tela que você está olhando |
 
@@ -670,7 +679,7 @@ Segurando `Ctrl+Alt` (configurável), o mouse manipula **a tela que está sob o 
 - O cursor real do Windows fica parado na última borda, e os cliques são engolidos pelo host, então **nada acontece no Windows por acidente**.
 
 #### Comportamento e conforto
-- **Movimento em esfera:** arrastar move a tela sobre uma esfera centrada na sua cabeça, então ela nunca fica de lado nem "foge". Segurando `Alt` durante o arraste, move num plano, sem girar.
+- **Movimento sobre a superfície de layout (seção 10.12):** arrastar move a tela sobre o **Cilindro** (padrão; a tela sobe reta e fica sempre em pé) ou a **Esfera** (a tela inclina para o centro) do perfil, então ela nunca fica de lado nem "foge". Segurando `Alt` durante o arraste, a tela vira **solta** e move num plano, sem girar.
 - **Snap:** ao mover, a tela gruda nas bordas das vizinhas, alinha centros e topos, e respeita a zona de passthrough (invariante 9.6). `Shift` segurado desliga o snap.
 - **Distância:** de 0,4 m a 5 m. Cada passo da roda é pequeno quando a tela está perto (~5 cm) e maior quando está longe (escala logarítmica): preciso de perto, rápido de longe. Sensibilidade configurável.
 - **Resposta imediata:** durante o arraste, o headset move a tela na hora (preview local, sem esperar a rede nem o Command). O Command é gerado ao soltar.
@@ -713,6 +722,27 @@ Os mesmos gestos pelo Meta Interaction SDK: pinçar a moldura pra mover, puxar a
 - Dispositivo: teste de uso real com 3–5 layouts do dia a dia.
 
 ---
+
+### 10.12 Superfície de layout: Cilindro ou Esfera (ADR 0005)
+
+Uma "grade invisível" em volta do usuário define **onde as telas ficam e para onde olham** por padrão.
+Design completo: [docs/specs/2026-09-28-superficie-layout-design.md](specs/2026-09-28-superficie-layout-design.md).
+
+| | **Cilindro** (padrão) | **Esfera** |
+|---|---|---|
+| Orientação | olha para o eixo vertical; gira só na horizontal; sempre em pé | olha para o centro; gira na horizontal e na vertical |
+| Arrastar na vertical | a tela sobe reta, mantendo o raio horizontal | a tela muda de elevação e inclina para você |
+| Roda do mouse | raio horizontal (altura fixa) | distância na direção |
+| Inclinação inteira | não | sim ("alinhar à postura", para usar reclinado) |
+
+- **Centro fixo**, capturado ao recentrar (`Ctrl+Alt+R` ou o recentrar do Quest). As telas não seguem a cabeça.
+- **Por perfil**; cada tela pode ficar **solta** (`Alt` + arrastar), fora da superfície, com pose livre.
+- **Trocar o modo não move nenhuma tela**: mesma posição, só muda a orientação. Um passo no undo.
+- **Encaixe** nas vizinhas ligado e **grade angular** opcional (5°), ambos em ângulos; gruda dentro de ~1,5°,
+  desgruda ao continuar arrastando, `Shift` desliga. Guias aparecem só durante o arraste.
+- **Curvatura (10.2):** a distância da curvatura é o raio horizontal no Cilindro, então curvatura 100% coincide com o cilindro.
+- **Domínio:** telas guardam `Placement` (azimute, elevação, distância ou pose livre); a pose é calculada por
+  `surface.ToPose(placement)`, função pura. O cursor espacial (10.6) usa o mesmo centro e a mesma "frente".
 
 ## 11. Orçamento de performance (Definition of Done técnica)
 
@@ -806,6 +836,7 @@ Objetivo: **provar o caminho de vídeo e medir latência** antes de qualquer UI.
 - "Recriar com outra resolução" (seção 10.4). Modo "captura por janela" como alternativa.
 - N `StreamPipeline`s no host e N decoders/layers no headset.
 - **Tela curva** (seção 10.2): curvatura 0–100%, presets, `CylinderLayerPolicy` com crossfade, e **medição** da troca de dono da layer cilíndrica (decide entre "curva em foco" e "curva principal fixa").
+- **Superfície de layout (10.12), primeiro item da parte de manipulação:** domínio (`LayoutSurface`, `Placement`, `ToPose`, comandos, `CylinderMath`, `SurfaceSnapper`, migração de `MoveScreen(Pose)`), recentrar (atalho e evento do sistema), alinhar à postura, guias durante o arraste.
 - Mover livre + resize **proporcional** (zoom sem mudar resolução) e curvatura já pelo `ScreenManipulationController` + Commands. Nesta fase a entrada provisória é o **controle/mãos** (Interaction SDK, rápido de ligar); o caminho principal, o **mouse**, entra na Fase 3, porque depende do hook e do `SpatialMap` do host.
 - Undo/redo.
 - **Frame rate manual por tela** (modos Auto/Fixed/Video/Eco no menu de contexto), já com o `BandwidthBudget` básico.
@@ -813,6 +844,7 @@ Objetivo: **provar o caminho de vídeo e medir latência** antes de qualquer UI.
 
 ### Fase 3: Mouse e teclado em primeiro lugar (pilar C, seção 10)
 - **Janela destacada:** `WindowDetacher` + monitor virtual dedicado, reanexar, fallback de "bastidores".
+- **Superfície de layout pelo mouse:** arrastar/roda/`Alt` sobre Cilindro/Esfera, atalhos `Ctrl+Alt+L/R/T/G` e controles no menu do app; o `SpatialMap` usa o centro e a "frente" da superfície.
 - **Cursor espacial:** `SpatialMap` + raycast angular (com a bateria de testes primeiro), Raw Input + hook, histerese, vão/parede, plano B com `SetDisplayConfig`.
 - **Cursor local** desenhado no headset (`CursorStreamer`), com captura sem cursor.
 - **Mouse-first (seção 10.10):** hit-test de moldura/espaço livre no `SpatialMap`, `ManipulationInterceptor`, moldura com as ações da tabela, tecla modificadora, cursor 3D livre, menu do app pelo mouse, `MouseManipulationAdapter`. O seletor de monitor e a edição da zona passam a funcionar pelo mouse.
@@ -945,6 +977,7 @@ Fontes: [IddCxMonitorUpdateModes (Microsoft Learn)](https://learn.microsoft.com/
 | D9 | **Escopo do MVP = 3 pilares** (seção 4). Todo o resto vai pro backlog | — |
 | D10 | **Mouse-first:** mouse (moldura + tecla modificadora + cursor 3D livre) é a forma principal de manipular as telas e operar a UI. Mãos são alternativa, gerando os mesmos Commands | Testes de integração e de uso da Fase 3 |
 | D11 | **Telas curvas:** curvatura horizontal ajustável 0–100% por tela (atalho, mouse, menu, mãos); a única layer cilíndrica vai pra tela curva em foco; curvatura nunca muda resolução | Medição na Fase 2 |
+| D12 | **Superfície de layout Cilindro/Esfera** por perfil (padrão Cilindro), centro fixo ao recentrar, telas soltas como exceção, encaixe que sempre desgruda (ADR 0005, seção 10.12) | Testes de domínio na Fase 2; uso real na Fase 3 |
 
 Se uma validação pendente falhar, a decisão é revista **com ADR**, e o escopo só muda seguindo a regra do topo do documento.
 

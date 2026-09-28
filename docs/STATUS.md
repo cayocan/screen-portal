@@ -15,7 +15,9 @@ Brief: [brief.md](brief.md) v1.3.1 (ADRs 0002 e 0003).
 | 5 | Keyboard Tracking + Passthrough Window | ❌ teclado não reconhecido → **ADR 0003: zona desenhada pelo usuário** |
 
 ADRs: [0000](adr/0000-unity-project-at-repo-root.md) Unity na raiz · [0001](adr/0001-hybrid-unity-native-video-path.md) caminho de vídeo (aceito) ·
-[0002](adr/0002-app-refresh-rate-72hz.md) 72 Hz · [0003](adr/0003-passthrough-zone-user-defined.md) zona manual.
+[0002](adr/0002-app-refresh-rate-72hz.md) 72 Hz · [0003](adr/0003-passthrough-zone-user-defined.md) zona manual ·
+[0004](adr/0004-immutable-workspace-and-shared-nunit-tests.md) workspace imutável + testes compartilhados ·
+[0005](adr/0005-layout-surface-cylinder-sphere.md) superfície Cilindro/Esfera.
 
 ## Ferramentas
 - `dotnet test tests-dotnet/UnityPureCode.Tests` — testes de Domain/Application sem o Editor (segundos).
@@ -35,3 +37,9 @@ ADRs: [0000](adr/0000-unity-project-at-repo-root.md) Unity na raiz · [0001](adr
   ScreenViewSynchronizer, VContainer 1.19.0 + cena `Main` com views OVROverlay. **75 testes** passando no
   `dotnet test` e no Test Runner da Unity. Plano: [plans/2026-09-28-fase1a-esqueleto-dominio.md](plans/2026-09-28-fase1a-esqueleto-dominio.md) · [ADR 0004](adr/0004-immutable-workspace-and-shared-nunit-tests.md).
 - **1B (próximo):** schemas FlatBuffers do canal de controle, handshake versionado, state machine de conexão, mDNS.
+
+## Decidido e documentado, para fases futuras
+- **Superfície de layout Cilindro/Esfera** ([ADR 0005](adr/0005-layout-surface-cylinder-sphere.md), brief §10.12,
+  [spec](specs/2026-09-28-superficie-layout-design.md)): domínio no início da manipulação da **Fase 2**; mouse, atalhos
+  e `SpatialMap` na **Fase 3**. Não altera a ordem do roadmap.
+- **Princípio "Liberdade"** registrado no brief e no CLAUDE.md.
