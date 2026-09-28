@@ -1,0 +1,51 @@
+# ---------- Unity (projeto na raiz, ver docs/adr/0000) ----------
+/[Ll]ibrary/
+/[Tt]emp/
+/[Oo]bj/
+/[Bb]uild/
+/[Bb]uilds/
+/[Ll]ogs/
+/[Uu]ser[Ss]ettings/
+/[Mm]emoryCaptures/
+/[Rr]ecordings/
+/Assets/Plugins/Editor/JetBrains*
+/Assets/AssetStoreTools*
+*.pidb.meta
+*.pdb.meta
+*.mdb.meta
+sysinfo.txt
+crashlytics-build.properties
+*.apk
+*.aab
+*.unitypackage
+
+# Arquivos gerados pela Unity na raiz (IDE)
+/*.csproj
+/*.sln
+/*.slnx
+/*.user
+/*.userprefs
+/.vs/
+/.idea/
+
+# ---------- .NET host ----------
+host/**/bin/
+host/**/obj/
+host/**/TestResults/
+*.suo
+
+# ---------- Android / headset-native ----------
+headset-native/**/build/
+headset-native/.gradle/
+headset-native/.cxx/
+headset-native/**/.cxx/
+headset-native/local.properties
+headset-native/.idea/
+
+# ---------- Geral ----------
+.DS_Store
+Thumbs.db
+*.swp
+*.h264
+*.log
+/tools/**/out/

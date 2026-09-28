@@ -1,0 +1,27 @@
+* text=auto
+
+# Unity YAML: merge como texto, sem normalizar para não quebrar GUIDs
+*.unity    text eol=lf
+*.prefab   text eol=lf
+*.asset    text eol=lf
+*.meta     text eol=lf
+*.mat      text eol=lf
+*.asmdef   text eol=lf
+
+*.cs       text diff=csharp
+*.kt       text
+*.cpp      text
+*.h        text
+*.fbs      text
+*.md       text
+*.sh       text eol=lf
+gradlew    text eol=lf
+*.bat      text eol=crlf
+
+*.png  binary
+*.jpg  binary
+*.dll  binary
+*.so   binary
+*.aar  binary
+*.jar  binary
+*.fbx  binary
