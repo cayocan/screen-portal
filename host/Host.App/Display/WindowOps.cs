@@ -27,8 +27,15 @@ public static class WindowOps
         return new RectI(r.Left, r.Top, r.Right - r.Left, r.Bottom - r.Top);
     }
 
-    public static void Move(IntPtr hwnd, RectI rect) =>
+    /// <summary>
+    /// Duas chamadas: se o destino tem outro DPI, a primeira dispara WM_DPICHANGED e a janela se redimensiona sozinha;
+    /// a segunda aplica o retângulo exato.
+    /// </summary>
+    public static void Move(IntPtr hwnd, RectI rect)
+    {
         SetWindowPos(hwnd, IntPtr.Zero, rect.X, rect.Y, rect.Width, rect.Height, SwpNoZOrder | SwpNoActivate);
+        SetWindowPos(hwnd, IntPtr.Zero, rect.X, rect.Y, rect.Width, rect.Height, SwpNoZOrder | SwpNoActivate);
+    }
 
     public static IntPtr MonitorOf(IntPtr hwnd) => MonitorFromWindow(hwnd, MonitorDefaultToNull);
 

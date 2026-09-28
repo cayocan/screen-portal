@@ -33,6 +33,14 @@ public static class Win32Displays
         return result;
     }
 
+    /// <summary>
+    /// Estado atual de um display. HMONITOR muda a cada mudança de topologia (criar/remover outro monitor), então
+    /// quem vai capturar resolve o handle na hora, nunca usa o guardado na criação.
+    /// </summary>
+    public static DisplayInfo Current(string deviceName) =>
+        Snapshot().FirstOrDefault(d => d.DeviceName.Equals(deviceName, StringComparison.OrdinalIgnoreCase))
+        ?? throw new InvalidOperationException($"{deviceName} não está ativo no desktop.");
+
     /// <summary>Troca o modo de um monitor (usado só pelo VDD, que não cria monitor com resolução definida).</summary>
     public static bool SetMode(string deviceName, int width, int height, int refresh)
     {

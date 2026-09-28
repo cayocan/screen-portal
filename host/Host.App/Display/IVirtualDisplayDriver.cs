@@ -23,7 +23,7 @@ internal static class DisplayWait
         var sw = Stopwatch.StartNew();
         while (sw.Elapsed < timeout)
         {
-            var added = Win32Displays.Snapshot().FirstOrDefault(d => !known.Contains(d.DeviceName));
+            var added = Win32Displays.Snapshot().FirstOrDefault(d => !known.Contains(d.DeviceName) && d.HMonitor != IntPtr.Zero);
             if (added != null) return added;
             Thread.Sleep(100);
         }

@@ -13,6 +13,8 @@ using ScreenPortal.Host.Transport;
 //   Host.App stream  --target <ip> [--port 9000] [--streams 1] [--fps 60] [--bitrate 20000]
 //                    [--width W --height H] [--cursor] [--dump out.h264] [--seconds N]
 //   Host.App receive [--port 9000] [--out out.h264] [--seconds N]
+//
+// Fase 2A: ScreenPortalHost display-spike --driver sudovda|vdd [--out relatorio.md]
 
 Console.OutputEncoding = System.Text.Encoding.UTF8;
 var opts = Args.Parse(args);
@@ -27,6 +29,7 @@ switch (opts.Command)
     case "serve": return RunServe(opts, cts.Token);
     case "stream": return RunStream(opts, cts.Token);
     case "receive": return RunReceive(opts, cts.Token);
+    case "display-spike": return RunDisplaySpike(opts);
     default:
         Console.Error.WriteLine("Uso: Host.App [serve] | stream --target <ip> [...] | receive [...]");
         return 2;
@@ -75,6 +78,22 @@ static int RunServe(Args o, CancellationToken ct)
         sw.Restart();
         if (server.ConnectionCount > 0) Log(streams.TakeStats(s));
     }
+    return 0;
+}
+
+static int RunDisplaySpike(Args o)
+{
+    static void Log(string message) => Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] {message}");
+    string driverName = o.Str("driver", "sudovda").ToLowerInvariant();
+    using var gpu = new GpuDevice();
+    using ScreenPortal.Host.App.Display.IVirtualDisplayDriver driver = driverName == "vdd"
+        ? ScreenPortal.Host.App.Display.VddDriver.Open(Log)
+        : ScreenPortal.Host.App.Display.SudoVdaDriver.Open(Log);
+    string report = ScreenPortal.Host.App.Display.DisplaySpike.Run(driver, gpu, Log, o.Int("only", 0));
+    string outPath = o.Str("out", Path.Combine("docs", "measurements", $"fase2a-driver-{driverName}.md"));
+    File.WriteAllText(outPath, report);
+    Console.WriteLine(report);
+    Log($"relatório: {outPath}");
     return 0;
 }
 
