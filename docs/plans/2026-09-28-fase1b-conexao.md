@@ -3401,8 +3401,20 @@ public sealed class MdnsAdvertiser(Action<string> log) : IDisposable
         if (result != DnsRequestPending) throw new InvalidOperationException($"DnsServiceRegister retornou {result}.");
     }
 
+    /// <summary>
+    /// IP da interface que o Windows usa na rota padrão. "Conectar" um socket UDP não envia pacote algum, só
+    /// escolhe a rota. Evita anunciar o IP de adaptadores de VPN (ex.: Radmin 26.x) que também têm gateway.
+    /// </summary>
     private static IPAddress GetPrimaryIPv4()
     {
+        try
+        {
+            using var probe = new Socket(AddressFamily.InterNetwork, SocketType.Dgram, ProtocolType.Udp);
+            probe.Connect(new IPEndPoint(IPAddress.Parse("8.8.8.8"), 53));
+            if (probe.LocalEndPoint is IPEndPoint local && !IPAddress.IsLoopback(local.Address)) return local.Address;
+        }
+        catch (SocketException) { /* sem rota padrão (rede isolada): cai na busca por interface */ }
+
         foreach (var nic in NetworkInterface.GetAllNetworkInterfaces())
         {
             if (nic.OperationalStatus != OperationalStatus.Up) continue;

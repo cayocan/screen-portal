@@ -29,7 +29,7 @@ public sealed class StreamPipeline : ICaptureFrameSink, IEncodedFrameSink, IDisp
     public string Description { get; }
 
     public StreamPipeline(GpuDevice gpu, ICaptureSource capture, EncoderSettings settings,
-        System.Net.IPEndPoint target, int streamCount, string? dumpPath)
+        System.Net.IPEndPoint target, int streamCount, string? dumpPath, ushort firstStreamId = 0)
     {
         _capture = capture;
         _converter = new Nv12Converter(gpu.Device, gpu.Context, capture.Width, capture.Height, settings.Width, settings.Height);
@@ -40,7 +40,7 @@ public sealed class StreamPipeline : ICaptureFrameSink, IEncodedFrameSink, IDisp
         _senders = new UdpVideoSender[streamCount];
         for (int i = 0; i < streamCount; i++)
         {
-            _packetizers[i] = new VideoPacketizer((ushort)i);
+            _packetizers[i] = new VideoPacketizer((ushort)(firstStreamId + i));
             _senders[i] = new UdpVideoSender(new System.Net.IPEndPoint(target.Address, target.Port + i));
         }
         if (dumpPath is not null) _dump = File.Create(dumpPath);
@@ -51,6 +51,9 @@ public sealed class StreamPipeline : ICaptureFrameSink, IEncodedFrameSink, IDisp
     }
 
     public void Start() => _capture.Start(this);
+
+    /// <summary>Reconexão: o decoder do headset precisa de um IDR para voltar a mostrar imagem.</summary>
+    public void RequestKeyframe() => _encoder.RequestKeyframe();
 
     public void OnFrame(Vortice.Direct3D11.ID3D11Texture2D bgraTexture, int width, int height, ulong captureTimeUs)
     {
