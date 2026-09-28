@@ -51,6 +51,47 @@ namespace ScreenPortal.Spikes.Phase0.Editor
             PlayerSettings.Android.forceInternetPermission = true;
         }
 
+        public const string ApkPath = "Builds/Phase0.apk";
+
+        /// <summary>
+        /// Agenda o build (retorna na hora, para não bloquear chamadas de MCP/CLI) e loga
+        /// "[ScreenPortal] BUILD RESULT: ..." no Editor.log ao terminar.
+        /// </summary>
+        [MenuItem("Screen Portal/Phase 0/Build APK (async)")]
+        public static void BuildApkAsync()
+        {
+            EditorApplication.delayCall += () => BuildApkNow();
+            Debug.Log("[ScreenPortal] BUILD SCHEDULED");
+        }
+
+        /// <summary>Build síncrono do APK. Sempre loga e devolve a linha "BUILD RESULT".</summary>
+        public static string BuildApkNow()
+        {
+            Directory.CreateDirectory("Builds");
+            var options = new BuildPlayerOptions
+            {
+                scenes = System.Array.ConvertAll(EditorBuildSettings.scenes, s => s.path),
+                locationPathName = ApkPath,
+                target = BuildTarget.Android,
+                targetGroup = BuildTargetGroup.Android,
+                options = BuildOptions.None,
+            };
+            string result;
+            try
+            {
+                var summary = BuildPipeline.BuildPlayer(options).summary;
+                result = $"BUILD RESULT: {summary.result} | {summary.totalErrors} erros | " +
+                         $"{summary.totalSize / (1024 * 1024)} MB | {summary.totalTime.TotalSeconds:F0} s | {ApkPath}";
+            }
+            catch (System.Exception e)
+            {
+                // Garante a linha de resultado mesmo quando o Gradle/IL2CPP lança exceção.
+                result = "BUILD RESULT: Exception | " + e.GetType().Name + ": " + e.Message;
+            }
+            Debug.Log("[ScreenPortal] " + result);
+            return result;
+        }
+
         [MenuItem("Screen Portal/Phase 0/Boot scene: Video")]
         public static void BootVideo() => SetBootScene(VideoScenePath);
 

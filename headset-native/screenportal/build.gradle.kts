@@ -4,7 +4,9 @@ plugins {
 
 android {
     namespace = "com.screenportal.video"
-    compileSdk = 36
+    // Igual ao compileSdk que a Unity usa no unityLibrary (android-34); maior que isso quebra o
+    // CheckAarMetadata do build da Unity.
+    compileSdk = 34
     // Mesma NDK que a Unity 6000.3.19f1 embarca (PlaybackEngines/AndroidPlayer/NDK).
     ndkVersion = "27.2.12479018"
     // tools/build-native.ps1 passa -PspNdkPath=<NDK da Unity>; sem ele, o AGP procura no SDK.
