@@ -211,6 +211,7 @@ namespace ScreenPortal.App.Connection
                     {
                         _pairing.SaveToken(_host.Name, result.PairingToken);
                         _awaitingPairing = false;
+                        _stateSince = now; // o timeout da negociação recomeça: o tempo do usuário decidindo não conta
                         SetStatus(new ConnectionStatus(ConnectionStatusKind.Connecting, _host.Name));
                     }
                     else

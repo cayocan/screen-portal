@@ -62,6 +62,33 @@ namespace ScreenPortal.Tests
             Assert.That(r.Pairing.Tokens["CAYO-PC"], Is.EqualTo("novo"));
         }
 
+        /// <summary>
+        /// Regressão (Quest, 28/09/2026): o usuário levou ~7 s para clicar em Permitir; o Welcome chegou num frame
+        /// depois do PairingResult e o timeout de negociação (contado desde o Hello) derrubou a conexão.
+        /// </summary>
+        [Test]
+        public void SlowPairingApproval_DoesNotTimeOutBeforeWelcome()
+        {
+            var r = new ConnectionRig();
+            r.Machine.Start();
+            r.Discovery.Host = ConnectionRig.Pc;
+            r.Machine.Tick();
+            r.Channel.Push(ChannelEventKind.Connected);
+            r.Channel.Push(ChannelEventKind.Message, new PairingRequiredMessage("245993"));
+            r.Machine.Tick();
+            r.Advance(7);
+
+            r.Channel.Push(ChannelEventKind.Message, new PairingResultMessage(true, "tok"));
+            r.Advance(0.1);          // Welcome ainda não chegou
+            Assert.That(r.Machine.State, Is.EqualTo(ConnectionState.Negotiating));
+            Assert.That(r.Channel.Closes, Is.EqualTo(0));
+
+            r.Channel.Push(ChannelEventKind.Message, ConnectionRig.Welcome);
+            r.Channel.Push(ChannelEventKind.Message, new StreamStartedMessage(0, 2560, 1080));
+            r.Machine.Tick();
+            Assert.That(r.Machine.State, Is.EqualTo(ConnectionState.Streaming));
+        }
+
         [Test]
         public void Welcome_CreatesScreenForPrimaryMonitor_AndRequestsStream()
         {
