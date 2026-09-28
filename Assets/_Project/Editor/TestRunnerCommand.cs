@@ -6,7 +6,7 @@ using UnityEngine;
 
 namespace ScreenPortal.Editor
 {
-    /// <summary>Comando "test-editmode": roda ScreenPortal.Tests.EditMode pelo Test Runner da Unity.</summary>
+    /// <summary>Comando "test-editmode": roda os testes EditMode (domínio + composição) pelo Test Runner da Unity.</summary>
     internal static class TestRunnerCommand
     {
         [InitializeOnLoadMethod]
@@ -19,7 +19,7 @@ namespace ScreenPortal.Editor
             api.Execute(new ExecutionSettings(new Filter
             {
                 testMode = TestMode.EditMode,
-                assemblyNames = new[] { "ScreenPortal.Tests.EditMode" },
+                assemblyNames = new[] { "ScreenPortal.Tests.EditMode", "ScreenPortal.Tests.Composition" },
             }));
         }
 
