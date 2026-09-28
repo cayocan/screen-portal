@@ -43,6 +43,19 @@ ADRs: [0000](adr/0000-unity-project-at-repo-root.md) Unity na raiz · [0001](adr
   [plano](plans/2026-09-28-fase1b-conexao.md) · [ADR 0006](adr/0006-control-protocol-pairing-mdns.md) ·
   [verificação](measurements/fase1b-conexao.md).
 
+## Fase 2 — subprojetos (aprovado em 28/09/2026)
+Cada um com spec → plano → implementação → verificação. Ordem: **2A + 2B** → 2C → 2D/2E → 2F/2G.
+
+| # | Subprojeto | Onde se testa | Depende de | Estado |
+|---|---|---|---|---|
+| 2A | Spikes: driver de monitor virtual (VDD) + capacidade do decoder | PC (admin) + Quest | — | ⏳ |
+| 2B | Superfície de layout Cilindro/Esfera + manipulação (controle/mãos) + undo | Meta XR Simulator | — | ⏳ |
+| 2C | Várias telas: monitores virtuais sob comando do headset, N streams | PC + Quest | 2A | — |
+| 2D | Seletor "Novo monitor" + contorno fantasma + recriar | Simulator + Quest | 2B, 2C | — |
+| 2E | Telas curvas (CylinderLayerPolicy, crossfade, medição) | Simulator + Quest | 2B, 2C | — |
+| 2F | Frame rate por tela + BandwidthBudget | testes + Quest | 2A, 2C | — |
+| 2G | Áudio do PC (WASAPI → Opus) | PC + Quest | — | — |
+
 ## Decidido e documentado, para fases futuras
 - **Superfície de layout Cilindro/Esfera** ([ADR 0005](adr/0005-layout-surface-cylinder-sphere.md), brief §10.12,
   [spec](specs/2026-09-28-superficie-layout-design.md)): domínio no início da manipulação da **Fase 2**; mouse, atalhos
