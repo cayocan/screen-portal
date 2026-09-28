@@ -850,7 +850,7 @@ git commit -m "phase1b: control protocol v1 (FlatBuffers 25.2.10), shared codec 
   - `enum ConnectionStatusKind { Idle, Searching, InstallHost, Connecting, ConfirmOnPc, Connected, Unstable, Reconnecting, Rejected, IncompatibleVersion, HostShutdown }`
   - `readonly struct ConnectionStatus(ConnectionStatusKind kind, string hostName = "", string pairingCode = "")` com igualdade por valor.
   - `sealed class ConnectionOptions` (propriedades com os tempos da Global Constraints).
-  - `ConnectionStatusText.Format(ConnectionStatus) → string`, `const string HostDownloadUrl`.
+  - `ConnectionStatusText.Format(ConnectionStatus) → string`, `const string HostInstallHint`.
 
 - [ ] **Step 1: Escrever os testes que falham**
 
@@ -909,9 +909,9 @@ namespace ScreenPortal.Tests
         }
 
         [Test]
-        public void InstallHost_MentionsDownloadUrl() =>
+        public void InstallHost_TellsWhatToDo() =>
             Assert.That(ConnectionStatusText.Format(new ConnectionStatus(ConnectionStatusKind.InstallHost)),
-                Does.Contain(ConnectionStatusText.HostDownloadUrl));
+                Does.Contain(ConnectionStatusText.HostInstallHint));
 
         [Test]
         public void HostEndpoint_RoundTripsThroughString()
@@ -1152,7 +1152,8 @@ namespace ScreenPortal.App.Connection
     /// <summary>Textos pt-BR do status da conexão (brief §1.1). Localização fica para depois do MVP.</summary>
     public static class ConnectionStatusText
     {
-        public const string HostDownloadUrl = "github.com/cayoaguiar/screen-portal";
+        /// <summary>Instrução até existir instalador + link/QR code (Fase 5, brief §1.1).</summary>
+        public const string HostInstallHint = "Abra o ScreenPortalHost.exe no seu PC\n(mesma rede Wi-Fi do Quest).";
 
         public static string Format(ConnectionStatus status)
         {
@@ -1162,7 +1163,7 @@ namespace ScreenPortal.App.Connection
                 case ConnectionStatusKind.Idle: return "";
                 case ConnectionStatusKind.Searching: return "Procurando seu PC…";
                 case ConnectionStatusKind.InstallHost:
-                    return "Não encontramos seu PC.\nInstale e abra o Screen Portal no Windows:\n" + HostDownloadUrl;
+                    return "Não encontramos seu PC.\n" + HostInstallHint;
                 case ConnectionStatusKind.Connecting: return "Conectando a " + pc + "…";
                 case ConnectionStatusKind.ConfirmOnPc: return "Confirme no PC:\ncódigo " + Group(status.PairingCode);
                 case ConnectionStatusKind.Connected: return "Conectado a " + pc;
