@@ -1,0 +1,18 @@
+{
+    "name": "ScreenPortal.Presentation",
+    "rootNamespace": "ScreenPortal.Presentation",
+    "references": [
+        "ScreenPortal.Domain",
+        "ScreenPortal.Application",
+        "Oculus.VR"
+    ],
+    "includePlatforms": [],
+    "excludePlatforms": [],
+    "allowUnsafeCode": false,
+    "overrideReferences": false,
+    "precompiledReferences": [],
+    "autoReferenced": false,
+    "defineConstraints": [],
+    "versionDefines": [],
+    "noEngineReferences": false
+}

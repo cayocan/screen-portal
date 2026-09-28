@@ -1,0 +1,19 @@
+{
+    "name": "ScreenPortal.Composition",
+    "rootNamespace": "ScreenPortal.Composition",
+    "references": [
+        "ScreenPortal.Domain",
+        "ScreenPortal.Application",
+        "ScreenPortal.Presentation",
+        "VContainer"
+    ],
+    "includePlatforms": [],
+    "excludePlatforms": [],
+    "allowUnsafeCode": false,
+    "overrideReferences": false,
+    "precompiledReferences": [],
+    "autoReferenced": false,
+    "defineConstraints": [],
+    "versionDefines": [],
+    "noEngineReferences": false
+}

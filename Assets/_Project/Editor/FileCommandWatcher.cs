@@ -19,10 +19,17 @@ namespace ScreenPortal.Editor
         {
             Directory.CreateDirectory(Dir);
             EditorApplication.update += Poll;
-            EditorCommands.Register("refresh", () =>
+            // Chamados direto (delayCall não é bombeado com o Editor em segundo plano). O .done é escrito
+            // antes porque o refresh/resolve pode recarregar o domínio e perder o callback.
+            EditorCommands.RegisterAsync("refresh", done =>
             {
-                EditorApplication.delayCall += () => AssetDatabase.Refresh(ImportAssetOptions.ForceUpdate);
-                return "OK (refresh agendado; veja 'Reloading assemblies' no Editor.log)";
+                done("OK (refresh solicitado; veja 'Reloading assemblies' no Editor.log)");
+                AssetDatabase.Refresh(ImportAssetOptions.ForceUpdate);
+            });
+            EditorCommands.RegisterAsync("resolve-packages", done =>
+            {
+                done("OK (Package Manager relendo o manifest.json; veja o Editor.log)");
+                UnityEditor.PackageManager.Client.Resolve();
             });
         }
 

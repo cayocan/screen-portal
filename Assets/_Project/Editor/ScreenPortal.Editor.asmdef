@@ -3,7 +3,10 @@
     "rootNamespace": "ScreenPortal.Editor",
     "references": [
         "UnityEditor.TestRunner",
-        "UnityEngine.TestRunner"
+        "UnityEngine.TestRunner",
+        "ScreenPortal.Composition",
+        "VContainer",
+        "Oculus.VR"
     ],
     "includePlatforms": ["Editor"],
     "excludePlatforms": [],
