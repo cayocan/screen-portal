@@ -49,7 +49,13 @@ O projeto Unity fica **na raiz** do repositório (não em `headset-unity/`). Ond
 | ffmpeg/ffprobe | chocolatey (só para verificação de streams no PC) |
 | GPU do PC de dev | AMD Radeon RX 5500 XT → encoder **AMF** (H.264 via MFT de hardware) |
 
-Comandos: `tools/build-host.ps1`, `tools/build-native.ps1`, `tools/receive-test.ps1` (ver cabeçalho de cada um).
+Comandos (ver cabeçalho de cada script):
+- Testes rápidos (Domain/Application, sem Editor): `dotnet test tests-dotnet/UnityPureCode.Tests`
+- Unity sem MCP: `tools/unity-cmd.ps1 -Command refresh|resolve-packages|test-editmode|build-main-scene|boot-main|build-apk|…`
+  (se o assembly `ScreenPortal.Editor` não compilar, o gatilho trava na versão antiga: focar a janela da Unity)
+- Host: `tools/host-loopback-test.ps1` · `.aar`: `tools/build-native.ps1` · vídeo no Quest: `tools/phase0-streams-test.ps1`
+- Namespace da camada Application é `ScreenPortal.App` (ADR 0004). Em Presentation, `Resolution` precisa de alias
+  (`UnityEngine.Resolution` também existe).
 
 ---
 

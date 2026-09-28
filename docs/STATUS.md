@@ -1,6 +1,6 @@
 # Status do projeto
 
-**Fase atual:** Fase 0 concluída (28/09/2026) → próxima: **Fase 1 — esqueleto limpo**.
+**Fase atual:** Fase 1 — 1A concluída (28/09/2026), próxima: **1B (protocolo e conexão)**.
 Brief: [brief.md](brief.md) v1.3.1 (ADRs 0002 e 0003).
 
 ## Fase 0 — resultado
@@ -18,7 +18,8 @@ ADRs: [0000](adr/0000-unity-project-at-repo-root.md) Unity na raiz · [0001](adr
 [0002](adr/0002-app-refresh-rate-72hz.md) 72 Hz · [0003](adr/0003-passthrough-zone-user-defined.md) zona manual.
 
 ## Ferramentas
-- `tools/unity-cmd.ps1 -Command build-apk|build-scenes|boot-video|boot-passthrough|refresh` — automação do Editor sem MCP.
+- `dotnet test tests-dotnet/UnityPureCode.Tests` — testes de Domain/Application sem o Editor (segundos).
+- `tools/unity-cmd.ps1 -Command refresh|resolve-packages|test-editmode|build-main-scene|boot-main|build-apk|…` — automação do Editor sem MCP.
 - `tools/phase0-streams-test.ps1 -Streams N [-Fps] [-AppExtras]` — teste de vídeo de ponta a ponta no Quest.
 - `tools/host-loopback-test.ps1` — host sem headset. `tools/build-native.ps1` — recompila o `.aar`.
 
@@ -28,7 +29,9 @@ ADRs: [0000](adr/0000-unity-project-at-repo-root.md) Unity na raiz · [0001](adr
 - **Fase 4a:** validar o shader de Passthrough Window com a zona manual e a oclusão overlay × janela.
 - Remover MRUK / `sceneSupport = Required` quando a cena de spike deixar de ser usada (ADR 0003).
 
-## Próximo: Fase 1
-Esqueleto limpo: asmdefs Domain/Application/Presentation/Infrastructure/Composition, VContainer,
-CommandBus + WorkspaceStore com testes, schemas FlatBuffers do canal de controle, handshake versionado,
-state machine de conexão, descoberta mDNS.
+## Fase 1 (branch `phase1/skeleton`)
+- **1A (esqueleto + domínio):** ✅ asmdefs Domain/Application/Presentation/Composition/Editor, Workspace imutável,
+  9 Commands com invariantes testados, WorkspaceStore (undo/redo), CommandBus + CommandJournal,
+  ScreenViewSynchronizer, VContainer 1.19.0 + cena `Main` com views OVROverlay. **75 testes** passando no
+  `dotnet test` e no Test Runner da Unity. Plano: [plans/2026-09-28-fase1a-esqueleto-dominio.md](plans/2026-09-28-fase1a-esqueleto-dominio.md) · [ADR 0004](adr/0004-immutable-workspace-and-shared-nunit-tests.md).
+- **1B (próximo):** schemas FlatBuffers do canal de controle, handshake versionado, state machine de conexão, mDNS.
