@@ -1,7 +1,7 @@
 ﻿# Dispara um comando no Unity Editor aberto via gatilho por arquivo (FileCommandWatcher.cs) e espera
 # o resultado, com timeout. Não usa MCP (que trava quando o Editor abre diálogos modais).
 #   powershell -ExecutionPolicy Bypass -File tools/unity-cmd.ps1 -Command build-apk [-TimeoutMinutes 40]
-# Comandos: refresh, build-scenes, boot-video, boot-passthrough, build-apk
+# Comandos: refresh, test-editmode, build-main-scene, boot-main, build-scenes, boot-video, boot-passthrough, build-apk
 param([Parameter(Mandatory)][string]$Command, [int]$TimeoutMinutes = 5)
 
 $root = Split-Path $PSScriptRoot -Parent

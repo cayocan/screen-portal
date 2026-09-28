@@ -240,13 +240,18 @@ namespace ScreenPortal.Spikes.Phase0.Editor
 
         private static void SetBootScene(string first)
         {
-            string other = first == VideoScenePath ? PassthroughScenePath : VideoScenePath;
-            EditorBuildSettings.scenes = new[]
-            {
-                new EditorBuildSettingsScene(first, true),
-                new EditorBuildSettingsScene(other, true),
-            };
-            Debug.Log("[ScreenPortal] Cena inicial do build: " + Path.GetFileNameWithoutExtension(first));
+            // Garante que as duas cenas do spike estejam no build e põe a escolhida em primeiro.
+            ScreenPortal.Editor.BuildScenes.SetFirst(first == VideoScenePath ? PassthroughScenePath : VideoScenePath);
+            ScreenPortal.Editor.BuildScenes.SetFirst(first);
+        }
+
+        [InitializeOnLoadMethod]
+        private static void RegisterFileCommands()
+        {
+            ScreenPortal.Editor.EditorCommands.Register("build-scenes", () => { BuildAll(); return "OK"; });
+            ScreenPortal.Editor.EditorCommands.Register("boot-video", () => { BootVideo(); return "OK"; });
+            ScreenPortal.Editor.EditorCommands.Register("boot-passthrough", () => { BootPassthrough(); return "OK"; });
+            ScreenPortal.Editor.EditorCommands.Register("build-apk", BuildApkNow);
         }
 
         private static void EnsureFolders()

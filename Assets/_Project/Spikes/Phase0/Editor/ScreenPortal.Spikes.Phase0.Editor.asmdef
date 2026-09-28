@@ -3,6 +3,7 @@
     "rootNamespace": "ScreenPortal.Spikes.Phase0.Editor",
     "references": [
         "ScreenPortal.Spikes.Phase0",
+        "ScreenPortal.Editor",
         "Oculus.VR",
         "Oculus.VR.Editor",
         "meta.xr.mrutilitykit"
