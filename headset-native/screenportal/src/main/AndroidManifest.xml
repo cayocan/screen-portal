@@ -5,4 +5,6 @@
     <uses-permission android:name="android.permission.ACCESS_WIFI_STATE" />
     <!-- Mantém o Wi-Fi em modo de baixa latência enquanto o stream roda (Fase 1+). -->
     <uses-permission android:name="android.permission.WAKE_LOCK" />
+    <!-- mDNS (NsdManager) precisa do multicast lock do Wi-Fi (Fase 1B). -->
+    <uses-permission android:name="android.permission.CHANGE_WIFI_MULTICAST_STATE" />
 </manifest>

@@ -3554,6 +3554,11 @@ git commit -m "phase1b(host): serve command — per-headset stream registry, mon
 
 ### Task 8: Headset `.aar` — descoberta NSD
 
+> **Desvio registrado na execução (28/09/2026):** a versão Kotlin abaixo gerou referências a `kotlin/jvm/internal/Intrinsics`,
+> `kotlin/text/StringsKt` e `kotlin/Unit` (casts, `startsWith`, `synchronized`), que quebrariam em runtime sem a kotlin-stdlib.
+> Implementado em **Java** com o mesmo comportamento: `headset-native/screenportal/src/main/java/com/screenportal/video/HostDiscovery.java`
+> (varredura do `classes.jar`: zero referências `kotlin/`). Regra no ADR 0006: classes do `.aar` com lógica vão em Java.
+
 **Files:**
 - Create: `headset-native/screenportal/src/main/kotlin/com/screenportal/video/HostDiscovery.kt`
 - Modify: `headset-native/screenportal/src/main/AndroidManifest.xml`, `headset-native/screenportal/consumer-rules.pro`
