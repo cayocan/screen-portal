@@ -26,6 +26,8 @@ public sealed unsafe class WgcMonitorCapture : ICaptureSource
     private GraphicsCaptureSession? _session;
     private ICaptureFrameSink? _sink;
     private Windows.Graphics.SizeInt32 _poolSize;
+    private readonly object _frameLock = new();
+    private bool _disposed;
 
     public string Name => $"WGC monitor ({_item.DisplayName})";
     public int Width => _item.Size.Width;
@@ -91,13 +93,25 @@ public sealed unsafe class WgcMonitorCapture : ICaptureSource
 
     private void OnFrameArrived(Direct3D11CaptureFramePool pool, object _)
     {
+        // O pool é free-threaded: sem o lock, Dispose pode liberar pool/sessão no meio deste callback (0xC0000005).
+        lock (_frameLock)
+        {
+            if (_disposed) return;
+            HandleFrame(pool);
+        }
+    }
+
+    private void HandleFrame(Direct3D11CaptureFramePool pool)
+    {
         using var frame = pool.TryGetNextFrame();
         if (frame is null) return;
 
         var size = frame.ContentSize;
         if (size.Width != _poolSize.Width || size.Height != _poolSize.Height)
         {
-            // Resolução do monitor mudou: recria o pool. (Nunca acontece por ação do app — brief §10.1.)
+            // Tamanho mudou (janela redimensionada, ou monitor recém-criado cujo item.Size ainda era o antigo):
+            // recria o pool. O frame precisa ser liberado ANTES do Recreate — liberar depois é 0xC0000005.
+            frame.Dispose();
             _poolSize = size;
             pool.Recreate(_gpu.WinRtDevice, DirectXPixelFormat.B8G8R8A8UIntNormalized, 2, size);
             return;
@@ -130,12 +144,14 @@ public sealed unsafe class WgcMonitorCapture : ICaptureSource
 
     public void Dispose()
     {
-        _session?.Dispose();
-        if (_pool is not null)
+        lock (_frameLock)
         {
-            _pool.FrameArrived -= OnFrameArrived;
-            _pool.Dispose();
+            if (_disposed) return;
+            _disposed = true;
         }
+        if (_pool is not null) _pool.FrameArrived -= OnFrameArrived;
+        _session?.Dispose();
+        _pool?.Dispose();
     }
 
     private const uint MONITOR_DEFAULTTOPRIMARY = 1;
