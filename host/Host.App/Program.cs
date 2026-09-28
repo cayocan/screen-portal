@@ -12,6 +12,7 @@ using ScreenPortal.Host.Transport;
 // Ferramentas da Fase 0 (docs/phase0-runbook.md):
 //   Host.App stream  --target <ip> [--port 9000] [--streams 1] [--fps 60] [--bitrate 20000]
 //                    [--width W --height H] [--cursor] [--dump out.h264] [--seconds N]
+//                    [--mix "60x1,15x3"]   (Fase 2A: grupos <fps>x<quantidade>; substitui --fps/--streams)
 //   Host.App receive [--port 9000] [--out out.h264] [--seconds N]
 //
 // Fase 2A: ScreenPortalHost display-spike --driver sudovda|vdd [--out relatorio.md]
@@ -66,6 +67,7 @@ static int RunServe(Args o, CancellationToken ct)
             hostName, () => ScreenPortal.Host.Domain.Pairing.PairingStore.NewPairingCode(System.Security.Cryptography.RandomNumberGenerator.GetInt32), Log),
         Log);
     server.Start();
+    using var keyframes = new KeyframeRequestListener(KeyframeRequestListener.DefaultPort, streams.RequestKeyframe);
 
     using var mdns = new ScreenPortal.Host.App.Control.MdnsAdvertiser(Log);
     mdns.Start(hostName, ScreenPortal.Infrastructure.Protocol.ControlProtocol.Port, "1");
@@ -101,19 +103,41 @@ static int RunStream(Args o, CancellationToken ct)
 {
     var target = new IPEndPoint(IPAddress.Parse(o.Str("target", "127.0.0.1")), o.Int("port", 9000));
 
-    using var gpu = new GpuDevice();
-    using var capture = WgcMonitorCapture.ForPrimaryMonitor(gpu, captureCursor: o.Flag("cursor"));
-    // NV12 exige dimensões pares.
-    int width = o.Int("width", capture.Width) & ~1;
-    int height = o.Int("height", capture.Height) & ~1;
-    var settings = new EncoderSettings(width, height, o.Int("fps", 60), o.Int("bitrate", 20_000));
+    // --mix "60x1,15x3": um pipeline (captura WGC própria) por grupo de fps; stream ids e portas consecutivos.
+    var groups = o.StrOrNull("mix") is { } mix
+        ? ScreenPortal.Host.Domain.Video.MixSpec.Parse(mix)
+        : new[] { new ScreenPortal.Host.Domain.Video.MixGroup(o.Int("fps", 60), o.Int("streams", 1)) };
 
+    using var gpu = new GpuDevice();
     using var clock = new ClockSyncServer();
-    using var pipeline = new StreamPipeline(gpu, capture, settings, target, o.Int("streams", 1), o.StrOrNull("dump"));
+    var pipelines = new List<StreamPipeline>();
+    int nextStream = 0;
+    foreach (var g in groups)
+    {
+        var capture = WgcMonitorCapture.ForPrimaryMonitor(gpu, captureCursor: o.Flag("cursor"));
+        // NV12 exige dimensões pares.
+        int width = o.Int("width", capture.Width) & ~1;
+        int height = o.Int("height", capture.Height) & ~1;
+        var settings = new EncoderSettings(width, height, g.Fps, o.Int("bitrate", 20_000));
+        var groupTarget = new IPEndPoint(target.Address, target.Port + nextStream);
+        pipelines.Add(new StreamPipeline(gpu, capture, settings, groupTarget, g.Count, o.StrOrNull("dump"), (ushort)nextStream));
+        nextStream += g.Count;
+    }
+
+    using var keyframes = new KeyframeRequestListener(KeyframeRequestListener.DefaultPort, (_, streamId) =>
+    {
+        int first = 0;
+        for (int i = 0; i < groups.Count; i++)
+        {
+            if (streamId >= first && streamId < first + groups[i].Count) { pipelines[i].RequestKeyframe(); return; }
+            first += groups[i].Count;
+        }
+    });
+
     Console.WriteLine($"GPU: {gpu.AdapterName}");
-    Console.WriteLine(pipeline.Description);
-    Console.WriteLine($"clock sync: udp/{ClockSyncServer.DefaultPort}. Ctrl+C para parar.");
-    pipeline.Start();
+    foreach (var p in pipelines) Console.WriteLine(p.Description);
+    Console.WriteLine($"clock sync: udp/{ClockSyncServer.DefaultPort} · keyframe requests: udp/{KeyframeRequestListener.DefaultPort}. Ctrl+C para parar.");
+    foreach (var p in pipelines) p.Start();
     // O tempo de --seconds conta a partir do início do stream (a inicialização do MFT leva ~1-3 s).
     using var timer = CancellationTokenSource.CreateLinkedTokenSource(ct);
     if (o.Int("seconds", 0) > 0) timer.CancelAfter(TimeSpan.FromSeconds(o.Int("seconds", 0)));
@@ -124,8 +148,11 @@ static int RunStream(Args o, CancellationToken ct)
     {
         double s = sw.Elapsed.TotalSeconds;
         sw.Restart();
-        Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] {pipeline.TakeStats(s)} | clk req {Interlocked.Exchange(ref clock.Requests, 0)}");
+        long clk = Interlocked.Exchange(ref clock.Requests, 0);
+        for (int i = 0; i < pipelines.Count; i++)
+            Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] {groups[i].Fps}fps×{groups[i].Count}: {pipelines[i].TakeStats(s)} | clk req {clk}");
     }
+    foreach (var p in pipelines) p.Dispose();
     return 0;
 }
 
