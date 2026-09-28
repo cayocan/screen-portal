@@ -277,6 +277,7 @@ O projeto Unity (`headset-unity/`, criado a partir do template **Universal 3D** 
 
 ### 8.5 Ciclo de conexão: State Machine
 `Idle → Discovering → Connecting → Negotiating → Streaming ⇄ Degraded → Reconnecting → Streaming`
+Tempos (Fase 1B, ADR 0006): connect 2 s · negociação 5 s (sem timeout durante o pareamento; recomeça ao aceitar) · ping 500 ms · Degraded após 1,5 s sem Pong · Reconnecting após +3 s · reconexão ao último IP a cada 250 ms, desiste em 10 s · recusa bloqueia o host 10 s, `Bye(Shutdown)` 3 s. Detalhes: docs/specs/2026-09-28-fase1b-conexao-design.md.
 Cada estado é uma classe com `Enter/Exit/Tick`. Isso evita a "sopa de booleanos" e deixa reconexão e perda de Wi-Fi previsíveis.
 
 ### 8.6 Backends plugáveis: Strategy + Factory
@@ -785,6 +786,7 @@ Design completo: [docs/specs/2026-09-28-superficie-layout-design.md](specs/2026-
 | Moldura "roubar" o gesto de jogar o mouse na borda (barras de rolagem, barra de tarefas, menus) | Resistência de borda: o cursor para na borda e só vai pra moldura com um empurrão extra. Configurável |
 | Tecla modificadora (`Ctrl+Alt` + mouse) conflitar com atalhos de algum app (ex.: multi-cursor de IDEs) | Configurável. Primeiro uso sugere a combinação. Lista de apps em que o modo modificador fica desligado |
 | Clique de manipulação vazar pro app do Windows (ou clique normal ser engolido) | Estado explícito no `ManipulationInterceptor`, feedback visual da moldura, testes de integração com `SendInput` |
+| Pareamento sem criptografia (MVP) | Token e vídeo podem ser capturados por alguém na mesma rede. O pareamento impede conexões casuais; TLS/DTLS na v1.1 (ADR 0006) |
 | Jogos/anti-cheat que não gostam de hooks ou `SetCursorPos` | Roteador desliga sozinho quando o cursor está preso (`ClipCursor`) ou o app está em tela cheia exclusiva. Lista de exceções configurável |
 
 ---

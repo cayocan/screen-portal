@@ -32,6 +32,11 @@ O projeto Unity fica **na raiz** do repositório (não em `headset-unity/`). Ond
 - O callback do hook de mouse nunca faz trabalho pesado.
 - **`ResizeScreen` nunca altera a resolução.** O host nunca troca o modo de um monitor virtual vivo; só `RecreateScreen`.
 - **Mouse-first:** toda ação executável só com mouse + teclado. Mãos são um adapter a mais.
+- **Onde testar (pedido do Cayo):** o que é conclusivo no **Meta XR Simulator** (lógica de cena, UI, composição,
+  interação, fluxos que não dependem de hardware) é testado **no Simulator**, sem pedir para ligar o Quest. Só vai
+  para o **headset** o que só é conclusivo nele: decoder/MediaCodec e latência real, compositor layers/nitidez,
+  passthrough, rede Wi-Fi do Quest, mDNS/NSD, permissões Android, desempenho/térmica. Antes de pedir o óculos,
+  diga por que o Simulator não basta.
 - **Liberdade (princípio do produto):** encaixes, grades e regras de layout ajudam, nunca prendem. Todo "ímã" tem
   limiar e desliga com `Shift`; toda tela pode sair da superfície de layout (brief §10.12, ADR 0005).
 - Cliques de manipulação nunca vazam pro Windows, e cliques normais nunca são engolidos.
@@ -55,7 +60,10 @@ Comandos (ver cabeçalho de cada script):
 - Testes rápidos (Domain/Application, sem Editor): `dotnet test tests-dotnet/UnityPureCode.Tests`
 - Unity sem MCP: `tools/unity-cmd.ps1 -Command refresh|resolve-packages|test-editmode|build-main-scene|boot-main|build-apk|…`
   (se o assembly `ScreenPortal.Editor` não compilar, o gatilho trava na versão antiga: focar a janela da Unity)
-- Host: `tools/host-loopback-test.ps1` · `.aar`: `tools/build-native.ps1` · vídeo no Quest: `tools/phase0-streams-test.ps1`
+- Host: `ScreenPortalHost serve` (padrão: controle tcp/9200 + mDNS + pareamento + vídeo) · protocolo: `tools/gen-protocol.ps1`
+  (regenera o C# de `protocol/control.fbs`) · testes do host: `dotnet test host/Host.Tests`
+- Fase 0: `tools/host-loopback-test.ps1` · `.aar`: `tools/build-native.ps1` · vídeo no Quest: `tools/phase0-streams-test.ps1`
+- Quest pelo Wi-Fi (reserva quando o USB cai): `adb tcpip 5555` + `adb connect 192.168.0.171:5555`
 - Namespace da camada Application é `ScreenPortal.App` (ADR 0004). Em Presentation, `Resolution` precisa de alias
   (`UnityEngine.Resolution` também existe).
 

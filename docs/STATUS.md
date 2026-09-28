@@ -1,7 +1,7 @@
 # Status do projeto
 
-**Fase atual:** Fase 1 — 1A concluída (28/09/2026), próxima: **1B (protocolo e conexão)**.
-Brief: [brief.md](brief.md) v1.3.1 (ADRs 0002 e 0003).
+**Fase atual:** Fase 1 concluída (1A + 1B, 28/09/2026) → próxima: **Fase 2 — multi-monitor livre**.
+Brief: [brief.md](brief.md) v1.3.2 (ADRs 0002–0006).
 
 ## Fase 0 — resultado
 | # | Item | Resultado |
@@ -36,7 +36,12 @@ ADRs: [0000](adr/0000-unity-project-at-repo-root.md) Unity na raiz · [0001](adr
   9 Commands com invariantes testados, WorkspaceStore (undo/redo), CommandBus + CommandJournal,
   ScreenViewSynchronizer, VContainer 1.19.0 + cena `Main` com views OVROverlay. **75 testes** passando no
   `dotnet test` e no Test Runner da Unity. Plano: [plans/2026-09-28-fase1a-esqueleto-dominio.md](plans/2026-09-28-fase1a-esqueleto-dominio.md) · [ADR 0004](adr/0004-immutable-workspace-and-shared-nunit-tests.md).
-- **1B (próximo):** schemas FlatBuffers do canal de controle, handshake versionado, state machine de conexão, mDNS.
+- **1B (conexão):** ✅ protocolo de controle v1 (FlatBuffers, TCP 9200), pareamento com código, máquina de estados
+  (descoberta → pareamento → stream ⇄ instável → reconexão), mDNS nos dois lados, status visível no headset, vídeo do
+  PC na tela da cena `Main`. **112 testes** (Unity/harness) + **28** (host). No Quest: descoberta ~1 s, reabertura sem
+  código, reconexão < 1 s após o host voltar. [spec](specs/2026-09-28-fase1b-conexao-design.md) ·
+  [plano](plans/2026-09-28-fase1b-conexao.md) · [ADR 0006](adr/0006-control-protocol-pairing-mdns.md) ·
+  [verificação](measurements/fase1b-conexao.md).
 
 ## Decidido e documentado, para fases futuras
 - **Superfície de layout Cilindro/Esfera** ([ADR 0005](adr/0005-layout-surface-cylinder-sphere.md), brief §10.12,
