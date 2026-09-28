@@ -38,27 +38,36 @@ public sealed unsafe class WgcMonitorCapture : ICaptureSource
         _captureCursor = captureCursor;
     }
 
-    public static WgcMonitorCapture ForPrimaryMonitor(GpuDevice gpu, bool captureCursor)
+    public static WgcMonitorCapture ForPrimaryMonitor(GpuDevice gpu, bool captureCursor) =>
+        ForMonitor(gpu, MonitorFromPoint(default, MONITOR_DEFAULTTOPRIMARY), captureCursor);
+
+    public static WgcMonitorCapture ForMonitor(GpuDevice gpu, IntPtr hmonitor, bool captureCursor) =>
+        new(gpu, CreateItem(hmonitor, forWindow: false), captureCursor);
+
+    /// <summary>Captura só a janela (monitor-palco com recorte, brief §10.5).</summary>
+    public static WgcMonitorCapture ForWindow(GpuDevice gpu, IntPtr hwnd, bool captureCursor) =>
+        new(gpu, CreateItem(hwnd, forWindow: true), captureCursor);
+
+    private static GraphicsCaptureItem CreateItem(IntPtr handle, bool forWindow)
     {
         if (!GraphicsCaptureSession.IsSupported())
             throw new PlatformNotSupportedException("Windows Graphics Capture não é suportado neste sistema.");
 
-        IntPtr monitor = MonitorFromPoint(default, MONITOR_DEFAULTTOPRIMARY);
         var factory = ActivationFactory.Get("Windows.Graphics.Capture.GraphicsCaptureItem");
 
-        // IGraphicsCaptureItemInterop::CreateForMonitor (vtable slot 4) — chamada direta, sem RCW.
+        // IGraphicsCaptureItemInterop: slot 3 = CreateForWindow, slot 4 = CreateForMonitor — chamada direta, sem RCW.
         var iidInterop = IID_IGraphicsCaptureItemInterop;
         Marshal.ThrowExceptionForHR(Marshal.QueryInterface(factory.ThisPtr, in iidInterop, out IntPtr interop));
         IntPtr itemPtr;
         try
         {
             var iidItem = IID_IGraphicsCaptureItem;
-            var createForMonitor = (delegate* unmanaged[Stdcall]<IntPtr, IntPtr, Guid*, IntPtr*, int>)(*(*(void***)interop + 4));
-            Marshal.ThrowExceptionForHR(createForMonitor(interop, monitor, &iidItem, &itemPtr));
+            var create = (delegate* unmanaged[Stdcall]<IntPtr, IntPtr, Guid*, IntPtr*, int>)(*(*(void***)interop + (forWindow ? 3 : 4)));
+            Marshal.ThrowExceptionForHR(create(interop, handle, &iidItem, &itemPtr));
         }
         finally { Marshal.Release(interop); }
 
-        try { return new WgcMonitorCapture(gpu, GraphicsCaptureItem.FromAbi(itemPtr), captureCursor); }
+        try { return GraphicsCaptureItem.FromAbi(itemPtr); }
         finally { Marshal.Release(itemPtr); }
     }
 

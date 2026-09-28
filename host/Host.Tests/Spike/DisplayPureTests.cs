@@ -57,6 +57,6 @@ public class DisplayPureTests
 
     [Fact]
     public void EnsureResolution_KeepsExistingEntry() =>
-        Assert.Equal(1, System.Text.RegularExpressions.Regex.Matches(
-            VddSettingsXml.EnsureResolution(SampleXml, 1920, 1080, 60), "<resolution>").Count);
+        Assert.Single(System.Text.RegularExpressions.Regex.Matches(
+            VddSettingsXml.EnsureResolution(SampleXml, 1920, 1080, 60), "<resolution>"));
 }
