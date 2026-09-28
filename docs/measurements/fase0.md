@@ -50,8 +50,23 @@ Decoder configurado com `MAX_WIDTH/HEIGHT = 4096×4096` nesta rodada.
 **Leituras:**
 - As compositor layers isolam o app: o fps do app não caiu nem com o decoder saturado (princípio do ADR 0001 confirmado).
 - A rede não é o gargalo até ~120 Mbps agregados (0 perdas de rede em todos os casos).
-- O limite está no decoder. Hipótese em teste: `MAX_WIDTH/HEIGHT = 4096` faz cada instância reservar
-  recursos de 4K×4K. Próxima rodada com `MAX = resolução real`.
+- O limite está no decoder. Hipótese testada e **refutada**: usar `MAX_WIDTH/HEIGHT = resolução real`
+  (2560×1080) piorou tudo — 4 e 5 telas caíram para 4–29 fps (CSVs `*-maxfix`), 1 tela seguiu perfeita.
+  Provável causa: 1080 linhas codificadas como 1088 → reconfiguração do decoder a cada IDR. Revertido para 4096.
+- Efeito cascata identificado: quando falta input buffer, o descarte espera o próximo IDR (1 s). Perto do
+  limite isso derruba o fps para ~4. Na Fase 2 (spike do decoder): esperar até ~1 frame por input buffer,
+  IDR sob demanda em vez de periódico, e medir de novo 5–6 telas e resoluções menores.
+- **Rodada 2 (05:15–05:35), instável — resultados NÃO reproduzem a rodada 1:** com o valor revertido
+  (4096) e até após reboot do Quest: 4@60 → 4–22 fps; 3@60 → 14–56 fps; 4@30 → ~29 fps mas com
+  latência ~65 ms (vs 33 ms na rodada 1). 1 tela segue perfeita. Rede sempre 0 perdas; app sempre 72 fps.
+  Térmico sem throttling (SoC ~45 °C), sem host perdido, sem codec vazado visível no resource manager.
+  Variáveis não controladas: conteúdo da tela do PC (afeta o custo de decode), bateria (51 % → 39 %),
+  nível de CPU/GPU do headset.
+- **Conclusão da Fase 0 sobre capacidade:** o limite estável de decode ainda NÃO está determinado.
+  Confirmado: 1–2 telas 2560×1080@60 com folga na rodada 1; 4@60 é o limite superior (passou uma vez).
+  Para medir de verdade (spike do decoder, Fase 2): conteúdo fixo no PC (`tools/text-test.html`),
+  headset carregado e com nível de desempenho fixo, política de descarte sem cascata (esperar até
+  1 frame por input buffer; pedir IDR em vez de esperar o periódico) e 3 repetições por cenário.
 - Mesmo sem a correção, o design do brief se sustenta: 4 telas a 60 fps (meta do MVP) passam, e a
   FocusPolicy (fora de foco a 10–15 fps) reduz a carga das demais.
 
