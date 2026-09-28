@@ -1,0 +1,17 @@
+{
+    "name": "ScreenPortal.Spikes.Phase0",
+    "rootNamespace": "ScreenPortal.Spikes.Phase0",
+    "references": [
+        "Oculus.VR",
+        "meta.xr.mrutilitykit"
+    ],
+    "includePlatforms": [],
+    "excludePlatforms": [],
+    "allowUnsafeCode": false,
+    "overrideReferences": false,
+    "precompiledReferences": [],
+    "autoReferenced": false,
+    "defineConstraints": [],
+    "versionDefines": [],
+    "noEngineReferences": false
+}

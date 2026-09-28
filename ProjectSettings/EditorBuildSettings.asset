@@ -6,8 +6,11 @@ EditorBuildSettings:
   serializedVersion: 2
   m_Scenes:
   - enabled: 1
-    path: Assets/Scenes/SampleScene.unity
-    guid: 99c9720ab356a0642a771bea13969a05
+    path: Assets/_Project/Spikes/Phase0/Scenes/Phase0_Video.unity
+    guid: f70b5080e345c2e45be813073bb3f426
+  - enabled: 1
+    path: Assets/_Project/Spikes/Phase0/Scenes/Phase0_Passthrough.unity
+    guid: 47dd0f63434b45040afcb5301e503bb9
   m_configObjects:
     com.unity.input.settings.actions: {fileID: -944628639613478452, guid: 052faaac586de48259a63d0c4782560b, type: 3}
     com.unity.xr.management.loader_settings: {fileID: 11400000, guid: aa2153c001d9a0e4aa430e35f0bddcfb, type: 2}
