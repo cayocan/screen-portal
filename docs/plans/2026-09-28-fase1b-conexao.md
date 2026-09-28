@@ -12,7 +12,7 @@
 
 - Porta TCP de controle **9200**; serviço mDNS **`_screenportal._tcp`**, TXT `v=1`; frame `[u32 LE tamanho][FlatBuffer]`, máximo **64 KiB**.
 - `protocol_version` = **1**; versão diferente = incompatível → `Bye(IncompatibleVersion)`.
-- Tempos: connect **2 s**; negociação **5 s** (sem timeout durante o pareamento); ping **500 ms**; `Degraded` após **1,5 s** sem `Pong`; `Reconnecting` após mais **3 s**; reconexão ao último IP a cada **250 ms**; desiste após **10 s**; dica "Instale o host" após **10 s** na 1ª abertura; recusa bloqueia o host por **10 s**; incompatível por **60 s**.
+- Tempos: connect **2 s**; negociação **5 s** (sem timeout durante o pareamento); ping **500 ms**; `Degraded` após **1,5 s** sem `Pong`; `Reconnecting` após mais **3 s**; reconexão ao último IP a cada **250 ms**; desiste após **10 s**; dica "Instale o host" após **10 s** na 1ª abertura; recusa bloqueia o host por **10 s**; incompatível por **60 s**; `Bye(Shutdown)` por **3 s**.
 - Vídeo: porta UDP **9000**, `stream_id` **0**; tela Demo a **1,4 m** de largura em `Pose.At(0, 1.2, 1.3)`, label `monitor:<id>`.
 - Pareamento: código de **6 dígitos**; token de **32 bytes** aleatórios em base64; host em `%APPDATA%\ScreenPortal\paired.json`.
 - Código Unity em **C# 9**; Domain/Application/Infrastructure.Shared com `noEngineReferences: true`; namespace da camada Application é `ScreenPortal.App`.
@@ -1137,6 +1137,7 @@ namespace ScreenPortal.App.Connection
         public double InstallHintAfterSeconds { get; set; } = 10.0;
         public double RejectCooldownSeconds { get; set; } = 10.0;
         public double IncompatibleCooldownSeconds { get; set; } = 60.0;
+        public double ShutdownCooldownSeconds { get; set; } = 3.0;
         public int VideoPort { get; set; } = 9000;
         public ushort StreamId { get; set; } = 0;
         public Pose DefaultScreenPose { get; set; } = Pose.At(new Vec3(0f, 1.2f, 1.3f));
@@ -1933,9 +1934,9 @@ namespace ScreenPortal.App.Connection
             switch (reason)
             {
                 case ByeReason.Shutdown:
-                    _channel.Close();
-                    StopVideo();
-                    EnterDiscovering(new ConnectionStatus(ConnectionStatusKind.HostShutdown, _host.Name));
+                    // Bloqueio curto: o anúncio mDNS demora a sumir; sem isso reconectaríamos na hora e a
+                    // mensagem "encerrou" piscaria e sumiria.
+                    Block(ConnectionStatusKind.HostShutdown, _options.ShutdownCooldownSeconds);
                     break;
                 case ByeReason.IncompatibleVersion:
                     Block(ConnectionStatusKind.IncompatibleVersion, _options.IncompatibleCooldownSeconds);

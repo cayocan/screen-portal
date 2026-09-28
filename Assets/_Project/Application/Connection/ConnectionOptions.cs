@@ -16,6 +16,7 @@ namespace ScreenPortal.App.Connection
         public double InstallHintAfterSeconds { get; set; } = 10.0;
         public double RejectCooldownSeconds { get; set; } = 10.0;
         public double IncompatibleCooldownSeconds { get; set; } = 60.0;
+        public double ShutdownCooldownSeconds { get; set; } = 3.0;
         public int VideoPort { get; set; } = 9000;
         public ushort StreamId { get; set; } = 0;
         public Pose DefaultScreenPose { get; set; } = Pose.At(new Vec3(0f, 1.2f, 1.3f));
