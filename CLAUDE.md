@@ -20,6 +20,10 @@ O projeto Unity fica **na raiz** do repositório (não em `headset-unity/`). Ond
 ```
 
 ## Regras (brief §13)
+- **Context-mode sempre que possível (pedido do Cayo):** comandos com saída potencialmente grande (builds, testes,
+  logcat, Editor.log, git log/diff, buscas amplas) vão por `ctx_execute`/`ctx_batch_execute` e consultas por
+  `ctx_search`; leitura de arquivo só com `Read` quando for para editar — para analisar, `ctx_execute_file`.
+  PowerShell/Bash direto só para comandos curtos (git add/commit, mkdir, iniciar processos). Regras completas no fim deste arquivo.
 - **Domain não referencia UnityEngine**, nem APIs Windows/Android. Asmdefs unidirecionais `Presentation/Infrastructure → Application → Domain`.
 - Toda mudança de estado da workspace é um **Command** via `CommandBus`. Views nunca mutam estado.
 - **Zero alocação** em `Update`/`LateUpdate` e no caminho de vídeo: sem LINQ, closures, `string` concatenada ou `new` em loop. Pools, `Span`, `NativeArray`.
