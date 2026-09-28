@@ -49,3 +49,8 @@ Thumbs.db
 *.h264
 *.log
 /tools/**/out/
+
+# Artefatos transitórios de build/testes da Unity
+/.utmp/
+/Assets/Resources/PerformanceTestRun*
+/Assets/StreamingAssets/RuntimeActionBindings.json*
