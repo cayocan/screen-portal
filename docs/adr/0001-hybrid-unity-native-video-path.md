@@ -1,6 +1,9 @@
 # ADR 0001 — Caminho de vídeo híbrido: host .NET (WGC + MFT de hardware) → UDP → MediaCodec nativo → OVROverlay external surface
 
-- **Status:** Proposto — implementado e validado no PC; **pendente de medição no Quest 3** (docs/measurements/fase0.md).
+- **Status:** **Aceito** (28/09/2026) — validado no Quest 3: 1 tela 2560×1080@60 com ~33 ms
+  captura→decodificado, 0 perdas, app estável a 72 Hz, texto 12 pt legível (fase0.md, fase0-texto.md).
+  Capacidade multi-tela ainda não estável (2–4 telas@60 passaram numa rodada e falharam em outra):
+  **remedido no spike do decoder da Fase 2** antes de fechar o `BandwidthBudget`.
 - **Data:** 28/09/2026
 - **Decisões do brief relacionadas:** D1, D5, D6; §6.3, §8.7, §15.4.
 

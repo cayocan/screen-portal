@@ -2,6 +2,8 @@
 
 > Documento de partida para o Claude Code. Descreve o produto, a arquitetura, os design patterns e a ordem de execução. Em caso de dúvida entre velocidade e qualidade do núcleo de vídeo, a qualidade do núcleo vence. Em caso de dúvida na UI/UX, entregue rápido e itere.
 >
+> **Revisões:** v1.3.1 (28/09/2026) — ADR 0002 (alvo de 72 Hz) e ADR 0003 (zona de passthrough desenhada pelo usuário, sem detecção de teclado).
+>
 > **Status: v1.3 do brief, escopo do MVP FECHADO em 27/09/2026** (inclui a manipulação com o mouse da seção 10.10, os monitores em retrato da seção 10.3 e as telas curvas com curvatura ajustável da seção 10.2). A partir daqui, mudanças de escopo só com: (1) atualização deste documento, (2) ADR em `docs/adr/` explicando o porquê e o que sai para compensar. Ideias novas vão direto para o backlog (seção 4.3).
 
 ---
@@ -50,7 +52,7 @@ Requisitos que não se negociam: **leve** (sem travadas e sem desperdício de ba
 1. **N monitores virtuais**, desacoplados dos monitores físicos
 2. **Resolução escolhida na criação, tamanho livre depois**: ao criar um monitor, o usuário escolhe a proporção (16:9, 16:10, ultrawide, super ultrawide, quadrado, 4:3, custom) e a **orientação: paisagem ou retrato (vertical)**, que vale pra qualquer proporção, num **seletor com preview visual**. Depois, redimensionar é **zoom proporcional** (a resolução nunca muda) o **posicionamento é livre** (qualquer distância e ângulo) e qualquer tela pode ser **plana ou curva, com a curvatura ajustável** por atalho, mouse ou menu (seções 10.1–10.3)
 3. **Perfis de layout** ("Dev", "Reunião", "Escrita"), ancorados na mesa real com spatial anchors
-4. **Zona de passthrough "sugere e você ajusta"**: o app detecta o teclado (qualquer marca) e **sugere** uma área de passthrough que cobre teclado, mouse e mãos. O usuário **ajusta livremente** (tamanho, altura, formato, bordas suaves, zonas extras), e o ajuste acompanha o teclado quando ele é movido (seção 9)
+4. **Zona de passthrough "você desenha, o app lembra"**: o usuário desenha em segundos (mouse, controle ou mãos) a área da mesa que mostra o mundo real (teclado, mouse, mãos), com **qualquer teclado**. Ajuste livre (tamanho, altura, formato, bordas suaves, zonas extras), ancorada na mesa e restaurada sozinha nas próximas sessões (seção 9, ADR 0003)
 5. **Texto nítido** via compositor layers, sem reamostragem pela cena 3D
 6. **Frame rate por tela, automático ou manual**: por padrão, a tela em foco roda a 60 fps e as outras a 10–15 fps (isso viabiliza muitas telas). O usuário pode **fixar o fps de qualquer tela** (ex.: um filme numa tela secundária a 60 fps enquanto trabalha em outra), e o app também **detecta sozinho conteúdo em movimento** (vídeo) e sobe o fps daquela tela
 7. **Janela destacada**: qualquer janela do Windows (Spotify, terminal, Slack) pode ser "arrancada" e virar uma tela flutuante própria, do tamanho exato dela (seção 10)
@@ -69,14 +71,14 @@ Requisitos que não se negociam: **leve** (sem travadas e sem desperdício de ba
 | Pilar | O que entra | Seções |
 |---|---|---|
 | **A. Telas nítidas e livres** | N monitores virtuais (IddCx) · **seletor de proporção/resolução na criação, com orientação paisagem ou retrato** · **janela destacada** · mover livre + resize proporcional (zoom) · **tela plana ou curva com curvatura ajustável** (atalho, mouse, menu) · frame rate por tela (Auto + manual: Fixed/Video/Eco) · áudio do PC · perfis de layout + retomar a última sessão ao colocar o headset | 8.8, 10 |
-| **B. Zona de passthrough "sugere e ajusta"** | Sugestão via teclado (com fallbacks) · modo edição completo · ajustes como deltas · zona por perfil · congelar ao perder o tracking · invariante "tela não invade zona" | 9 |
+| **B. Zona de passthrough "você desenha, o app lembra"** | Criação manual (mouse · 2 cantos com controle/mãos) · modo edição completo · ancorada na mesa (spatial anchor) · zona por perfil · restauração automática · invariante "tela não invade zona" | 9 |
 | **C. Mouse e teclado em primeiro lugar** | **Cursor espacial** (roteamento 3D) · cursor desenhado localmente no headset (latência baixa) · **manipulação das telas com o mouse** (moldura + tecla modificadora: mover, afastar com a roda, redimensionar, menu da tela) · **cursor 3D livre** operando toda a UI do app · atalhos globais de teclado · mãos como alternativa · Windows organizado como plano B | 10 |
 
 ### 4.2 Barra de qualidade para lançar (critérios de aceite)
 - 72 Hz estáveis (ADR 0002), 0 bytes de GC por frame, latência de vídeo dentro do orçamento (seção 11)
 - **Cursor:** atravessar entre telas em **100%** dos casos dos testes de layout (esquerda, direita, diagonal, acima, abaixo, com vão e sem vão), sem "pulos" nem cursor preso
 - **Cursor local:** movimento percebido com < 20 ms de atraso (independente do vídeo)
-- **Zona:** sugestão aceitável sem ajuste em ≥ 80% dos testes com teclados diferentes
+- **Zona:** criar do zero em < 60 s só com o mouse (< 30 s com o controle); restaurada no lugar, sem reconfigurar, em ≥ 95% das aberturas na mesma mesa
 - **Estabilidade:** sessão de 4 h sem crash; reconexão em < 3 s sem perder o layout
 - **Texto:** fonte 12 legível na distância padrão sugerida
 - **Janela destacada:** destacar e reanexar sem perder nem deslocar a janela em 100% dos testes (apps comuns: navegador, IDE, terminal, Spotify, Slack)
@@ -121,7 +123,7 @@ Seria preciso reescrever interação, hand tracking, UI, raycast e passthrough n
 | Headset: app | **Unity 6.3 LTS** (último patch; suportado até ~dez/2027) + **Meta XR SDK na versão mais recente** (mínimo 83.0.1 no Unity 6.3), URP enxuto, **OpenXR + Meta XR Core SDK**, **Meta Interaction SDK** (grab/resize/poke), IL2CPP, ARM64 |
 | Headset: vídeo | **Android library (.aar)** em Kotlin + C++ (NDK): rede, `MediaCodec` (decode por hardware) |
 | Headset: renderização das telas | **Compositor layers** (`OVROverlay` quad/cylinder) com **external surface**: o `MediaCodec` decodifica direto na Surface da layer (zero-copy, sem passar pela cena) |
-| Headset: passthrough | **MR Utility Kit (MRUK) Keyboard Tracking** (rastreamento de teclado genérico, sem depender de marca) + **Passthrough Windows** (shader que zera o alpha, recortando a região da mesa). Detalhes e fontes na seção 15 |
+| Headset: passthrough | Zona desenhada pelo usuário + **spatial anchor** na mesa + **Passthrough Windows** (shader que zera o alpha, recortando a região da mesa). Keyboard Tracking do MRUK descartado (ADR 0003). Detalhes e fontes na seção 15 |
 | PC: host | **C# / .NET 10 LTS** (Windows), com interop para as APIs nativas. (.NET 8 perde suporte em 10/11/2026, então não usar) |
 | PC: captura | **Windows Graphics Capture** (por monitor **e por janela**). Fallback: DXGI Desktop Duplication |
 | PC: monitores virtuais | **Indirect Display Driver (IddCx)**: cria monitores "reais" para o Windows, sem limite físico. MVP: controlar o **Virtual Display Driver** open-source (MIT, já assinado). Resolução definida **na criação** do monitor e nunca trocada ao vivo (seções 10.1 e 15.7) |
@@ -142,7 +144,7 @@ O projeto Unity (`headset-unity/`, criado a partir do template **Universal 3D** 
 |---|---|---|
 | Meta XR Core SDK | `com.meta.xr.sdk.core` | Base: OpenXR/Meta, `OVROverlay` (compositor layers com external surface), Passthrough, Building Blocks, Project Setup Tool |
 | Meta XR Interaction SDK | `com.meta.xr.sdk.interaction.ovr` | Mãos e controles (alternativa ao mouse, seção 10.10) |
-| Meta MR Utility Kit | `com.meta.xr.mrutilitykit` | Keyboard Tracking e plano da mesa (zona de passthrough, seção 9) |
+| Meta MR Utility Kit | `com.meta.xr.mrutilitykit` | ~~Keyboard Tracking~~ (ADR 0003). Hoje só usado pela cena de spike da Fase 0; candidato a remoção na Fase 4 se as spatial anchors do Core SDK bastarem |
 | OpenXR Plugin + XR Plugin Management | `com.unity.xr.openxr` · `com.unity.xr.management` | Runtime XR (normalmente entram como dependência do Core SDK; conferir) |
 | URP | `com.unity.render-pipelines.universal` | Já vem do template Universal 3D |
 
@@ -307,47 +309,45 @@ Cada decisão estrutural (ex.: "H.264 no MVP", "OVROverlay external surface", "I
 
 ---
 
-## 9. Zona de passthrough: o app sugere, o usuário ajusta
+## 9. Zona de passthrough: o usuário define, o app lembra
+
+> **Revisado em 28/09/2026 (ADR 0003).** A detecção automática do teclado (MRUK Keyboard Tracking) foi
+> abandonada: na Fase 0 o rastreador da Meta não reconheceu o teclado do Cayo (TKL). A zona passa a ser
+> **sempre definida pelo usuário**, uma vez por mesa, e restaurada automaticamente nas sessões seguintes.
 
 ### 9.1 Princípio
-O app **nunca impõe** a área de passthrough. Ele **sugere** um ponto de partida inteligente, e o usuário tem **controle total** para ajustar. O ajuste do usuário é **preservado** mesmo quando a sugestão muda (ex.: o teclado foi movido na mesa).
+O app **não tenta adivinhar** onde está o teclado. O usuário **desenha a zona uma vez** (rápido, com
+mouse, controle ou mãos), vendo a mesa real através dela enquanto ajusta. A zona fica **ancorada na mesa**
+(spatial anchor) e salva no perfil: nas próximas vezes ela simplesmente aparece no lugar certo.
 
-**Modelo central:**
-```
-Zona final = Sugestão (calculada do teclado/mesa) ⊕ Ajustes do usuário (offsets relativos)
-```
-Os ajustes são guardados **como deltas sobre a sugestão**, não como posição absoluta. Se o teclado anda 10 cm pra esquerda, a zona anda junto e mantém os ajustes (ex.: "+8 cm pro lado do mouse", "+5 cm de altura").
+Funciona com **qualquer teclado, mouse, mesa e iluminação**, porque não depende de reconhecimento.
 
-### 9.2 Como a sugestão é gerada (Strategy, em ordem de prioridade)
+### 9.2 Como a zona é criada
 
-| Estratégia | Quando | Resultado |
+| Caminho | Como | Quando usar |
 |---|---|---|
-| `KeyboardBasedSuggestion` | MRUK detectou teclado | Caixa sobre o `VolumeBounds` do teclado + margens padrão (abaixo) |
-| `TablePlaneSuggestion` | Sem teclado, mas a mesa existe no Space Setup do Quest (MRUK, label de mesa) | Retângulo na borda da mesa, em frente ao usuário |
-| `ManualPlacementSuggestion` | Nenhum dos dois | O usuário toca 2 cantos na mesa com o dedo/controle, e a zona nasce ali |
+| **Mouse** (principal, mouse-first) | "Nova zona" (menu do app ou `Ctrl+Alt+P` com nenhuma zona): nasce um retângulo padrão à frente e abaixo da vista, já em modo edição. **Arrastar** move sobre o plano horizontal · **roda** sobe/desce a altura · **arrastar canto/borda** redimensiona · `Shift`+roda gira · `Enter` confirma | Sempre funciona; você alinha olhando a mesa real através da zona |
+| **Controle** (mais rápido e preciso) | Encostar a ponta do controle em **2 cantos opostos** da área na mesa (gatilho em cada um). A altura da mesa sai do toque | Primeira configuração numa mesa nova |
+| **Mãos** | Pinçar os 2 cantos na mesa (mesma lógica do controle) | Alternativa, nunca obrigatória |
 
-**Margens padrão da sugestão com teclado** (todas ajustáveis nas configurações):
-- **Frente:** +8 cm (apoio dos pulsos)
-- **Trás:** +4 cm
-- **Lado do mouse:** +25 cm, no lado da **mão dominante** (configurada no onboarding; o app pode sugerir trocar se o hand tracking mostrar a outra mão parando fora do teclado com frequência)
-- **Lado oposto:** +3 cm
-- **Altura:** 25 cm acima da mesa (mãos visíveis enquanto digita)
-- **Borda suave (feather):** 2 cm
+**Tamanho padrão do retângulo inicial** (ajustável nas configurações): **70 × 35 cm**, cobrindo um
+teclado TKL/full + área do mouse, com **25 cm de altura** acima da mesa (mãos visíveis ao digitar) e
+**feather de 2 cm**. O lado do mouse segue a **mão dominante** (onboarding).
 
 ### 9.3 O que o usuário pode ajustar
 
-| Ajuste | Como (hand tracking ou controle) |
+| Ajuste | Como (mouse · controle/mãos) |
 |---|---|
-| **Largura/profundidade** | Arrastar **bordas** (1 eixo) ou **cantos** (2 eixos) com pinça |
-| **Altura** | Handle no topo da caixa |
-| **Mover** | Pinçar o centro e arrastar sobre o plano da mesa |
-| **Girar** | Anel de rotação no eixo vertical (snap de 5°, desliga segurando) |
+| **Largura/profundidade** | Arrastar **bordas** (1 eixo) ou **cantos** (2 eixos) com o cursor 3D · com pinça |
+| **Altura** | Roda do mouse com o cursor sobre a zona · handle no topo da caixa |
+| **Mover** | Arrastar o centro sobre o plano da mesa (cursor 3D ou pinça) |
+| **Girar** | `Shift`+roda · anel de rotação no eixo vertical (snap de 5°, desliga segurando) |
 | **Formato** | Retângulo ou retângulo arredondado (raio ajustável). **Polígono livre** (desenhar contornando com o dedo) fica para a v1.2 |
 | **Borda suave** | Slider de 0–8 cm (transição gradual entre virtual e real) |
 | **Opacidade** | Slider de 30–100% (ex.: passthrough "fantasma" para quem quer imersão) |
 | **Zonas extras** | Botão "+ zona" (ex.: caneca, celular, bloco de notas). Cada uma com os mesmos ajustes |
-| **Âncora** | `Seguir teclado` (padrão) · `Fixa na mesa` (spatial anchor) · `Fixa no mundo` |
-| **Resetar** | "Voltar à sugestão" descarta só os ajustes, sem apagar a zona |
+| **Âncora** | `Fixa na mesa` (spatial anchor, padrão) · `Fixa no mundo` |
+| **Refazer** | "Redesenhar zona" volta ao fluxo de criação (9.2), mantendo feather/opacidade/formato |
 
 **Precisão e conforto:**
 - Snap de 1 cm (desliga segurando a pinça por mais de 0,5 s)
@@ -356,7 +356,7 @@ Os ajustes são guardados **como deltas sobre a sugestão**, não como posição
 - Tamanho mínimo de 10×10 cm, para não "perder" a zona
 
 ### 9.4 Fluxo de UX
-1. **Primeira vez:** o app detecta o teclado e mostra a zona sugerida com contorno pulsante + "Essa área está boa? [Usar] [Ajustar]".
+1. **Primeira vez (ou mesa nova):** o app abre o fluxo de criação (9.2) com uma dica curta: "Desenhe a área do seu teclado e mouse". Dá para pular ("Sem zona por enquanto").
 2. **Modo edição** (menu do app → "Editar zona": com o mouse via `Ctrl+Alt+M` ou clicando no espaço vazio; com as mãos via menu de pulso): contorno com handles visíveis, **arrastáveis pelo cursor 3D do mouse** (seção 10.10) ou pela pinça, as telas ficam semitransparentes para não atrapalhar, e há um painel pequeno com sliders (feather, opacidade, formato).
 3. **Sair da edição:** salva automaticamente no **perfil de layout** ativo. Cada perfil pode ter a sua zona (ex.: "Dev" com zona grande, "Filme" com zona mínima ou desligada).
 4. **Uso normal:** handles escondidos, só o recorte suave.
@@ -364,10 +364,10 @@ Os ajustes são guardados **como deltas sobre a sugestão**, não como posição
    - **Revelar ao olhar pra baixo** (opcional): a opacidade da zona sobe quando a cabeça inclina pra mesa
    - **Mostrar/ocultar zona** com um atalho de teclado (útil em filme)
 
-### 9.5 Detecção e recuperação
-- **Teclado perdido** (tracking caiu): a zona **congela** na última posição conhecida, sem sumir nem pular. Um ícone discreto indica "teclado não rastreado".
-- **Teclado reencontrado:** a zona volta a seguir, com transição suave (lerp de ~200 ms), sem teleporte.
-- **Teclado muito diferente do salvo** (outro teclado, outra mesa): pergunta "Recalcular sugestão? [Sim] [Manter a atual]".
+### 9.5 Restauração entre sessões
+- **Ao abrir o app:** a zona do perfil ativo é carregada da spatial anchor. Se a âncora localizar, a zona aparece no lugar, sem pergunta.
+- **Âncora não localizada** (outra sala, mapa do Quest refeito): aviso discreto "Zona não encontrada nesta mesa" com [Redesenhar] [Ignorar]. Nunca inventa uma posição.
+- **Teclado mudou de lugar na mesa:** o usuário move a zona (arrastar com o mouse), é um ajuste de segundos.
 
 ### 9.6 Conflito com as telas
 - **Invariante do domínio:** nenhuma tela ocupa o volume de uma zona. Se o usuário arrasta uma tela pra dentro, a zona fica destacada e a tela é **empurrada suavemente** para fora ao soltar.
@@ -380,24 +380,22 @@ Os ajustes são guardados **como deltas sobre a sugestão**, não como posição
 public sealed record PassthroughZone(
     ZoneId Id,
     ZoneShape Shape,            // Rect | RoundedRect(radius)  (Polygon na v1.2; o tipo já prevê a extensão)
-    ZoneAnchorMode AnchorMode,  // FollowKeyboard | DeskAnchor | WorldAnchor
-    ZoneSuggestion Suggestion,  // caixa base calculada (pose + size)
-    ZoneAdjustment Adjustment,  // deltas do usuário: edges, height, offset, yaw
+    ZoneAnchorMode AnchorMode,  // DeskAnchor | WorldAnchor
+    Pose DeskPose,              // centro na superfície da mesa + yaw, relativo à âncora
+    ZoneSize Size,              // largura × profundidade × altura acima da mesa
     float FeatherMeters,
-    float Opacity,
-    bool IsUserEdited);
+    float Opacity);
 
-// Zona final = Suggestion.Apply(Adjustment): função pura, coberta por testes
+// ZoneFromCorners(c1, c2, height) e os limites (mín. 10×10 cm): funções puras, cobertas por testes
 ```
 
 **Commands:**
-`SuggestZone`, `AdjustZoneEdge(edge, delta)`, `AdjustZoneHeight`, `MoveZone`, `RotateZone`, `SetZoneShape`, `SetZoneFeather`, `SetZoneOpacity`, `SetZoneAnchorMode`, `AddZone`, `RemoveZone`, `ResetZoneToSuggestion`, `ToggleZoneVisibility`.
+`CreateZone(pose, size)`, `CreateZoneFromCorners(c1, c2)`, `MoveZone`, `ResizeZoneEdge(edge, delta)`, `AdjustZoneHeight`, `RotateZone`, `SetZoneShape`, `SetZoneFeather`, `SetZoneOpacity`, `SetZoneAnchorMode`, `AddZone`, `RemoveZone`, `ToggleZoneVisibility`.
 
 **Patterns:**
-- **Strategy:** `IZoneSuggestionStrategy` (Keyboard / TablePlane / Manual), escolhida por **Chain of Responsibility** (a primeira que conseguir sugerir vence)
-- **Decorator/composição:** `Suggestion ⊕ Adjustment`, onde a sugestão recalcula e o ajuste persiste
+- **Adapter:** `IManipulationInput` (mouse / controle / mãos) alimenta o mesmo editor de zona e gera os mesmos Commands (igual às telas, seção 10.10)
 - **Memento:** a zona faz parte do snapshot do perfil
-- **Observer:** `MRUKTrackable` (Added/Removed/pose) → `KeyboardTrackingAdapter` → Command `UpdateKeyboardPose` no domínio
+- **Port:** `IAnchorStore` (spatial anchors da Meta) persiste e localiza a âncora da mesa
 
 **Renderização (Presentation):**
 - Uma **malha de caixa arredondada** com o shader de **Passthrough Window** (seção 15.3), estendido com **feather via SDF** no fragment shader (alpha gradual nas bordas, em vez de corte seco).
@@ -405,8 +403,8 @@ public sealed record PassthroughZone(
 - Handles de edição: Meta Interaction SDK (`Grabbable` + `OneGrabTranslateTransformer` restrito ao eixo), instanciados só no modo edição.
 
 **Testes:**
-- EditMode: `Suggestion.Apply(Adjustment)` com teclado movido/girado, cantos arredondados, limites mínimos, invariante "tela não invade zona"
-- Dispositivo: precisão da sugestão com 2–3 teclados reais, estabilidade ao perder/recuperar tracking
+- EditMode: `ZoneFromCorners` (cantos em qualquer ordem, girados), cantos arredondados, limites mínimos, invariante "tela não invade zona"
+- Dispositivo: criar a zona só com o mouse e só com o controle (cronometrado); restauração pela âncora após reiniciar o app e o headset
 
 ---
 
@@ -744,8 +742,8 @@ Os mesmos gestos pelo Meta Interaction SDK: pinçar a moldura pra mover, puxar a
 | Usuário fixa várias telas em 60 fps e estoura o orçamento | `BandwidthBudget` com prioridade clara + aviso na UI. Nunca degradar a tela em foco |
 | Assinatura do driver de monitor virtual para distribuição | **Resolvida pela decisão D3** (Virtual Display Driver, já assinado). Se um dia for preciso driver próprio: certificado EV + atestação Microsoft. Captura **por janela** (WGC) segue como modo sem driver |
 | Wi-Fi congestionado | Bitrate adaptativo, FEC e, futuramente, USB tether |
-| Keyboard Tracking do MRUK falhar com algum teclado ou iluminação | Cadeia de sugestão cai pra `TablePlane` → `Manual`. Zona congela ao perder o tracking (seção 9.5). Testar na Fase 0 com os teclados que você tem |
-| Mouse não é rastreado pelo SDK | Margem de +25 cm no lado da mão dominante na sugestão, ajustável pelo usuário |
+| ~~Keyboard Tracking do MRUK falhar com algum teclado~~ | **Confirmado na Fase 0** (não reconheceu um TKL). Resolvido por design: zona sempre desenhada pelo usuário (ADR 0003) |
+| Spatial anchor da mesa não localizar (outra sala, mapa refeito) | Aviso "Zona não encontrada" + [Redesenhar]; nunca inventar posição (seção 9.5) |
 | Telas (overlays) cobrindo a zona de passthrough | Invariante do domínio "tela não invade zona" (seção 9.6). Testar Depth Buffer Testing entre layers na Fase 0 |
 | Limite de 15 compositor layers / 1 cilindro | Telas em Eco renderizadas no eye buffer. A única layer cilíndrica vai pra **tela curva em foco** (`CylinderLayerPolicy`, seção 10.2), com crossfade na troca; as outras curvas usam malha no eye buffer. Plano B: tela curva principal fixa. Medir na Fase 2 |
 | Texto ainda borrado | Compositor layers + resolução nativa por tela + supersampling só na tela em foco |
@@ -826,9 +824,9 @@ Objetivo: **provar o caminho de vídeo e medir latência** antes de qualquer UI.
 - Troca rápida (menu do app pelo mouse, `Ctrl+Alt+1…9` ou menu de pulso).
 
 ### Fase 4: Zona de passthrough (seção 9)
-- **4a, sugestão:** MRUK Keyboard Tracking → `KeyboardBasedSuggestion` com as margens padrão. Passthrough Window com feather. Fluxo "Usar / Ajustar" na primeira vez. Fallbacks `TablePlane` e `Manual`.
-- **4b, ajuste:** modo edição completo (bordas, cantos, altura, mover, girar, formato retângulo/arredondado, feather, opacidade, zonas extras, âncoras, reset). Ajustes guardados como deltas e salvos no perfil. Undo/redo.
-- **4c, robustez:** congelar ao perder tracking, transição suave ao reencontrar, invariante "tela não invade zona", revelar ao olhar pra baixo.
+- **4a, criação:** fluxo "Nova zona" pelo mouse (retângulo padrão + arrastar/roda) e pelos 2 cantos com controle/mãos. Passthrough Window com feather. Spatial anchor na mesa + restauração ao abrir (ADR 0003).
+- **4b, ajuste:** modo edição completo (bordas, cantos, altura, mover, girar, formato retângulo/arredondado, feather, opacidade, zonas extras, âncoras, redesenhar). Salvo no perfil. Undo/redo.
+- **4c, robustez:** âncora não localizada → aviso + redesenhar, invariante "tela não invade zona", revelar ao olhar pra baixo.
 - **4d (opcional):** detecção de mouse via Passthrough Camera API + modelo on-device, só se a margem do lado do mouse não bastar na prática.
 
 ### Fase 5: Polimento até a barra de qualidade (lançamento do MVP v1.0)
@@ -942,7 +940,7 @@ Fontes: [IddCxMonitorUpdateModes (Microsoft Learn)](https://learn.microsoft.com/
 | D4 | **Resolução e orientação (paisagem/retrato) definidas na criação; resize = zoom proporcional**; mudar resolução ou orientação = recriar o monitor. Retrato é criado nativo (ex.: 1440×2560), sem rotação de tela do Windows | Spike da Fase 2 |
 | D5 | **H.264 no MVP**; HEVC na v1.1. Resoluções acima do limite do encoder ficam marcadas "requer HEVC" | Spike da Fase 2 (limite real) |
 | D6 | **Rede:** Wi-Fi 6/6E + PC no cabo. USB tether em "Futuro" | Fase 0 (latência) |
-| D7 | **Zona de passthrough:** MRUK Keyboard Tracking + Passthrough Windows; formatos retângulo/arredondado no MVP | Fase 0 (tracking real) |
+| D7 | **Zona de passthrough:** ~~MRUK Keyboard Tracking~~ → **desenhada pelo usuário** + spatial anchor + Passthrough Windows; formatos retângulo/arredondado no MVP (revisada pelo ADR 0003) | ✅ Fase 0: tracking reprovado, decisão revisada |
 | D8 | **Cursor espacial** no host (Raw Input + hook + mapa angular), com o Windows como plano B | Testes de domínio da Fase 3 |
 | D9 | **Escopo do MVP = 3 pilares** (seção 4). Todo o resto vai pro backlog | — |
 | D10 | **Mouse-first:** mouse (moldura + tecla modificadora + cursor 3D livre) é a forma principal de manipular as telas e operar a UI. Mãos são alternativa, gerando os mesmos Commands | Testes de integração e de uso da Fase 3 |
