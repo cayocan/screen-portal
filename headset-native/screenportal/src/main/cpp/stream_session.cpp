@@ -45,8 +45,11 @@ bool StreamSession::configureCodec() {
     AMediaFormat_setString(format, AMEDIAFORMAT_KEY_MIME, "video/avc");
     AMediaFormat_setInt32(format, AMEDIAFORMAT_KEY_WIDTH, config_.width);
     AMediaFormat_setInt32(format, AMEDIAFORMAT_KEY_HEIGHT, config_.height);
-    AMediaFormat_setInt32(format, AMEDIAFORMAT_KEY_MAX_WIDTH, 4096);
-    AMediaFormat_setInt32(format, AMEDIAFORMAT_KEY_MAX_HEIGHT, 4096);
+    // MAX_WIDTH/HEIGHT = resolução real. Com 4096×4096 cada instância reservava recursos de 4K×4K
+    // e o decoder do Quest 3 saturava com 6 telas (docs/measurements/fase0.md, seção 3).
+    // A resolução de um monitor nunca muda ao vivo (brief §10.1), então não precisamos de folga.
+    AMediaFormat_setInt32(format, AMEDIAFORMAT_KEY_MAX_WIDTH, config_.width);
+    AMediaFormat_setInt32(format, AMEDIAFORMAT_KEY_MAX_HEIGHT, config_.height);
     // Low-latency: chave padrão (API 30+) + extensão da Qualcomm (XR2 Gen 2 do Quest 3).
     AMediaFormat_setInt32(format, "low-latency", 1);
     AMediaFormat_setInt32(format, "vendor.qti-ext-dec-low-latency.enable", 1);

@@ -1,4 +1,4 @@
-# Teste de loopback do host no próprio PC (sem headset):
+﻿# Teste de loopback do host no próprio PC (sem headset):
 # captura o monitor primário → H.264 HW → UDP 127.0.0.1 → receptor de depuração → .h264 → ffprobe.
 #   powershell -ExecutionPolicy Bypass -File tools/host-loopback-test.ps1 [-Seconds 6] [-ExtraArgs "--bitrate 30000"]
 param([int]$Seconds = 6, [string]$ExtraArgs = "")

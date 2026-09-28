@@ -1,19 +1,25 @@
-# Coleta as linhas SPSTAT/SPKB do logcat do Quest e grava CSV em docs/measurements/.
+﻿# Coleta as linhas SPSTAT/SPKB do logcat do Quest e grava CSV em docs/measurements/.
 #   powershell -ExecutionPolicy Bypass -File tools/phase0-collect.ps1 -Label "1stream-2560x1080" [-Seconds 60]
 param([Parameter(Mandatory)][string]$Label, [int]$Seconds = 60,
-      [string]$Adb = "D:\Unity Editor\6000.3.19f1\Editor\Data\PlaybackEngines\AndroidPlayer\SDK\platform-tools\adb.exe")
+      [string]$Adb = "D:\Unity Editor\6000.3.19f1\Editor\Data\PlaybackEngines\AndroidPlayer\SDK\platform-tools\adb.exe",
+      [string]$Serial = "2G0YC1ZG410B1H", [switch]$FromBuffer)
 
 $ErrorActionPreference = "Stop"
 $root = Split-Path $PSScriptRoot -Parent
 $csv = Join-Path $root "docs\measurements\fase0-$Label.csv"
 
-& $Adb logcat -c
-Write-Host "Coletando $Seconds s de logcat... (deixe o app rodando no headset)"
-$job = Start-Job { param($adb) & $adb logcat -v time -s ScreenPortal:I Unity:I } -ArgumentList $Adb
-Start-Sleep -Seconds $Seconds
-Stop-Job $job
-$lines = Receive-Job $job | Where-Object { $_ -match "SPSTAT,|SPKB," }
-Remove-Job $job
+if (-not $FromBuffer) { & $Adb -s $Serial logcat -c }
+if ($FromBuffer) {
+    # Usa o que já está no buffer do logcat (sem esperar).
+    $lines = & $Adb -s $Serial logcat -d -v time -s ScreenPortal:I Unity:I | Where-Object { $_ -match "SPSTAT,|SPKB," }
+} else {
+    Write-Host "Coletando $Seconds s de logcat... (deixe o app rodando no headset)"
+    $job = Start-Job { param($adb, $serial) & $adb -s $serial logcat -v time -s ScreenPortal:I Unity:I } -ArgumentList $Adb, $Serial
+    Start-Sleep -Seconds $Seconds
+    Stop-Job $job
+    $lines = Receive-Job $job | Where-Object { $_ -match "SPSTAT,|SPKB," }
+    Remove-Job $job
+}
 
 "time,stream,rx_fps,dec_fps,mbps,drop_net,drop_dec,lat_avg_ms,lat_min_ms,lat_max_ms,rtt_ms" | Set-Content $csv -Encoding utf8
 foreach ($l in $lines) {
@@ -35,3 +41,4 @@ if ($rows) {
     }
 }
 Write-Host "CSV: $csv"
+

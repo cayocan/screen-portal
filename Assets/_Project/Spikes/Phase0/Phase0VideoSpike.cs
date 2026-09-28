@@ -27,6 +27,7 @@ namespace ScreenPortal.Spikes.Phase0
         [Header("Qualidade da layer")]
         [SerializeField] private bool useBicubicFiltering = true;
         [SerializeField] private bool useEfficientSharpen = false;
+        [SerializeField] private bool useEfficientSupersample = false;
 
         [Header("HUD")]
         [SerializeField] private TextMesh statsLabel;
@@ -36,8 +37,34 @@ namespace ScreenPortal.Spikes.Phase0
         private float _nextStatsTime;
         private readonly StringBuilder _hud = new StringBuilder(1024);
 
+        /// <summary>
+        /// Permite variar o teste sem rebuild:
+        /// adb shell am start -n com.screenportal.app/&lt;activity&gt; --ei streams 4 --ei width 2560 --ei height 1080
+        /// </summary>
+        private void ApplyLaunchOverrides()
+        {
+#if UNITY_ANDROID && !UNITY_EDITOR
+            using var player = new AndroidJavaClass("com.unity3d.player.UnityPlayer");
+            using var activity = player.GetStatic<AndroidJavaObject>("currentActivity");
+            using var intent = activity.Call<AndroidJavaObject>("getIntent");
+            streamCount = Mathf.Clamp(intent.Call<int>("getIntExtra", "streams", streamCount), 1, 8);
+            videoWidth = intent.Call<int>("getIntExtra", "width", videoWidth);
+            videoHeight = intent.Call<int>("getIntExtra", "height", videoHeight);
+            // Teste de legibilidade (docs/measurements/fase0-texto.md): tamanho/distância em cm e filtros da layer.
+            screenWidthMeters = intent.Call<int>("getIntExtra", "widthcm", Mathf.RoundToInt(screenWidthMeters * 100f)) / 100f;
+            distanceMeters = intent.Call<int>("getIntExtra", "distcm", Mathf.RoundToInt(distanceMeters * 100f)) / 100f;
+            useBicubicFiltering = intent.Call<int>("getIntExtra", "bicubic", useBicubicFiltering ? 1 : 0) != 0;
+            useEfficientSharpen = intent.Call<int>("getIntExtra", "sharpen", useEfficientSharpen ? 1 : 0) != 0;
+            useEfficientSupersample = intent.Call<int>("getIntExtra", "supersample", useEfficientSupersample ? 1 : 0) != 0;
+            Debug.Log($"[ScreenPortal] config: {streamCount} stream(s), {videoWidth}x{videoHeight}, " +
+                      $"{screenWidthMeters:F2} m a {distanceMeters:F2} m, bicubic={useBicubicFiltering} " +
+                      $"sharpen={useEfficientSharpen} supersample={useEfficientSupersample}");
+#endif
+        }
+
         private void Start()
         {
+            ApplyLaunchOverrides();
             _overlays = new OVROverlay[streamCount];
             _handles = new long[streamCount];
 
@@ -66,6 +93,7 @@ namespace ScreenPortal.Spikes.Phase0
                 overlay.externalSurfaceHeight = videoHeight;
                 overlay.useBicubicFiltering = useBicubicFiltering;
                 overlay.useEfficientSharpen = useEfficientSharpen;
+                overlay.useEfficientSupersample = useEfficientSupersample;
                 overlay.compositionDepth = i;
                 _overlays[i] = overlay;
 

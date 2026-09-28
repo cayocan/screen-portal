@@ -1,0 +1,68 @@
+<!doctype html>
+<!-- Teste de legibilidade da Fase 0. Abrir no monitor primário, zoom do navegador 100%, tela cheia (F11).
+     Critério do brief §4.2: fonte 12 legível na distância padrão. -->
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<title>Screen Portal — teste de texto</title>
+<style>
+  :root { color-scheme: light; }
+  body { margin: 0; padding: 24px 40px; background: #fff; color: #111; font-family: "Segoe UI", sans-serif; }
+  .row { display: flex; align-items: baseline; gap: 24px; margin: 6px 0; white-space: nowrap; }
+  .tag { width: 64px; flex: none; font: 600 14px/1 Consolas, monospace; color: #c00; }
+  .code { font-family: Consolas, "Cascadia Mono", monospace; }
+  .dark { background: #1e1e1e; color: #d4d4d4; padding: 10px 16px; margin: 14px 0; }
+  .dark .kw { color: #569cd6; } .dark .str { color: #ce9178; } .dark .cm { color: #6a9955; }
+  #clock { position: fixed; top: 16px; right: 32px; font: 700 64px/1 Consolas, monospace; background: #000; color: #0f0; padding: 8px 16px; }
+  .lines { display: flex; gap: 40px; margin-top: 14px; }
+  .lines div { width: 220px; height: 60px; }
+  h2 { font-size: 16px; margin: 18px 0 6px; color: #555; }
+</style>
+</head>
+<body>
+<div id="clock">0000000</div>
+
+<h2>A · Texto corrido (Segoe UI) — tamanho em pt a 100% de escala</h2>
+<div id="prose"></div>
+
+<h2>B · Código (Consolas) — caracteres parecidos: Il1| O0o rn/m ;: ,. {}[]()</h2>
+<div id="code"></div>
+
+<h2>C · Tema escuro (IDE) — 12 pt</h2>
+<div class="dark code" style="font-size:12pt">
+  <div><span class="kw">public sealed class</span> VideoPacketizer <span class="cm">// Il1| O0o rn m — 12pt</span></div>
+  <div>&nbsp;&nbsp;<span class="kw">private readonly</span> byte[] _scratch = <span class="kw">new</span> byte[<span class="str">1424</span>]; <span class="cm">// l1I0O</span></div>
+  <div>&nbsp;&nbsp;<span class="kw">return</span> frameId &gt;= 0x7FFF_FFFF ? <span class="str">"wrap"</span> : <span class="str">"ok"</span>;</div>
+</div>
+<div class="dark code" style="font-size:10pt">
+  <div><span class="cm">// 10pt:</span> <span class="kw">var</span> latency = HostClock.NowUs() - h.CaptureTimeUs; <span class="cm">// Il1| O0o</span></div>
+</div>
+
+<h2>D · Linhas de 1 px (horizontais, verticais, xadrez) — aliasing/tremulação</h2>
+<div class="lines">
+  <div style="background: repeating-linear-gradient(0deg, #000 0 1px, #fff 1px 2px)"></div>
+  <div style="background: repeating-linear-gradient(90deg, #000 0 1px, #fff 1px 2px)"></div>
+  <div style="background: repeating-conic-gradient(#000 0 25%, #fff 0 50%) 0 0/2px 2px"></div>
+  <div style="background: repeating-linear-gradient(90deg, #000 0 2px, #fff 2px 4px)"></div>
+</div>
+
+<script>
+  const sample = "O rápido Portal exibe 3 telas nítidas: Il1| O0o rn m — 0123456789";
+  const codeSample = "if (frame.Id != 0x1F && list[i] == l1I) { return O0o; } // rn m";
+  const sizes = [8, 9, 10, 11, 12, 13, 14, 16];
+  const add = (host, text, cls) => sizes.forEach(pt => {
+    const row = document.createElement("div");
+    row.className = "row";
+    row.innerHTML = `<span class="tag">${pt}pt</span><span class="${cls}" style="font-size:${pt}pt">${text}</span>`;
+    host.appendChild(row);
+  });
+  add(document.getElementById("prose"), sample, "");
+  add(document.getElementById("code"), codeSample, "code");
+
+  // Relógio em ms: força frames contínuos no WGC e permite comparar latência a olho.
+  const clock = document.getElementById("clock");
+  const tick = () => { clock.textContent = String(Math.floor(performance.now())).padStart(7, "0"); requestAnimationFrame(tick); };
+  tick();
+</script>
+</body>
+</html>

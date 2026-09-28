@@ -1,4 +1,4 @@
-# Compila headset-native (.aar: Kotlin + C++/NDK) com o JDK, SDK, NDK e Gradle embarcados na Unity
+﻿# Compila headset-native (.aar: Kotlin + C++/NDK) com o JDK, SDK, NDK e Gradle embarcados na Unity
 # e copia o resultado para Assets/Plugins/Android/.
 #   powershell -ExecutionPolicy Bypass -File tools/build-native.ps1 [-UnityEditor "D:\Unity Editor\6000.3.19f1\Editor"]
 param([string]$UnityEditor = "D:\Unity Editor\6000.3.19f1\Editor", [string]$Task = "assembleRelease")
