@@ -17,8 +17,13 @@ namespace ScreenPortal.Presentation.Screens
 
         public OVROverlay Overlay { get; private set; }
 
-        public OverlayScreenView(Transform parent, VirtualScreen screen)
+        public ScreenId Id { get; }
+        private readonly System.Action<OverlayScreenView> _onDisposed;
+
+        public OverlayScreenView(Transform parent, VirtualScreen screen, System.Action<OverlayScreenView> onDisposed = null)
         {
+            Id = screen.Id;
+            _onDisposed = onDisposed;
             _root = new GameObject("Screen " + screen.Id.Value);
             _root.transform.SetParent(parent, false);
             BuildOverlay(screen.Resolution);
@@ -54,6 +59,7 @@ namespace ScreenPortal.Presentation.Screens
 
         public void Dispose()
         {
+            _onDisposed?.Invoke(this);
             if (_root != null) Object.Destroy(_root);
         }
     }

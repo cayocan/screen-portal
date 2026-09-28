@@ -5,6 +5,8 @@
         "ScreenPortal.Domain",
         "ScreenPortal.Application",
         "ScreenPortal.Presentation",
+        "ScreenPortal.Infrastructure",
+        "ScreenPortal.Infrastructure.Shared",
         "VContainer"
     ],
     "includePlatforms": [],

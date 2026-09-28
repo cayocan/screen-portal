@@ -1,37 +1,43 @@
 using System;
-using ScreenPortal.App;
+using ScreenPortal.App.Connection;
 using ScreenPortal.App.Screens;
-using ScreenPortal.Domain.Commands;
-using ScreenPortal.Domain.Screens;
-using ScreenPortal.Domain.Spatial;
 using VContainer.Unity;
 
 namespace ScreenPortal.Composition
 {
-    /// <summary>Liga o sincronizador de views e, em modo demo, cria a tela padrão validada na Fase 0.</summary>
-    public sealed class AppEntryPoint : IStartable, IDisposable
+    /// <summary>Liga views, painel de status e a conexão; a tela do PC é criada pela conexão (Welcome).</summary>
+    public sealed class AppEntryPoint : IStartable, ITickable, IDisposable
     {
         private readonly ScreenViewSynchronizer _synchronizer;
-        private readonly ICommandBus _bus;
-        private readonly AppOptions _options;
+        private readonly ConnectionStateMachine _connection;
+        private readonly IControlChannel _channel;
+        private readonly IHostDiscovery _discovery;
+        private readonly AppEnvironment _env;
 
-        public AppEntryPoint(ScreenViewSynchronizer synchronizer, ICommandBus bus, AppOptions options)
+        public AppEntryPoint(ScreenViewSynchronizer synchronizer, ConnectionStateMachine connection,
+            IControlChannel channel, IHostDiscovery discovery, AppEnvironment env)
         {
             _synchronizer = synchronizer;
-            _bus = bus;
-            _options = options;
+            _connection = connection;
+            _channel = channel;
+            _discovery = discovery;
+            _env = env;
         }
 
         public void Start()
         {
             _synchronizer.Start();
-            if (_options.SeedDemoScreen)
-            {
-                // Tamanho/distância padrão do teste de legibilidade (fase0-texto.md): 140 cm a 1,3 m.
-                _bus.Send(new CreateScreen(Resolution.Create(2560, 1080), Pose.At(new Vec3(0f, 1.2f, 1.3f)), 1.4f, label: "Demo"));
-            }
+            if (_env.StatusView != null) _env.StatusView.Bind(_connection);
+            _connection.Start();
         }
 
-        public void Dispose() => _synchronizer.Dispose();
+        public void Tick() => _connection.Tick();
+
+        public void Dispose()
+        {
+            _channel.Close();
+            _discovery.Stop();
+            _synchronizer.Dispose();
+        }
     }
 }

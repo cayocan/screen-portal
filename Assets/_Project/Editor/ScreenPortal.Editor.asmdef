@@ -5,6 +5,7 @@
         "UnityEditor.TestRunner",
         "UnityEngine.TestRunner",
         "ScreenPortal.Composition",
+        "ScreenPortal.Presentation",
         "VContainer",
         "Oculus.VR"
     ],

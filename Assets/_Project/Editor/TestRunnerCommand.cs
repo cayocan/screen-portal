@@ -19,7 +19,7 @@ namespace ScreenPortal.Editor
             api.Execute(new ExecutionSettings(new Filter
             {
                 testMode = TestMode.EditMode,
-                assemblyNames = new[] { "ScreenPortal.Tests.EditMode", "ScreenPortal.Tests.Composition" },
+                assemblyNames = new[] { "ScreenPortal.Tests.EditMode", "ScreenPortal.Tests.Shared", "ScreenPortal.Tests.Composition" },
             }));
         }
 

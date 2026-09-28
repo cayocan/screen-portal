@@ -26,10 +26,26 @@ namespace ScreenPortal.Editor
 
             var screensRoot = new GameObject("Screens");
 
+            var statusGo = new GameObject("ConnectionStatus");
+            statusGo.transform.position = new Vector3(0f, 1.25f, 1.2f);
+            var text = statusGo.AddComponent<TextMesh>();
+            text.font = Resources.GetBuiltinResource<Font>("LegacyRuntime.ttf");
+            statusGo.GetComponent<MeshRenderer>().sharedMaterial = text.font.material;
+            text.fontSize = 64;
+            text.characterSize = 0.012f;
+            text.anchor = TextAnchor.MiddleCenter;
+            text.alignment = TextAlignment.Center;
+            text.color = Color.white;
+            var statusView = statusGo.AddComponent<ScreenPortal.Presentation.Connection.ConnectionStatusView>();
+            var statusSo = new SerializedObject(statusView);
+            statusSo.FindProperty("label").objectReferenceValue = text;
+            statusSo.ApplyModifiedPropertiesWithoutUndo();
+
             var scopeGo = new GameObject("AppLifetimeScope");
             var scope = scopeGo.AddComponent<AppLifetimeScope>();
             var so = new SerializedObject(scope);
             so.FindProperty("screensRoot").objectReferenceValue = screensRoot.transform;
+            so.FindProperty("statusView").objectReferenceValue = statusView;
             so.ApplyModifiedPropertiesWithoutUndo();
 
             EditorSceneManager.SaveScene(scene, ScenePath);
