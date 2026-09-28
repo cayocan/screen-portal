@@ -81,6 +81,7 @@ namespace ScreenPortal.Spikes.Phase0.Editor
             if (mrukAsset != null) PrefabUtility.InstantiatePrefab(mrukAsset);
             else Debug.LogError("[ScreenPortal] MRUK.prefab não encontrado em " + MrukPrefab);
 
+            CreateBackdrop();
             var material = GetOrCreateWindowMaterial();
             var overlay = CreateOcclusionOverlay();
             var label = CreateLabel("StatusHUD", new Vector3(0f, 1.45f, 1.0f), 0.01f);
@@ -104,13 +105,20 @@ namespace ScreenPortal.Spikes.Phase0.Editor
             manager.trackingOriginType = OVRManager.TrackingOrigin.FloorLevel;
             manager.isInsightPassthroughEnabled = passthrough;
 
+            // Mesmos valores que o Project Setup Tool aplica (evita que o Fix All reabra estas tarefas).
+            var so = new SerializedObject(manager);
+            SetBool(so, "_enableDynamicResolution", true);
+            SetBool(so, "requestScenePermissionOnStartup", passthrough);
+            so.ApplyModifiedPropertiesWithoutUndo();
+
             // No SDK 207 o OVRPassthroughLayer é sempre underlay.
             if (passthrough) go.AddComponent<OVRPassthroughLayer>();
 
-            // Fundo opaco escuro: no modo passthrough, só a Passthrough Window revela o mundo real.
+            // Passthrough: fundo transparente (exigência do Project Setup Tool); o "vazio" virtual
+            // opaco vem da esfera de CreateBackdrop, recortada só pela Passthrough Window.
             var cam = rig.centerEyeAnchor.GetComponent<Camera>();
             cam.clearFlags = CameraClearFlags.SolidColor;
-            cam.backgroundColor = passthrough ? new Color(0.08f, 0.08f, 0.1f, 1f) : Color.black;
+            cam.backgroundColor = passthrough ? new Color(0f, 0f, 0f, 0f) : Color.black;
             return rig;
         }
 
@@ -128,6 +136,27 @@ namespace ScreenPortal.Spikes.Phase0.Editor
             text.color = new Color(0.85f, 1f, 0.85f);
             text.text = "Screen Portal — Fase 0";
             return text;
+        }
+
+        /// <summary>Esfera opaca em volta do usuário: o "mundo virtual" que a Passthrough Window recorta.</summary>
+        private static void CreateBackdrop()
+        {
+            string path = GeneratedDir + "/UnlitBackdrop.mat";
+            var material = AssetDatabase.LoadAssetAtPath<Material>(path);
+            if (material == null)
+            {
+                material = new Material(Shader.Find("ScreenPortal/UnlitBackdrop"));
+                AssetDatabase.CreateAsset(material, path);
+            }
+
+            var sphere = GameObject.CreatePrimitive(PrimitiveType.Sphere);
+            sphere.name = "VirtualBackdrop";
+            Object.DestroyImmediate(sphere.GetComponent<Collider>());
+            sphere.transform.position = new Vector3(0f, 1.2f, 0f);
+            sphere.transform.localScale = Vector3.one * 30f;
+            var renderer = sphere.GetComponent<MeshRenderer>();
+            renderer.sharedMaterial = material;
+            renderer.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.Off;
         }
 
         private static Material GetOrCreateWindowMaterial()
@@ -183,6 +212,13 @@ namespace ScreenPortal.Spikes.Phase0.Editor
         {
             if (!AssetDatabase.IsValidFolder(ScenesDir)) AssetDatabase.CreateFolder(Root, "Scenes");
             if (!AssetDatabase.IsValidFolder(GeneratedDir)) AssetDatabase.CreateFolder(Root, "Generated");
+        }
+
+        private static void SetBool(SerializedObject so, string field, bool value)
+        {
+            var prop = so.FindProperty(field);
+            if (prop != null) prop.boolValue = value;
+            else Debug.LogWarning($"[ScreenPortal] Campo '{field}' não encontrado em {so.targetObject.GetType().Name}");
         }
 
         private static void SetPrivate(Object target, string field, Object value)
