@@ -1,0 +1,18 @@
+﻿<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <TargetFramework>$(WindowsTfm)</TargetFramework>
+    <RootNamespace>ScreenPortal.Host.App</RootNamespace>
+    <AssemblyName>ScreenPortalHost</AssemblyName>
+    <ServerGarbageCollection>false</ServerGarbageCollection>
+    <ConcurrentGarbageCollection>true</ConcurrentGarbageCollection>
+    <TieredPGO>true</TieredPGO>
+    <ApplicationManifest>app.manifest</ApplicationManifest>
+  </PropertyGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\Host.Domain\Host.Domain.csproj" />
+    <ProjectReference Include="..\Host.Capture\Host.Capture.csproj" />
+    <ProjectReference Include="..\Host.Encode\Host.Encode.csproj" />
+    <ProjectReference Include="..\Host.Transport\Host.Transport.csproj" />
+  </ItemGroup>
+</Project>

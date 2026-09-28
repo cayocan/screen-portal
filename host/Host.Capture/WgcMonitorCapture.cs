@@ -1,0 +1,136 @@
+using System.Runtime.InteropServices;
+using Vortice.Direct3D11;
+using Windows.Foundation.Metadata;
+using Windows.Graphics.Capture;
+using Windows.Graphics.DirectX;
+using Windows.Graphics.DirectX.Direct3D11;
+using WinRT;
+
+namespace ScreenPortal.Host.Capture;
+
+/// <summary>
+/// Captura de um monitor via Windows Graphics Capture (brief §6.3).
+/// O timestamp é o SystemRelativeTime do frame (QPC), o mesmo domínio de <c>HostClock</c>.
+/// </summary>
+public sealed unsafe class WgcMonitorCapture : ICaptureSource
+{
+    private static readonly Guid IID_IGraphicsCaptureItemInterop = new("3628E81B-3CAC-4C60-B7F4-23CE0E0C3356");
+    private static readonly Guid IID_IGraphicsCaptureItem = new("79C3F95B-31F7-4EC2-A464-632EF5D30760");
+    private static readonly Guid IID_IDirect3DDxgiInterfaceAccess = new("A9B3D012-3DF2-4EE3-B8D1-8695F457D3C1");
+    private static readonly Guid IID_ID3D11Texture2D = typeof(ID3D11Texture2D).GUID;
+
+    private readonly GpuDevice _gpu;
+    private readonly GraphicsCaptureItem _item;
+    private readonly bool _captureCursor;
+    private Direct3D11CaptureFramePool? _pool;
+    private GraphicsCaptureSession? _session;
+    private ICaptureFrameSink? _sink;
+    private Windows.Graphics.SizeInt32 _poolSize;
+
+    public string Name => $"WGC monitor ({_item.DisplayName})";
+    public int Width => _item.Size.Width;
+    public int Height => _item.Size.Height;
+
+    private WgcMonitorCapture(GpuDevice gpu, GraphicsCaptureItem item, bool captureCursor)
+    {
+        _gpu = gpu;
+        _item = item;
+        _captureCursor = captureCursor;
+    }
+
+    public static WgcMonitorCapture ForPrimaryMonitor(GpuDevice gpu, bool captureCursor)
+    {
+        if (!GraphicsCaptureSession.IsSupported())
+            throw new PlatformNotSupportedException("Windows Graphics Capture não é suportado neste sistema.");
+
+        IntPtr monitor = MonitorFromPoint(default, MONITOR_DEFAULTTOPRIMARY);
+        var factory = ActivationFactory.Get("Windows.Graphics.Capture.GraphicsCaptureItem");
+
+        // IGraphicsCaptureItemInterop::CreateForMonitor (vtable slot 4) — chamada direta, sem RCW.
+        var iidInterop = IID_IGraphicsCaptureItemInterop;
+        Marshal.ThrowExceptionForHR(Marshal.QueryInterface(factory.ThisPtr, in iidInterop, out IntPtr interop));
+        IntPtr itemPtr;
+        try
+        {
+            var iidItem = IID_IGraphicsCaptureItem;
+            var createForMonitor = (delegate* unmanaged[Stdcall]<IntPtr, IntPtr, Guid*, IntPtr*, int>)(*(*(void***)interop + 4));
+            Marshal.ThrowExceptionForHR(createForMonitor(interop, monitor, &iidItem, &itemPtr));
+        }
+        finally { Marshal.Release(interop); }
+
+        try { return new WgcMonitorCapture(gpu, GraphicsCaptureItem.FromAbi(itemPtr), captureCursor); }
+        finally { Marshal.Release(itemPtr); }
+    }
+
+    public void Start(ICaptureFrameSink sink)
+    {
+        _sink = sink;
+        _poolSize = _item.Size;
+        // 2 buffers: o mínimo para não bloquear a captura enquanto o frame anterior é convertido.
+        _pool = Direct3D11CaptureFramePool.CreateFreeThreaded(
+            _gpu.WinRtDevice, DirectXPixelFormat.B8G8R8A8UIntNormalized, 2, _poolSize);
+        _pool.FrameArrived += OnFrameArrived;
+
+        _session = _pool.CreateCaptureSession(_item);
+        _session.IsCursorCaptureEnabled = _captureCursor;
+        if (ApiInformation.IsPropertyPresent(typeof(GraphicsCaptureSession).FullName, nameof(GraphicsCaptureSession.IsBorderRequired)))
+        {
+            try { _session.IsBorderRequired = false; } catch { /* exige consentimento no Win11; a borda amarela é aceitável no spike */ }
+        }
+        _session.StartCapture();
+    }
+
+    private void OnFrameArrived(Direct3D11CaptureFramePool pool, object _)
+    {
+        using var frame = pool.TryGetNextFrame();
+        if (frame is null) return;
+
+        var size = frame.ContentSize;
+        if (size.Width != _poolSize.Width || size.Height != _poolSize.Height)
+        {
+            // Resolução do monitor mudou: recria o pool. (Nunca acontece por ação do app — brief §10.1.)
+            _poolSize = size;
+            pool.Recreate(_gpu.WinRtDevice, DirectXPixelFormat.B8G8R8A8UIntNormalized, 2, size);
+            return;
+        }
+
+        // SystemRelativeTime é o instante de apresentação alvo do DWM (medido: ~6 ms no FUTURO em
+        // relação à chegada), então não serve como início do relógio de latência. Usamos a chegada
+        // do frame: subestima o glass-to-glass em ~1 vsync do PC (documentado em docs/measurements).
+        ulong captureUs = Domain.Timing.HostClock.NowUs();
+        using var texture = new ID3D11Texture2D(GetTexturePointer(frame.Surface));
+        _sink!.OnFrame(texture, size.Width, size.Height, captureUs);
+    }
+
+    /// <summary>IDirect3DDxgiInterfaceAccess::GetInterface (vtable slot 3). Devolve ponteiro com AddRef.</summary>
+    private static IntPtr GetTexturePointer(IDirect3DSurface surface)
+    {
+        IntPtr surfacePtr = ((IWinRTObject)surface).NativeObject.ThisPtr;
+        var iidAccess = IID_IDirect3DDxgiInterfaceAccess;
+        Marshal.ThrowExceptionForHR(Marshal.QueryInterface(surfacePtr, in iidAccess, out IntPtr access));
+        try
+        {
+            var iidTex = IID_ID3D11Texture2D;
+            IntPtr texture;
+            var getInterface = (delegate* unmanaged[Stdcall]<IntPtr, Guid*, IntPtr*, int>)(*(*(void***)access + 3));
+            Marshal.ThrowExceptionForHR(getInterface(access, &iidTex, &texture));
+            return texture;
+        }
+        finally { Marshal.Release(access); }
+    }
+
+    public void Dispose()
+    {
+        _session?.Dispose();
+        if (_pool is not null)
+        {
+            _pool.FrameArrived -= OnFrameArrived;
+            _pool.Dispose();
+        }
+    }
+
+    private const uint MONITOR_DEFAULTTOPRIMARY = 1;
+
+    [DllImport("user32.dll")]
+    private static extern IntPtr MonitorFromPoint(System.Drawing.Point pt, uint flags);
+}

@@ -1,0 +1,9 @@
+﻿<Project Sdk="Microsoft.NET.Sdk">
+  <ItemGroup>
+    <ProjectReference Include="..\Host.Domain\Host.Domain.csproj" />
+  </ItemGroup>
+  <PropertyGroup>
+    <TargetFramework>$(WindowsTfm)</TargetFramework>
+    <RootNamespace>ScreenPortal.Host.Transport</RootNamespace>
+  </PropertyGroup>
+</Project>

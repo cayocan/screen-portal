@@ -1,0 +1,6 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <TargetFramework>$(PortableTfm)</TargetFramework>
+    <RootNamespace>ScreenPortal.Host.Domain</RootNamespace>
+  </PropertyGroup>
+</Project>
