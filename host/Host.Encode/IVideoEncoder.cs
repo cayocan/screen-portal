@@ -13,7 +13,7 @@ public sealed record EncoderSettings(
     int Height,
     int Fps = 60,
     int BitrateKbps = 20_000,
-    int KeyframeIntervalMs = 1000);
+    int KeyframeIntervalMs = 5000); // rede de segurança: o normal é o headset pedir IDR (KFRQ) quando precisa
 
 /// <summary>Strategy de encoder (brief §8.6): MF hardware (NVENC/AMF/QSV via MFT), software, etc.</summary>
 public interface IVideoEncoder : IDisposable

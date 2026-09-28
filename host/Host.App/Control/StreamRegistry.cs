@@ -101,6 +101,19 @@ public sealed class StreamRegistry(GpuDevice gpu, int bitrateKbps, Action<string
         });
     }
 
+    /// <summary>Pedido de keyframe (KFRQ, UDP 9101) de um headset: força IDR no stream dele.</summary>
+    public void RequestKeyframe(System.Net.IPAddress address, ushort streamId)
+    {
+        lock (_lock)
+        {
+            foreach (var entry in _entries.Values)
+            {
+                if (entry.StreamId == streamId && System.Net.IPAddress.TryParse(entry.Address, out var ip) && ip.MapToIPv4().Equals(address))
+                    entry.Pipeline.RequestKeyframe();
+            }
+        }
+    }
+
     public string TakeStats(double seconds)
     {
         lock (_lock)

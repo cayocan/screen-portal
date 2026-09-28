@@ -43,3 +43,9 @@ Porta UDP **9100** no host. Request/response de 24 bytes, little-endian:
 
 O headset calcula `offset = hostUs - (clientSend + clientRecv)/2` e escolhe a amostra de menor
 RTT de uma janela. Latência captura→decodificado = `(agoraHeadset + offset) - captureTimeUs`.
+
+## Pedido de keyframe (KFRQ) — headset → host, UDP 9101
+8 bytes LE: `magic u32 = 0x5152464B ("KFRQ")`, `stream_id u16`, `reserved u16`. O decoder envia após descartar um
+frame (falta de input buffer ou fragmento perdido) e enquanto espera o IDR, no máximo 1 pedido a cada 100 ms por stream.
+O host força IDR imediato. O IDR periódico (5 s) é só rede de segurança. Mesmo papel do PLI no WebRTC.
+Implementação: `host/Host.Domain/Video/KeyframeRequest.cs` ⇄ `headset-native/.../packet.h`.
