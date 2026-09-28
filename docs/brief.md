@@ -771,7 +771,7 @@ Design completo: [docs/specs/2026-09-28-superficie-layout-design.md](specs/2026-
 |---|---|
 | Limite de decoders de hardware simultâneos no Quest 3 | Medir cedo (Fase 0). Se estourar, usar FocusPolicy e/ou **atlas** (várias telas de baixa prioridade num único stream) |
 | Usuário fixa várias telas em 60 fps e estoura o orçamento | `BandwidthBudget` com prioridade clara + aviso na UI. Nunca degradar a tela em foco |
-| Assinatura do driver de monitor virtual para distribuição | **Resolvida pela decisão D3** (Virtual Display Driver, já assinado). Se um dia for preciso driver próprio: certificado EV + atestação Microsoft. Captura **por janela** (WGC) segue como modo sem driver |
+| Assinatura do driver de monitor virtual para distribuição | Decisão D3 revista pelo **ADR 0007** (SudoVDA, MIT/CC0): confirmar a assinatura do build a distribuir na fase do instalador. Se um dia for preciso driver próprio: certificado EV + atestação Microsoft. Captura **por janela** (WGC) segue como modo sem driver |
 | Wi-Fi congestionado | Bitrate adaptativo, FEC e, futuramente, USB tether |
 | ~~Keyboard Tracking do MRUK falhar com algum teclado~~ | **Confirmado na Fase 0** (não reconheceu um TKL). Resolvido por design: zona sempre desenhada pelo usuário (ADR 0003) |
 | Spatial anchor da mesa não localizar (outra sala, mapa refeito) | Aviso "Zona não encontrada" + [Redesenhar]; nunca inventar posição (seção 9.5) |
@@ -970,7 +970,7 @@ Fontes: [IddCxMonitorUpdateModes (Microsoft Learn)](https://learn.microsoft.com/
 |---|---|---|
 | D1 | **Stack híbrida:** Unity 6.3 LTS + Meta XR SDK (mais recente) pra interação/UI; vídeo em código nativo (`MediaCodec` → compositor layer, zero-copy); host em .NET 10 LTS | Fase 0 |
 | D2 | **Windows-only no MVP** (Windows 10/11). Mac em "Futuro". `Host.Domain` fica portável | — |
-| D3 | **Monitores virtuais via Virtual Display Driver** open-source (MIT, assinado). Driver próprio só com ADR justificando | Spike da Fase 2 |
+| D3 | **Monitores virtuais via SudoVDA** (MIT/CC0; IOCTL com resolução exata por monitor e remoção individual). Revisada pelo [ADR 0007](adr/0007-virtual-display-driver.md): o VDD caiu no spike e só tem resolução global. Driver próprio só com ADR justificando | Spike da Fase 2A ✅ |
 | D4 | **Resolução e orientação (paisagem/retrato) definidas na criação; resize = zoom proporcional**; mudar resolução ou orientação = recriar o monitor. Retrato é criado nativo (ex.: 1440×2560), sem rotação de tela do Windows | Spike da Fase 2 |
 | D5 | **H.264 no MVP**; HEVC na v1.1. Resoluções acima do limite do encoder ficam marcadas "requer HEVC" | Spike da Fase 2 (limite real) |
 | D6 | **Rede:** Wi-Fi 6/6E + PC no cabo. USB tether em "Futuro" | Fase 0 (latência) |

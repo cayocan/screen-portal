@@ -1,6 +1,6 @@
 # ADR 0007 — Driver de monitor virtual: SudoVDA no lugar do VDD
 
-- **Status:** Proposto (Fase 2A, 28/09/2026) — aguarda aprovação do Cayo; revisa a decisão **D3** do brief
+- **Status:** Aceito (Fase 2A, 28/09/2026, aprovado pelo Cayo) — revisa a decisão **D3** do brief
 - **Spec:** docs/specs/2026-09-28-fase2a-spikes-design.md · **Relatórios:**
   [SudoVDA](../measurements/fase2a-driver-sudovda.md) · [VDD](../measurements/fase2a-driver-vdd.md)
 
@@ -44,4 +44,5 @@ Usar o **SudoVDA** para os monitores virtuais (substitui a D3). O VDD sai do pro
 - **Pendências para o instalador (fase de distribuição):** confirmar a assinatura do build do SudoVDA que vamos
   distribuir (o protocolo reporta "test build" neste PC, que veio de outra instalação), e o fluxo de instalação
   (`nefconc`/`devcon` com o hardware id `root\sudomaker\sudovda`).
-- **Brief:** §16.1 D3 e §12 (assinatura) atualizados para apontar para este ADR quando aprovado.
+- **Brief:** D3 e a linha de assinatura do driver atualizadas para apontar para este ADR. O VDD foi desinstalado do PC
+  de desenvolvimento (`tools/install-vdd.ps1 -Uninstall`); o script fica só como registro do spike.
