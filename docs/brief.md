@@ -73,7 +73,7 @@ Requisitos que não se negociam: **leve** (sem travadas e sem desperdício de ba
 | **C. Mouse e teclado em primeiro lugar** | **Cursor espacial** (roteamento 3D) · cursor desenhado localmente no headset (latência baixa) · **manipulação das telas com o mouse** (moldura + tecla modificadora: mover, afastar com a roda, redimensionar, menu da tela) · **cursor 3D livre** operando toda a UI do app · atalhos globais de teclado · mãos como alternativa · Windows organizado como plano B | 10 |
 
 ### 4.2 Barra de qualidade para lançar (critérios de aceite)
-- 90 Hz estáveis, 0 bytes de GC por frame, latência de vídeo dentro do orçamento (seção 11)
+- 72 Hz estáveis (ADR 0002), 0 bytes de GC por frame, latência de vídeo dentro do orçamento (seção 11)
 - **Cursor:** atravessar entre telas em **100%** dos casos dos testes de layout (esquerda, direita, diagonal, acima, abaixo, com vão e sem vão), sem "pulos" nem cursor preso
 - **Cursor local:** movimento percebido com < 20 ms de atraso (independente do vídeo)
 - **Zona:** sugestão aceitável sem ajuste em ≥ 80% dos testes com teclados diferentes
@@ -720,7 +720,7 @@ Os mesmos gestos pelo Meta Interaction SDK: pinçar a moldura pra mover, puxar a
 
 | Métrica | Alvo |
 |---|---|
-| Frame rate do app | 90 Hz estáveis (72 Hz como mínimo aceitável) |
+| Frame rate do app | 72 Hz estáveis, sem queda (ADR 0002; 90 Hz fica como opção futura) |
 | Alocação GC por frame (Unity, regime) | **0 bytes** |
 | Latência glass-to-glass (PC → olho), LAN Wi-Fi 6 | **< 50 ms** (meta), < 80 ms (aceitável) |
 | Tela em foco | 1440p @ 60 fps |
