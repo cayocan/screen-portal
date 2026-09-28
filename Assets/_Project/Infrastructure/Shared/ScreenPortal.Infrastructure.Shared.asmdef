@@ -1,0 +1,14 @@
+{
+    "name": "ScreenPortal.Infrastructure.Shared",
+    "rootNamespace": "ScreenPortal.Infrastructure",
+    "references": ["ScreenPortal.Domain", "ScreenPortal.Application"],
+    "includePlatforms": [],
+    "excludePlatforms": [],
+    "allowUnsafeCode": false,
+    "overrideReferences": true,
+    "precompiledReferences": ["Google.FlatBuffers.dll"],
+    "autoReferenced": false,
+    "defineConstraints": [],
+    "versionDefines": [],
+    "noEngineReferences": true
+}

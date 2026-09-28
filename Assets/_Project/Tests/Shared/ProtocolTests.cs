@@ -1,0 +1,110 @@
+using System;
+using NUnit.Framework;
+using ScreenPortal.App.Connection;
+using ScreenPortal.Infrastructure.Protocol;
+
+namespace ScreenPortal.Tests
+{
+    public class ProtocolTests
+    {
+        private static ControlMessage RoundTrip(ControlMessage message)
+        {
+            var result = ControlMessageCodec.Decode(ControlMessageCodec.Encode(message));
+            Assert.That(result.Status, Is.EqualTo(DecodeStatus.Ok));
+            Assert.That(result.Version, Is.EqualTo(ControlProtocol.Version));
+            Assert.That(result.Message.Kind, Is.EqualTo(message.Kind));
+            return result.Message;
+        }
+
+        [Test]
+        public void Hello_RoundTrips()
+        {
+            var m = (HelloMessage)RoundTrip(new HelloMessage("dev-1", "Quest 3", "tok"));
+            Assert.That(m.DeviceId, Is.EqualTo("dev-1"));
+            Assert.That(m.DeviceName, Is.EqualTo("Quest 3"));
+            Assert.That(m.PairingToken, Is.EqualTo("tok"));
+        }
+
+        [Test]
+        public void Welcome_RoundTripsMonitorList()
+        {
+            var m = (WelcomeMessage)RoundTrip(new WelcomeMessage("CAYO-PC", new[]
+            {
+                new MonitorDescriptor(1, 2560, 1080, "DISPLAY1", true),
+                new MonitorDescriptor(2, 1920, 1080, "DISPLAY2", false),
+            }));
+            Assert.That(m.HostName, Is.EqualTo("CAYO-PC"));
+            Assert.That(m.Monitors.Count, Is.EqualTo(2));
+            Assert.That(m.Monitors[0].Width, Is.EqualTo(2560u));
+            Assert.That(m.Monitors[0].IsPrimary, Is.True);
+            Assert.That(m.Monitors[1].Name, Is.EqualTo("DISPLAY2"));
+        }
+
+        [Test]
+        public void AllOtherMessages_RoundTrip()
+        {
+            Assert.That(((PairingRequiredMessage)RoundTrip(new PairingRequiredMessage("482913"))).Code, Is.EqualTo("482913"));
+            var pr = (PairingResultMessage)RoundTrip(new PairingResultMessage(true, "t"));
+            Assert.That(pr.Accepted, Is.True);
+            Assert.That(pr.PairingToken, Is.EqualTo("t"));
+            var ss = (StartStreamMessage)RoundTrip(new StartStreamMessage(1, 9000, 0));
+            Assert.That(ss.UdpPort, Is.EqualTo((ushort)9000));
+            var st = (StreamStartedMessage)RoundTrip(new StreamStartedMessage(0, 2560, 1080));
+            Assert.That(st.Height, Is.EqualTo(1080u));
+            Assert.That(((StreamStoppedMessage)RoundTrip(new StreamStoppedMessage(0, "x"))).Reason, Is.EqualTo("x"));
+            Assert.That(((PingMessage)RoundTrip(new PingMessage(123456789UL))).SentUs, Is.EqualTo(123456789UL));
+            Assert.That(((PongMessage)RoundTrip(new PongMessage(42UL))).SentUs, Is.EqualTo(42UL));
+            Assert.That(((ByeMessage)RoundTrip(new ByeMessage(ByeReason.PairingRejected))).Reason, Is.EqualTo(ByeReason.PairingRejected));
+        }
+
+        [Test]
+        public void Decode_Garbage_IsInvalid()
+        {
+            Assert.That(ControlMessageCodec.Decode(new byte[] { 1, 2, 3 }).Status, Is.EqualTo(DecodeStatus.Invalid));
+            Assert.That(ControlMessageCodec.Decode(new byte[64]).Status, Is.EqualTo(DecodeStatus.Invalid));
+        }
+
+        [Test]
+        public void Decode_OtherVersion_IsIncompatible()
+        {
+            var bytes = ControlMessageCodec.Encode(new PingMessage(1), protocolVersion: 2);
+            var result = ControlMessageCodec.Decode(bytes);
+            Assert.That(result.Status, Is.EqualTo(DecodeStatus.IncompatibleVersion));
+            Assert.That(result.Version, Is.EqualTo((ushort)2));
+        }
+
+        [Test]
+        public void FrameReader_HandlesSplitAndCoalescedFrames()
+        {
+            var a = FrameCodec.Frame(new byte[] { 1, 2, 3 });
+            var b = FrameCodec.Frame(new byte[] { 9 });
+            var stream = new byte[a.Length + b.Length];
+            Buffer.BlockCopy(a, 0, stream, 0, a.Length);
+            Buffer.BlockCopy(b, 0, stream, a.Length, b.Length);
+
+            var reader = new FrameReader();
+            reader.Append(stream, 0, 2);                        // metade do header
+            Assert.That(reader.TryRead(out _), Is.False);
+            reader.Append(stream, 2, stream.Length - 2);        // resto + frame inteiro colado
+            Assert.That(reader.TryRead(out var p1), Is.True);
+            Assert.That(p1, Is.EqualTo(new byte[] { 1, 2, 3 }));
+            Assert.That(reader.TryRead(out var p2), Is.True);
+            Assert.That(p2, Is.EqualTo(new byte[] { 9 }));
+            Assert.That(reader.TryRead(out _), Is.False);
+        }
+
+        [Test]
+        public void FrameReader_RejectsOversizedFrame()
+        {
+            var reader = new FrameReader();
+            var header = BitConverter.GetBytes(ControlProtocol.MaxFrameBytes + 1);
+            reader.Append(header, 0, 4);
+            Assert.That(reader.TryRead(out _), Is.False);
+            Assert.That(reader.IsCorrupt, Is.True);
+        }
+
+        [Test]
+        public void Frame_RejectsOversizedPayload() =>
+            Assert.Throws<ArgumentException>(() => FrameCodec.Frame(new byte[ControlProtocol.MaxFrameBytes + 1]));
+    }
+}

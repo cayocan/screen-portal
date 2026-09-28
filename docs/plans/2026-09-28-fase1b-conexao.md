@@ -121,6 +121,7 @@ union Message { Hello, PairingRequired, PairingResult, Welcome, StartStream, Str
 table Envelope { protocol_version:ushort; body:Message; }
 
 root_type Envelope;
+file_identifier "SPCT";   // 4 bytes no início do buffer: rejeita lixo cedo (e evita o bug do Verify sem identificador no C# 25.2.10)
 ```
 
 `tools/gen-protocol.ps1`:
@@ -697,7 +698,7 @@ namespace ScreenPortal.Infrastructure.Protocol
             }
 
             var envelope = Fb.Envelope.CreateEnvelope(b, protocolVersion, type, body);
-            b.Finish(envelope.Value);
+            Fb.Envelope.FinishEnvelopeBuffer(b, envelope); // grava o file_identifier "SPCT"
             return b.SizedByteArray();
         }
 

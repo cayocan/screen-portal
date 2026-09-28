@@ -13,11 +13,14 @@
   <ItemGroup>
     <Compile Include="../../Assets/_Project/Domain/**/*.cs" />
     <Compile Include="../../Assets/_Project/Application/**/*.cs" />
+    <Compile Include="../../Assets/_Project/Infrastructure/Shared/**/*.cs" />
     <Compile Include="../../Assets/_Project/Tests/EditMode/**/*.cs" />
+    <Compile Include="../../Assets/_Project/Tests/Shared/**/*.cs" />
   </ItemGroup>
   <ItemGroup>
     <PackageReference Include="Microsoft.NET.Test.Sdk" Version="17.14.1" />
     <PackageReference Include="NUnit" Version="3.14.0" />
     <PackageReference Include="NUnit3TestAdapter" Version="4.6.0" />
+    <PackageReference Include="Google.FlatBuffers" Version="25.2.10" />
   </ItemGroup>
 </Project>
