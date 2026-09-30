@@ -29,7 +29,7 @@ namespace ScreenPortal.Composition
             builder.Register<CommandBus>(Lifetime.Singleton).As<ICommandBus>();
 
             var views = new OverlayScreenViewFactory(env.ScreensRoot, env.UnlitMaterial);
-            builder.RegisterInstance(views).As<IScreenViewFactory>().As<IScreenSurfaceProvider>();
+            builder.RegisterInstance(views).AsSelf().As<IScreenViewFactory>().As<IScreenSurfaceProvider>();
             builder.Register<ScreenViewSynchronizer>(Lifetime.Singleton);
 
             builder.RegisterInstance(new MonotonicClock()).As<IClock>();
@@ -38,10 +38,15 @@ namespace ScreenPortal.Composition
             builder.RegisterInstance(env.Pairing).As<IPairingStore>();
             builder.Register<ConnectionStateMachine>(Lifetime.Singleton);
 
+            // 2C: telas com vídeo sob comando do headset (spec 2026-09-30-fase2c-varias-telas-design.md)
+            builder.Register<NativeScreenVideo>(Lifetime.Singleton).As<IScreenVideo>();
+            builder.Register<HostSync>(Lifetime.Singleton).AsSelf().As<IHostCatalog>().As<IScreenLinks>();
+
             // 2B: manipulação por controle/mãos + menu de pulso (spec 2026-09-29-fase2b-manipulacao-design.md)
             builder.RegisterInstance(env.Head ?? new FixedHeadPose(Pose.At(LayoutSurface.DefaultCenter))).As<IHeadPoseSource>();
             builder.Register<ScreenManipulationController>(Lifetime.Singleton);
-            builder.Register<WristMenu>(Lifetime.Singleton);
+            builder.Register(r => new WristMenu(r.Resolve<WorkspaceStore>(), r.Resolve<ICommandBus>(), r.Resolve<IHeadPoseSource>(),
+                r.Resolve<IHostCatalog>(), env.ShowTestScreens), Lifetime.Singleton);
             builder.Register(r => new InteractionRouter(env.RightPointer, env.LeftPointer,
                 r.Resolve<ScreenManipulationController>(), r.Resolve<WristMenu>(), env.MenuPanel, r.Resolve<ICommandBus>()), Lifetime.Singleton);
             builder.Register(r => new ManipulationPresenter(env.ScreensRoot, env.UnlitMaterial,

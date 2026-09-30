@@ -24,11 +24,14 @@ namespace ScreenPortal.Composition
         public IRecenterEvents Recenter { get; }
         public IWristMenuPanel MenuPanel { get; }
         public Material UnlitMaterial { get; }
+        /// <summary>Build de desenvolvimento: o menu mostra "+ Tela de teste".</summary>
+        public bool ShowTestScreens { get; }
 
         public AppEnvironment(Transform screensRoot, ConnectionStatusView statusView, IHostDiscovery discovery,
             IPairingStore pairing, ConnectionOptions options,
             IManipulationInput rightPointer = null, IManipulationInput leftPointer = null, IHeadPoseSource head = null,
-            IRecenterEvents recenter = null, IWristMenuPanel menuPanel = null, Material unlitMaterial = null)
+            IRecenterEvents recenter = null, IWristMenuPanel menuPanel = null, Material unlitMaterial = null,
+            bool showTestScreens = false)
         {
             ScreensRoot = screensRoot;
             StatusView = statusView;
@@ -41,6 +44,7 @@ namespace ScreenPortal.Composition
             Recenter = recenter;
             MenuPanel = menuPanel;
             UnlitMaterial = unlitMaterial;
+            ShowTestScreens = showTestScreens;
         }
     }
 }

@@ -34,7 +34,7 @@ namespace ScreenPortal.Composition
             IHostDiscovery discovery = android
                 ? new AndroidHostDiscovery()
                 : (IHostDiscovery)new StaticHostDiscovery(new HostEndpoint("Editor", editorHostAddress, ControlProtocol.Port));
-            IPairingStore pairing = android ? new PlayerPrefsPairingStore() : (IPairingStore)new InMemoryPairingStore("editor");
+            IPairingStore pairing = new PlayerPrefsPairingStore(); // Editor também: pareia uma vez (verificação com o host real)
             var options = new ConnectionOptions { DeviceName = SystemInfo.deviceName };
 
             IManipulationInput right = trackingSpace != null
@@ -45,7 +45,7 @@ namespace ScreenPortal.Composition
 
             AppInstaller.Install(builder, new AppEnvironment(
                 screensRoot != null ? screensRoot : transform, statusView, discovery, pairing, options,
-                right, left, head, new OvrRecenterEvents(), menuPanel, unlitMaterial));
+                right, left, head, new OvrRecenterEvents(), menuPanel, unlitMaterial, Debug.isDebugBuild));
         }
     }
 }
