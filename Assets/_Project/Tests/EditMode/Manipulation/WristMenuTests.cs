@@ -171,6 +171,17 @@ namespace ScreenPortal.Tests
         }
 
         [Test]
+        public void CreatedScreen_AppearsWhereTheHeadIsLooking()
+        {
+            var r = new Rig();
+            r.Menu.Invoke(MenuItemId.AddMirror);
+            r.Menu.Invoke(1);
+            var expected = SurfaceSlots.Facing(r.Store.State.Surface, Head);
+            Assert.That(r.Store.State.Screens[0].Placement.AzimuthDeg, Is.EqualTo(expected.AzimuthDeg).Within(0.01f));
+            Assert.That(expected.AzimuthDeg, Is.EqualTo(30f).Within(0.01f));
+        }
+
+        [Test]
         public void FifthVideoScreen_ShowsTheWarning_TestScreensDoNotCount_HidingClearsIt()
         {
             var r = new Rig();

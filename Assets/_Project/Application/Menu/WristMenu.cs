@@ -294,7 +294,8 @@ namespace ScreenPortal.App.Menu
 
         private void Create(Resolution resolution, ScreenSource source, string label)
         {
-            var result = _bus.Send(new CreateScreen(resolution, null, ScreenSizing.InitialWidthMeters(resolution), 0f, label, source));
+            var near = SurfaceSlots.Facing(_store.State.Surface, _head.HeadPose); // spec 2C §3: nasce à frente da visão
+            var result = _bus.Send(new CreateScreen(resolution, null, ScreenSizing.InitialWidthMeters(resolution), 0f, label, source, near));
             Page = MenuPage.Main;
             if (result.Accepted && VideoScreens(_store.State) > ComfortableVideoScreens) _notice = TooManyNotice;
         }
