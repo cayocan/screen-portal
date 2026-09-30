@@ -29,6 +29,12 @@ namespace ScreenPortal.Spikes.Phase0
         [SerializeField] private bool useEfficientSharpen = false;
         [SerializeField] private bool useEfficientSupersample = false;
 
+        [Header("Fase 2E (spike de telas curvas)")]
+        [Tooltip("Telas como layers cilíndricas lado a lado (centro do cilindro na cabeça, raio = distância).")]
+        [SerializeField] private bool cylinder = false;
+        [Tooltip("> 0: a tela 0 alterna plana ↔ curva a cada N s (recria a layer e a sessão nativa).")]
+        [SerializeField] private int toggleSeconds = 0;
+
         [Header("HUD")]
         [SerializeField] private TextMesh statsLabel;
 
@@ -56,9 +62,11 @@ namespace ScreenPortal.Spikes.Phase0
             useBicubicFiltering = intent.Call<int>("getIntExtra", "bicubic", useBicubicFiltering ? 1 : 0) != 0;
             useEfficientSharpen = intent.Call<int>("getIntExtra", "sharpen", useEfficientSharpen ? 1 : 0) != 0;
             useEfficientSupersample = intent.Call<int>("getIntExtra", "supersample", useEfficientSupersample ? 1 : 0) != 0;
+            cylinder = intent.Call<int>("getIntExtra", "cylinder", cylinder ? 1 : 0) != 0;
+            toggleSeconds = intent.Call<int>("getIntExtra", "toggle", toggleSeconds);
             Debug.Log($"[ScreenPortal] config: {streamCount} stream(s), {videoWidth}x{videoHeight}, " +
                       $"{screenWidthMeters:F2} m a {distanceMeters:F2} m, bicubic={useBicubicFiltering} " +
-                      $"sharpen={useEfficientSharpen} supersample={useEfficientSupersample}");
+                      $"sharpen={useEfficientSharpen} supersample={useEfficientSupersample} cylinder={cylinder} toggle={toggleSeconds}");
 #endif
         }
 
@@ -72,33 +80,65 @@ namespace ScreenPortal.Spikes.Phase0
             int cols = Mathf.Min(columns, streamCount);
             int rows = (streamCount + cols - 1) / cols;
 
-            for (int i = 0; i < streamCount; i++)
+            _height = height;
+            _cols = cols;
+            _rows = rows;
+            for (int i = 0; i < streamCount; i++) _overlays[i] = CreateOverlay(i, cylinder);
+            _nextToggleTime = toggleSeconds > 0 ? Time.unscaledTime + toggleSeconds : float.MaxValue;
+        }
+
+        private float _height;
+        private int _cols, _rows;
+        private float _nextToggleTime;
+        private bool _screen0Cylinder;
+
+        private OVROverlay CreateOverlay(int i, bool asCylinder)
+        {
+            int col = i % _cols;
+            int row = i / _cols;
+            float y = 1.2f + ((_rows - 1) * 0.5f - row) * (_height + gapMeters);
+
+            var go = new GameObject("Screen" + i);
+            go.SetActive(false); // configurar a overlay antes do OnEnable criar a layer
+            go.transform.SetParent(transform, false);
+            if (asCylinder)
             {
-                int col = i % cols;
-                int row = i / cols;
-                float x = (col - (cols - 1) * 0.5f) * (screenWidthMeters + gapMeters);
-                float y = 1.2f + ((rows - 1) * 0.5f - row) * (height + gapMeters);
-
-                var go = new GameObject("Screen" + i);
-                go.SetActive(false); // configurar a overlay antes do OnEnable criar a layer
-                go.transform.SetParent(transform, false);
-                go.transform.localPosition = new Vector3(x, y, distanceMeters);
-                go.transform.localScale = new Vector3(screenWidthMeters, height, 1f);
-
-                var overlay = go.AddComponent<OVROverlay>();
-                overlay.currentOverlayType = OVROverlay.OverlayType.Overlay;
-                overlay.currentOverlayShape = OVROverlay.OverlayShape.Quad;
-                overlay.isExternalSurface = true;
-                overlay.externalSurfaceWidth = videoWidth;
-                overlay.externalSurfaceHeight = videoHeight;
-                overlay.useBicubicFiltering = useBicubicFiltering;
-                overlay.useEfficientSharpen = useEfficientSharpen;
-                overlay.useEfficientSupersample = useEfficientSupersample;
-                overlay.compositionDepth = i;
-                _overlays[i] = overlay;
-
-                go.SetActive(true);
+                // Centro do cilindro na cabeça; scale = (comprimento do arco, altura, raio).
+                float stepDeg = (screenWidthMeters + gapMeters) / distanceMeters * Mathf.Rad2Deg;
+                go.transform.localPosition = new Vector3(0f, y, 0f);
+                go.transform.localRotation = Quaternion.Euler(0f, (col - (_cols - 1) * 0.5f) * stepDeg, 0f);
+                go.transform.localScale = new Vector3(screenWidthMeters, _height, distanceMeters);
             }
+            else
+            {
+                float x = (col - (_cols - 1) * 0.5f) * (screenWidthMeters + gapMeters);
+                go.transform.localPosition = new Vector3(x, y, distanceMeters);
+                go.transform.localScale = new Vector3(screenWidthMeters, _height, 1f);
+            }
+
+            var overlay = go.AddComponent<OVROverlay>();
+            overlay.currentOverlayType = OVROverlay.OverlayType.Overlay;
+            overlay.currentOverlayShape = asCylinder ? OVROverlay.OverlayShape.Cylinder : OVROverlay.OverlayShape.Quad;
+            overlay.isExternalSurface = true;
+            overlay.externalSurfaceWidth = videoWidth;
+            overlay.externalSurfaceHeight = videoHeight;
+            overlay.useBicubicFiltering = useBicubicFiltering;
+            overlay.useEfficientSharpen = useEfficientSharpen;
+            overlay.useEfficientSupersample = useEfficientSupersample;
+            overlay.compositionDepth = i;
+            go.SetActive(true);
+            if (i == 0) _screen0Cylinder = asCylinder;
+            return overlay;
+        }
+
+        /// <summary>Spike 2E: troca a forma da tela 0 recriando a layer e a sessão (mede o buraco sem imagem no logcat).</summary>
+        private void ToggleScreen0()
+        {
+            NativeVideoBridge.Stop(_handles[0]);
+            _handles[0] = 0;
+            Destroy(_overlays[0].gameObject);
+            _overlays[0] = CreateOverlay(0, !_screen0Cylinder);
+            Debug.Log($"[ScreenPortal] toggle: tela 0 agora {(_screen0Cylinder ? "cilindro" : "quad")} t={Time.realtimeSinceStartup:F3}");
         }
 
         private void Update()
@@ -111,8 +151,14 @@ namespace ScreenPortal.Spikes.Phase0
 
                 _handles[i] = NativeVideoBridge.Start(i, basePort + i, surface, videoWidth, videoHeight);
                 Debug.Log(_handles[i] != 0
-                    ? $"[ScreenPortal] tela {i}: sessão nativa na porta {basePort + i}"
+                    ? $"[ScreenPortal] tela {i}: sessão nativa na porta {basePort + i} t={Time.realtimeSinceStartup:F3}"
                     : $"[ScreenPortal] tela {i}: falha ao iniciar a sessão nativa");
+            }
+
+            if (Time.unscaledTime >= _nextToggleTime)
+            {
+                _nextToggleTime = Time.unscaledTime + toggleSeconds;
+                ToggleScreen0();
             }
 
             if (Time.unscaledTime >= _nextStatsTime)
