@@ -88,6 +88,9 @@ public sealed unsafe class MfH264Encoder : IVideoEncoder
             _codec.SetUInt32(CodecApi.AVEncCommonRateControlMode, CodecApi.RateControlCbr);
             _codec.SetUInt32(CodecApi.AVEncCommonMeanBitRate, (uint)settings.BitrateKbps * 1000);
             _codec.SetUInt32(CodecApi.AVEncMPVDefaultBPictureCount, 0);
+            // 1 referência → max_dec_frame_buffering baixo no SPS. Com 4 (padrão do AMF), o decoder do Quest segura
+            // ~1 quadro antes de liberar: +16,7 ms a 60 fps, +67 ms a 15 fps (medido na 2A).
+            _codec.SetUInt32(CodecApi.AVEncVideoMaxNumRefFrame, 1);
             _codec.SetUInt32(CodecApi.AVEncMPVGOPSize, (uint)Math.Max(1, settings.Fps * settings.KeyframeIntervalMs / 1000));
         }
 

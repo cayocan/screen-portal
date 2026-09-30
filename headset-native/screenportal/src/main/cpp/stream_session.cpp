@@ -55,6 +55,8 @@ bool StreamSession::configureCodec() {
     // Low-latency: chave padrão (API 30+) + extensão da Qualcomm (XR2 Gen 2 do Quest 3).
     AMediaFormat_setInt32(format, "low-latency", 1);
     AMediaFormat_setInt32(format, "vendor.qti-ext-dec-low-latency.enable", 1);
+    // Libera cada quadro na ordem de decodificação, sem esperar o seguinte (não há B-frames no stream).
+    AMediaFormat_setInt32(format, "vendor.qti-ext-dec-picture-order.enable", 1);
     AMediaFormat_setInt32(format, "priority", 0);  // realtime
     AMediaFormat_setInt32(format, "operating-rate", 120);
 
