@@ -43,13 +43,15 @@ public sealed class HeadsetSession(
                 if (pairing.IsPaired(hello.DeviceId, hello.PairingToken)) SendWelcome();
                 else BeginPairing(hello);
                 break;
-            case AcquireScreenMessage acquire:
+            // Antes do Welcome, mensagens de tela são descartadas sem entrar na fila: um peer não pareado não mexe em
+            // telas nem faz a fila crescer.
+            case AcquireScreenMessage acquire when _welcomed:
                 Enqueue(() => OnAcquire(acquire));
                 break;
-            case StartStreamMessage start:
+            case StartStreamMessage start when _welcomed:
                 Enqueue(() => OnStartStream(start));
                 break;
-            case ReleaseScreenMessage release:
+            case ReleaseScreenMessage release when _welcomed:
                 Enqueue(() => OnRelease(release));
                 break;
             case PingMessage ping:
@@ -131,7 +133,9 @@ public sealed class HeadsetSession(
 
     public void OnClosed()
     {
+        // Só uma sessão que recebeu Welcome fala por aquele device id: o Hello (em claro) de um peer não pareado não
+        // pode derrubar os streams de outro headset.
         string? deviceId = _deviceId;
-        if (deviceId != null) Enqueue(() => screens.Disconnected(deviceId));
+        if (_welcomed && deviceId != null) Enqueue(() => screens.Disconnected(deviceId));
     }
 }

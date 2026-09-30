@@ -162,6 +162,38 @@ public class HeadsetSessionTests
     }
 
     [Fact]
+    public void ScreenMessages_BeforeWelcome_AreNotEvenEnqueued()
+    {
+        var (session, _, _, _, _) = Create(approve: false);
+        var idle = session.Idle;
+        session.OnMessage(new AcquireScreenMessage(1, ScreenKind.Virtual, 2560, 1440, 0));
+        session.OnMessage(new StartStreamMessage(1, 9000, 0));
+        session.OnMessage(new ReleaseScreenMessage(1, 0));
+        Assert.Same(idle, session.Idle); // nada na fila: um peer não pareado não a faz crescer
+    }
+
+    [Theory]
+    [InlineData(false)] // pareamento recusado
+    [InlineData(null)]  // pareamento nunca concluído
+    public async Task UnpairedSession_Closing_DoesNotDisconnectThatDevice(bool? answer)
+    {
+        var conn = new FakeConnection();
+        var screens = new FakeScreens();
+        IPairingApprover approver = answer.HasValue ? new FakeApprover(answer.Value) : new PendingApprover();
+        var session = new HeadsetSession(conn, new PairingStore(), () => { }, approver, new FakeMonitors(), screens,
+            "CAYO-PC", () => "482913", _ => { });
+        session.OnMessage(new HelloMessage("victim-dev", "Quest 3", "")); // id de outro headset, sem token
+        session.OnClosed();
+        await session.Idle.WaitAsync(TimeSpan.FromSeconds(5));
+        Assert.Empty(screens.Calls);
+    }
+
+    private sealed class PendingApprover : IPairingApprover
+    {
+        public Task<bool> ApproveAsync(string deviceName, string code) => new TaskCompletionSource<bool>().Task;
+    }
+
+    [Fact]
     public async Task SlowAcquire_DoesNotBlockPingOnTheReadThread()
     {
         var session = Welcomed(out var conn, out var screens);
