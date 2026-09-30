@@ -37,6 +37,8 @@ namespace ScreenPortal.Editor
             menuSo.FindProperty("head").objectReferenceValue = rig.centerEyeAnchor;
             menuSo.FindProperty("leftHand").objectReferenceValue = leftHand;
             menuSo.FindProperty("unlit").objectReferenceValue = unlit;
+            // calibrado no Simulator (30/09/2026): palma para o rosto dá +0,86; palma para baixo −0,29; para fora −0,86
+            menuSo.FindProperty("palmNormalLocal").vector3Value = Vector3.down;
             menuSo.ApplyModifiedPropertiesWithoutUndo();
 
             var screensRoot = new GameObject("Screens");
