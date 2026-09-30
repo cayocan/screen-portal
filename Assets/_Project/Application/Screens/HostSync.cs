@@ -12,7 +12,8 @@ namespace ScreenPortal.App.Screens
     /// Reconcilia as telas com vídeo da workspace com os aluguéis de monitor do host (spec 2C §4, ADR 0009).
     /// A workspace é a fonte da verdade: undo, remoção adiada e reconexão caem no mesmo caminho.
     /// <see cref="Tick"/> 1× por quadro, depois de <see cref="ConnectionStateMachine.Tick"/>; sem alocação por quadro
-    /// (mensagens só nas transições).
+    /// (mensagens só nas transições). Handlers de <see cref="LinkChanged"/> não podem enviar Commands
+    /// (<c>Reconcile</c> não é reentrante): as views nunca mudam o estado.
     /// </summary>
     public sealed class HostSync : IHostCatalog, IScreenLinks, IDisposable
     {
@@ -156,7 +157,7 @@ namespace ScreenPortal.App.Screens
                 else if (!e.Resolution.Equals(s.Resolution) || !e.Source.Equals(s.Source))
                 {
                     // RecreateScreen: o AcquireScreen com o tamanho novo faz o host trocar o monitor
-                    CloseVideo(e);
+                    CloseDecoder(e); // o slot (porta/stream_id) continua com a tela
                     e.Source = s.Source;
                     e.Resolution = s.Resolution;
                     SetPhase(e, Phase.Unlinked);
@@ -168,7 +169,8 @@ namespace ScreenPortal.App.Screens
                 var e = _entries[i];
                 if (e.Seen) continue;
                 _connection.Send(new ReleaseScreenMessage(Key(e.Id), RemoveGraceMs));
-                CloseVideo(e);
+                CloseDecoder(e);
+                ReleaseSlot(e);
                 _entries.RemoveAt(i);
             }
         }
@@ -270,6 +272,8 @@ namespace ScreenPortal.App.Screens
 
         private void Fail(Entry e, string detail)
         {
+            CloseDecoder(e);
+            ReleaseSlot(e);
             e.Detail = detail ?? string.Empty;
             SetPhase(e, Phase.Failed);
         }
@@ -282,10 +286,14 @@ namespace ScreenPortal.App.Screens
             LinkChanged?.Invoke(e.Id);
         }
 
-        private void CloseVideo(Entry e)
+        private void CloseDecoder(Entry e)
         {
             if (e.VideoOpen) _video.Close(e.Id);
             e.VideoOpen = false;
+        }
+
+        private void ReleaseSlot(Entry e)
+        {
             if (e.Slot >= 0) _slots[e.Slot] = false;
             e.Slot = -1;
         }
@@ -330,7 +338,11 @@ namespace ScreenPortal.App.Screens
             _connection.Welcomed -= OnWelcomed;
             _connection.Lost -= OnLost;
             _connection.ScreenMessage -= OnScreenMessage;
-            for (int i = 0; i < _entries.Count; i++) CloseVideo(_entries[i]);
+            for (int i = 0; i < _entries.Count; i++)
+            {
+                CloseDecoder(_entries[i]);
+                ReleaseSlot(_entries[i]);
+            }
             _entries.Clear();
         }
     }

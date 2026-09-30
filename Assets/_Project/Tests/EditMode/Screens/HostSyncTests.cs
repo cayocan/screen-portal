@@ -245,6 +245,46 @@ namespace ScreenPortal.Tests
         }
 
         [Test]
+        public void Recreate_KeepsTheStreamSlot_AndReopensTheDecoderWithTheNewResolution()
+        {
+            var r = new Rig();
+            var id = r.AddVirtual();
+            r.Link();
+            r.Push(new ScreenReadyMessage((uint)id.Value, 2560, 1440));
+            Assert.That(r.C.Channel.Last<StartStreamMessage>().UdpPort, Is.EqualTo((ushort)9000));
+
+            r.C.Bus.Send(new RecreateScreen(id, Resolution.Create(1920, 1080)));
+            r.Tick();
+            var acquire = r.C.Channel.Last<AcquireScreenMessage>();
+            Assert.That(acquire.ScreenKey, Is.EqualTo((uint)id.Value));
+            Assert.That(acquire.Width, Is.EqualTo(1920u));
+            Assert.That(acquire.Height, Is.EqualTo(1080u));
+
+            r.Push(new ScreenReadyMessage((uint)id.Value, 1920, 1080));
+            Assert.That(r.Video.Opens, Is.EqualTo(2));
+            Assert.That(r.Video.LastResolution, Is.EqualTo(Resolution.Create(1920, 1080)));
+            Assert.That(r.Video.LastPort, Is.EqualTo(9000));
+
+            var b = r.AddVirtual(1280, 720);
+            r.Tick();
+            r.Push(new ScreenReadyMessage((uint)b.Value, 1280, 720));
+            Assert.That(r.Video.LastPort, Is.EqualTo(9001), "o slot da tela recriada não foi liberado");
+        }
+
+        [Test]
+        public void ScreenFailed_WhileStreaming_ClosesTheDecoder()
+        {
+            var r = new Rig();
+            var id = r.AddVirtual();
+            r.Link();
+            r.Push(new ScreenReadyMessage((uint)id.Value, 2560, 1440));
+            r.Push(new StreamStartedMessage(0, 2560, 1440));
+            Assert.That(r.Video.Open.Contains(id), Is.True);
+            r.Push(new ScreenFailedMessage((uint)id.Value, "perdeu o monitor"));
+            Assert.That(r.Video.Open.Contains(id), Is.False);
+        }
+
+        [Test]
         public void Catalog_ExposesConnectionAndPhysicalMonitors()
         {
             var r = new Rig();
