@@ -4,6 +4,7 @@
 >
 > **Revisões:** v1.3.1 (28/09/2026) — ADR 0002 (alvo de 72 Hz) e ADR 0003 (zona de passthrough desenhada pelo usuário, sem detecção de teclado).
 > v1.3.2 (28/09/2026) — ADR 0005: **superfície de layout Cilindro/Esfera** (seção 10.12) e o princípio **Liberdade**. Entra nas Fases 2 e 3, sem mudar a ordem do roadmap.
+> v1.3.3 (30/09/2026) — ADR 0011: **toda tela curva é uma layer cilíndrica** (o limite de 1 cilindro não vale no OpenXR do Quest 3; saem `CylinderLayerPolicy`, crossfade e o modo "nitidez reduzida"). ADR 0012: **sem resolução personalizada**, **sem contorno fantasma** (a tela nasce à frente da visão) e **recriar sem confirmação** (com undo).
 >
 > **Princípio de produto — Liberdade:** encaixes, grades e regras de layout **ajudam, nunca prendem**. Tudo que gruda pode ser desgrudado e toda tela pode sair da superfície de layout.
 >
@@ -455,6 +456,7 @@ Qualquer tela pode ser **plana ou curva**, e o usuário define **quanto** ela cu
 Durante o ajuste, a tela se curva **na hora** (preview local) e aparece o valor (ex.: "Média · 60% · ≈ 1800R"). Ao soltar, vira um único Command (`SetScreenCurvature`), então `Ctrl+Alt+Z` desfaz.
 
 **O limite técnico (e como a UX lida com ele):**
+> **v1.3.3 (ADR 0011):** medido no Quest 3 com OpenXR, 4 layers cilíndricas com vídeo aparecem nítidas. Toda tela curva é uma layer cilíndrica; os itens abaixo sobre layer única, dono, crossfade, plano B e "nitidez reduzida" não se aplicam mais. O limite de arco de ~120° continua.
 - A Meta permite **no máximo 1 compositor layer cilíndrica por cena** (seção 15.4). A tela curva que estiver nessa layer fica com **nitidez máxima**; as outras curvas precisam ser desenhadas como malha curva no eye buffer, **um pouco menos nítidas**.
 - **Regra de prioridade:** a layer cilíndrica vai pra **tela curva em foco** (a do cursor, seção 8.8). Quando o foco muda para outra tela curva, a layer troca de dono **no próximo frame, com um crossfade curto** pra não piscar. Telas planas continuam sempre em layers quad nítidas.
 - Se a troca de dono se mostrar perceptível nos testes, o plano B é **"tela curva principal" fixa**, escolhida pelo usuário no menu. Decidir na Fase 2 com medição.
@@ -471,6 +473,7 @@ Durante o ajuste, a tela se curva **na hora** (preview local) e aparece o valor 
 - Commands: `SetScreenCurvature(screenId, value)`, `ToggleScreenCurvature(screenId)`.
 - **Invariante:** mudar a curvatura nunca altera `Resolution`, `Orientation` nem `WidthMeters`.
 - Política de layer: `CylinderLayerPolicy` (**Strategy**: `FocusedCurvedScreen` padrão, `PinnedPrimaryCurvedScreen` plano B).
+  > **v1.3.3:** sem política de layer (ADR 0011): curva → layer cilíndrica, plana → layer quad.
 
 ### 10.3 Criar monitor novo: seletor de proporção e resolução
 A resolução é escolhida **uma vez, na criação**. É aí que o usuário decide "quero um ultrawide", "quero um vertical para código" etc.
@@ -523,6 +526,7 @@ A resolução é escolhida **uma vez, na criação**. É aí que o usuário deci
 | **Custom** | Personalizado | Largura × altura livres | Qualquer caso | Qualquer caso |
 
 **Personalizado:**
+> **v1.3.3 (ADR 0012):** fora do escopo. Sem resolução personalizada nem favoritos de resolução; a proporção "Custom" sai do seletor.
 - Dois campos (largura, altura) + o preview do retângulo atualizando ao vivo + a razão calculada (ex.: "≈ 2,39:1"). O botão de orientação troca os dois campos entre si.
 - Validação: mínimo 640×480 (ou 480×640 em retrato), **múltiplos de 8** (encoder), máximo dentro do limite do encoder/decoder (ver o aviso abaixo).
 - "Salvar como favorito" com nome (a orientação é salva junto).
@@ -533,6 +537,7 @@ A resolução é escolhida **uma vez, na criação**. É aí que o usuário deci
 - ⚠️ **Limite de encoder (a validar):** encoders H.264 de hardware costumam limitar cada dimensão em ~4096 px. Resoluções maiores **em qualquer orientação** (ex.: 5120×1440 em paisagem ou 1440×5120 em retrato) provavelmente precisam de **HEVC**. No MVP (H.264), essas opções aparecem marcadas "requer HEVC" e ficam desabilitadas até a v1.1, ou o host divide o monitor em 2 streams (decidir no spike da Fase 2).
 
 **Depois de escolher: posicionar no espaço**
+> **v1.3.3 (ADR 0012):** sem contorno fantasma. A tela é criada direto, à frente da visão, no espaço livre mais perto (spec 2C §3); mover e redimensionar vêm depois, com undo.
 1. "Posicionar ▶" mostra um **contorno fantasma em tamanho real** na frente do usuário, com a proporção escolhida.
 2. O usuário ajusta **onde** e **quão grande** (zoom proporcional, regra 10.1): com o mouse (arrastar move, roda afasta, `Ctrl`+roda redimensiona, igual à seção 10.10), com as setas do teclado ou com pinça.
 3. Confirma, e só então o host cria o monitor virtual **com a resolução exata** (padrão comprovado em produção, seção 15.7) e o stream começa.
@@ -546,6 +551,7 @@ A resolução é escolhida **uma vez, na criação**. É aí que o usuário deci
 - No menu da tela: **"Recriar com outra resolução…"** abre o mesmo seletor (dá pra trocar resolução, proporção e/ou orientação).
 - O host cria um monitor novo com a resolução nova, **move as janelas** do antigo pra ele (mantendo as posições relativas), remove o antigo e **mantém a posição e o tamanho físico** da tela no espaço (a nova proporção é centralizada no mesmo lugar).
 - É raro e deliberado. Uma confirmação avisa: "As janelas desse monitor serão movidas pro novo".
+  > **v1.3.3 (ADR 0012):** sem confirmação. `RecreateScreen` é desfazível: o undo recria na resolução anterior e leva as janelas de volta.
 
 ### 10.5 Janela destacada ("arrancar" uma janela)
 **Como funciona:**
@@ -914,6 +920,7 @@ public void OnTrackableAdded(MRUKTrackable trackable)
 - ✅ **External surface existe:** o `OVROverlay` tem "Is External Surface" pra "alimentar vídeo externo direto no compositor" via plugin Android (`isExternalSurface` / `externalSurfaceObject`). Suporta até conteúdo protegido (Widevine L1). O caminho `MediaCodec → Surface → layer` do projeto é viável.
 - ✅ **Nitidez:** a Meta afirma que a versão em compositor layer "é visivelmente mais nítida, especialmente para texto", com opções de filtragem bicúbica, sharpening e supersampling. E as layers "mantêm fluidez mesmo quando o app perde frames".
 - ⚠️ **Limite: até 15 layers por cena**, e **no máximo 1 layer cilíndrica e 1 cubemap**. Consequências:
+  > **v1.3.3 (ADR 0011):** o "1 cilindro" vem do runtime Oculus; no OpenXR do Quest 3 (Horizon OS v83) 4 cilíndricas com vídeo funcionaram ([fase2e-spike.md](measurements/fase2e-spike.md)). O teto de 15 layers continua.
   - no máximo ~12–13 telas em layer (passthrough e UI também contam)
   - **só 1 tela curva** pode ser layer; outras curvas precisam ir pro eye buffer (menos nítidas) ou ficar planas
 - ⚠️ **Overlays são desenhadas na frente do eye buffer.** Uma tela-overlay pode cobrir a Passthrough Window da mesa. Usar `compositionDepth` e Depth Buffer Testing, e a regra de layout "telas não invadem o volume da mesa". Underlays são possíveis, mas "mais caras em banda" (punch-through de alpha).
