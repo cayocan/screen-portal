@@ -21,7 +21,8 @@ namespace ScreenPortal.Presentation.Screens
         private const string HoleShaderName = "ScreenPortal/ScreenHole"; // Resources/ScreenHole.shader
 
         private readonly GameObject _root;       // pose (sem escala)
-        private readonly Transform _statusQuad;  // escala = largura × altura
+        private readonly CurvedQuadMesh _shape;   // furo e quad de estado: plana ou arco (spec 2E §4)
+        private readonly GameObject _statusQuad;
         private readonly TextMesh _statusText;
         private readonly Material _statusMaterial;
         private readonly Material _textMaterial;
@@ -32,7 +33,10 @@ namespace ScreenPortal.Presentation.Screens
         private bool _everLive;
         private ScreenLinkState _state = ScreenLinkState.Offline;
         private string _detail = string.Empty;
-        private Vector3 _size = Vector3.one;
+        private float _width = 1f;
+        private float _height = 1f;
+        private bool _cylinder;
+        private float _layerRadius = 1f; // último raio válido da layer cilíndrica
         private Transform _layer;
 
         public OVROverlay Overlay { get; private set; }
@@ -45,33 +49,15 @@ namespace ScreenPortal.Presentation.Screens
             _root = new GameObject("Screen " + screen.Id.Value);
             _root.transform.SetParent(parent, false);
 
-            var quad = GameObject.CreatePrimitive(PrimitiveType.Quad);
-            quad.name = "Status";
-            quad.GetComponent<Collider>().enabled = false;
-            quad.transform.SetParent(_root.transform, false);
-            _statusQuad = quad.transform;
-            if (unlit != null)
-            {
-                _statusMaterial = new Material(unlit) { color = new Color(0.08f, 0.09f, 0.11f) };
-                quad.GetComponent<MeshRenderer>().sharedMaterial = _statusMaterial;
-            }
+            _shape = new CurvedQuadMesh("Screen " + screen.Id.Value);
+            if (unlit != null) _statusMaterial = new Material(unlit) { color = new Color(0.08f, 0.09f, 0.11f) };
+            _statusQuad = ScreenMeshes.MeshObject("Status", _root.transform, _shape.Mesh, _statusMaterial);
 
-            var hole = GameObject.CreatePrimitive(PrimitiveType.Quad);
-            hole.name = "Hole";
-            hole.GetComponent<Collider>().enabled = false;
-            hole.transform.SetParent(_root.transform, false);
-            _hole = hole;
             var holeShader = Shader.Find(HoleShaderName);
-            if (holeShader != null)
-            {
-                _holeMaterial = new Material(holeShader) { name = "ScreenHole" };
-                hole.GetComponent<MeshRenderer>().sharedMaterial = _holeMaterial;
-            }
-            else
-            {
-                Debug.LogError($"[VideoScreenView] shader {HoleShaderName} não encontrado: a tela não aparece sob o eye buffer.");
-            }
-            hole.SetActive(false);
+            if (holeShader != null) _holeMaterial = new Material(holeShader) { name = "ScreenHole" };
+            else Debug.LogError($"[VideoScreenView] shader {HoleShaderName} não encontrado: a tela não aparece sob o eye buffer.");
+            _hole = ScreenMeshes.MeshObject("Hole", _root.transform, _shape.Mesh, _holeMaterial);
+            _hole.SetActive(false);
 
             var textGo = new GameObject("StatusText");
             textGo.transform.SetParent(_root.transform, false);
@@ -91,10 +77,15 @@ namespace ScreenPortal.Presentation.Screens
 
         public void Apply(VirtualScreen screen, Pose pose, float radiusM)
         {
-            // Resolução só muda via RecreateScreen (raro): recria a layer com a nova external surface.
-            if (!screen.Resolution.Equals(_resolution))
+            bool cylinder = radiusM > 0f;
+            // Resolução (RecreateScreen) ou forma (plana ↔ curva, spec 2E; ADR 0011 — se o Horizon OS voltar a limitar
+            // cilindros, o fallback é aqui): recria a layer com uma external surface nova. O HostSync fecha o decoder no
+            // mesmo evento e o reabre nela no próximo Tick (StartStream → IDR).
+            if (!screen.Resolution.Equals(_resolution) || cylinder != _cylinder)
             {
-                _everLive = false; // a última imagem não vale no novo tamanho
+                if (!screen.Resolution.Equals(_resolution)) _everLive = false; // a última imagem não vale no novo tamanho
+                _cylinder = cylinder;
+                if (cylinder) _layerRadius = radiusM;
                 BuildOverlay(screen.Resolution);
                 SetLink(_state, _detail);
             }
@@ -102,15 +93,32 @@ namespace ScreenPortal.Presentation.Screens
             _root.name = string.IsNullOrEmpty(screen.Label) ? "Screen " + screen.Id.Value : screen.Label;
         }
 
+        /// <summary>Também a prévia do arraste: nunca troca a forma da layer (só no <see cref="Apply"/> confirmado).</summary>
         public void ApplyTransform(Pose pose, float widthMeters, float heightMeters, float radiusM)
         {
             _root.transform.SetLocalPositionAndRotation(pose.Position.ToUnity(), pose.Rotation.ToUnity());
-            var size = new Vector3(widthMeters, heightMeters, 1f);
-            _size = size;
-            _layer.localScale = size;
-            _statusQuad.localScale = size;
-            _hole.transform.localScale = size;
-            _statusText.characterSize = 0.006f * widthMeters;
+            _width = widthMeters;
+            _height = heightMeters;
+            if (_cylinder && radiusM > 0f) _layerRadius = radiusM; // prévia plana numa layer cilíndrica: mantém o último raio
+            PlaceLayer();
+            // furo e estado seguem a forma que a layer mostra (senão o furo recorta fora da imagem)
+            _shape.Set(widthMeters, heightMeters, _cylinder ? _layerRadius : 0f);
+            _statusText.characterSize = 0.006f * widthMeters; // texto plano no centro, 3 mm à frente
+        }
+
+        /// <summary>Cilindro: centro R atrás da tela (do lado do usuário), escala = (arco, altura, raio), como no spike 2E.</summary>
+        private void PlaceLayer()
+        {
+            if (_cylinder)
+            {
+                _layer.localPosition = new Vector3(0f, 0f, -_layerRadius);
+                _layer.localScale = new Vector3(_width, _height, _layerRadius);
+            }
+            else
+            {
+                _layer.localPosition = Vector3.zero;
+                _layer.localScale = new Vector3(_width, _height, 1f);
+            }
         }
 
         public void SetLink(ScreenLinkState state, string detail)
@@ -129,7 +137,7 @@ namespace ScreenPortal.Presentation.Screens
             }
             // Depois de já ter tido vídeo, só a falha troca a imagem por texto; o resto escurece a última imagem.
             bool showText = text != null && (!_everLive || state == ScreenLinkState.Failed);
-            _statusQuad.gameObject.SetActive(showText);
+            _statusQuad.SetActive(showText);
             _statusText.gameObject.SetActive(showText);
             if (showText) _statusText.text = text;
             _hole.SetActive(!showText && Overlay != null);
@@ -146,12 +154,12 @@ namespace ScreenPortal.Presentation.Screens
             var go = new GameObject("Layer");
             _layer = go.transform;
             _layer.SetParent(_root.transform, false);
-            _layer.localScale = _size;
+            PlaceLayer();
             if (old != null) Object.Destroy(old.gameObject); // adiada: o decoder fecha antes da Surface antiga morrer
             go.SetActive(false); // configurar antes do OnEnable criar a layer
             var overlay = go.AddComponent<OVROverlay>();
             overlay.currentOverlayType = OVROverlay.OverlayType.Underlay;
-            overlay.currentOverlayShape = OVROverlay.OverlayShape.Quad;
+            overlay.currentOverlayShape = _cylinder ? OVROverlay.OverlayShape.Cylinder : OVROverlay.OverlayShape.Quad;
             overlay.isExternalSurface = true;
             overlay.externalSurfaceWidth = resolution.Width;
             overlay.externalSurfaceHeight = resolution.Height;
@@ -166,6 +174,7 @@ namespace ScreenPortal.Presentation.Screens
         {
             _onDisposed?.Invoke(this);
             if (_root != null) Object.Destroy(_root);
+            _shape.Dispose();
             if (_statusMaterial != null) Object.Destroy(_statusMaterial);
             if (_textMaterial != null) Object.Destroy(_textMaterial);
             if (_holeMaterial != null) Object.Destroy(_holeMaterial);
