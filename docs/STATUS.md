@@ -1,6 +1,6 @@
 # Status do projeto
 
-**Fase atual:** Fase 1 concluída (1A + 1B, 28/09/2026) → próxima: **Fase 2 — multi-monitor livre**.
+**Fase atual:** **Fase 2 — multi-monitor livre**: 2A concluída (29/09/2026) → próximas: 2B (Simulator) e 2C.
 Brief: [brief.md](brief.md) v1.3.2 (ADRs 0002–0006).
 
 ## Fase 0 — resultado
@@ -17,7 +17,9 @@ Brief: [brief.md](brief.md) v1.3.2 (ADRs 0002–0006).
 ADRs: [0000](adr/0000-unity-project-at-repo-root.md) Unity na raiz · [0001](adr/0001-hybrid-unity-native-video-path.md) caminho de vídeo (aceito) ·
 [0002](adr/0002-app-refresh-rate-72hz.md) 72 Hz · [0003](adr/0003-passthrough-zone-user-defined.md) zona manual ·
 [0004](adr/0004-immutable-workspace-and-shared-nunit-tests.md) workspace imutável + testes compartilhados ·
-[0005](adr/0005-layout-surface-cylinder-sphere.md) superfície Cilindro/Esfera.
+[0005](adr/0005-layout-surface-cylinder-sphere.md) superfície Cilindro/Esfera ·
+[0006](adr/0006-control-protocol-pairing-mdns.md) protocolo de controle · [0007](adr/0007-virtual-display-driver.md) SudoVDA ·
+[0008](adr/0008-decode-capacity.md) capacidade de decode.
 
 ## Ferramentas
 - `dotnet test tests-dotnet/UnityPureCode.Tests` — testes de Domain/Application sem o Editor (segundos).
@@ -26,8 +28,8 @@ ADRs: [0000](adr/0000-unity-project-at-repo-root.md) Unity na raiz · [0001](adr
 - `tools/host-loopback-test.ps1` — host sem headset. `tools/build-native.ps1` — recompila o `.aar`.
 
 ## Pendências levadas para frente
-- **Fase 2 (spike do decoder):** capacidade estável de telas (conteúdo fixo, bateria cheia, política de
-  descarte sem cascata, IDR sob demanda, 3 repetições).
+- **2C:** espera de ~2 s antes de capturar um monitor recém-criado; resolver o HMONITOR na hora (ADR 0007). Medir 4K.
+- **2F:** jitter do Wi-Fi (rajadas de ~1 s) e bitrate proporcional ao fps (ADR 0008).
 - **Fase 4a:** validar o shader de Passthrough Window com a zona manual e a oclusão overlay × janela.
 - Remover MRUK / `sceneSupport = Required` quando a cena de spike deixar de ser usada (ADR 0003).
 
@@ -48,7 +50,7 @@ Cada um com spec → plano → implementação → verificação. Ordem: **2A + 
 
 | # | Subprojeto | Onde se testa | Depende de | Estado |
 |---|---|---|---|---|
-| 2A | Spikes: driver de monitor virtual (VDD) + capacidade do decoder | PC (admin) + Quest | — | ⏳ |
+| 2A | Spikes: driver de monitor virtual + capacidade do decoder | PC (admin) + Quest | — | ✅ SudoVDA ([ADR 0007](adr/0007-virtual-display-driver.md)); 4×60 fps sem perdas, foco a ~16 ms ([ADR 0008](adr/0008-decode-capacity.md)) |
 | 2B | Superfície de layout Cilindro/Esfera + manipulação (controle/mãos) + undo | Meta XR Simulator | — | ⏳ |
 | 2C | Várias telas: monitores virtuais sob comando do headset, N streams | PC + Quest | 2A | — |
 | 2D | Seletor "Novo monitor" + contorno fantasma + recriar | Simulator + Quest | 2B, 2C | — |
