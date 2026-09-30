@@ -13,8 +13,10 @@ namespace ScreenPortal.Tests
 
         internal static float AngleDeg(Vec3 a, Vec3 b)
         {
-            double cos = Vec3.Dot(a.Normalized, b.Normalized);
-            return (float)(Math.Acos(Math.Max(-1.0, Math.Min(1.0, cos))) * 180.0 / Math.PI);
+            // atan2(|a×b|, a·b): preciso para ângulos pequenos (acos em float tem piso de ~0,02° perto de 1)
+            var na = a.Normalized;
+            var nb = b.Normalized;
+            return (float)(Math.Atan2(Vec3.Cross(na, nb).Length, Vec3.Dot(na, nb)) * 180.0 / Math.PI);
         }
 
         [Test]
