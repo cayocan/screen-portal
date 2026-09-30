@@ -37,3 +37,9 @@ workspace (`screen_key`), nunca reutilizado; undo restaura o mesmo id e, portant
 
 Desconexão: o host aplica 5 min (padrão) a todos os aluguéis do headset. Espelho nunca remove nada no Windows: expirar só
 encerra o stream. Portas de vídeo do headset: 9000 + `stream_id`. Detalhes: ADR 0009.
+
+## Verificação
+
+O codec (`ControlMessageCodec.Decode`) verifica o envelope e depois despacha o verificador do corpo pelo `BodyType`, como
+workaround de um bug do runtime Google.FlatBuffers 25.2.10 (`Verifier.VerifyUnion` passa o type id errado). Reavaliar ao
+atualizar o pacote Google.FlatBuffers.

@@ -104,6 +104,7 @@ namespace ScreenPortal.Tests
             Assert.That(screen.Resolution.Width, Is.EqualTo(2560));
             Assert.That(r.Video.Starts, Is.EqualTo(1));
             var start = r.Channel.Last<StartStreamMessage>();
+            // Task 5 reescreve: hoje o monitor id vai como screen key
             Assert.That(start.ScreenKey, Is.EqualTo(1u));
             Assert.That(start.UdpPort, Is.EqualTo((ushort)9000));
             Assert.That(r.Pairing.LastHost, Is.EqualTo(ConnectionRig.Pc));

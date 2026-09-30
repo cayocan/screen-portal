@@ -132,6 +132,7 @@ namespace ScreenPortal.Infrastructure.Protocol
             {
                 var bb = new ByteBuffer(payload);
                 if (!new Verifier(bb).VerifyBuffer("SPCT", false, VerifyEnvelopeShell)) return new DecodeResult(DecodeStatus.Invalid, 0, null);
+                if (!VerifyBody(bb)) return new DecodeResult(DecodeStatus.Invalid, 0, null);
                 var envelope = Fb.Envelope.GetRootAsEnvelope(bb);
                 ushort version = envelope.ProtocolVersion;
                 if (version == 0) return new DecodeResult(DecodeStatus.Invalid, 0, null); // campo ausente = lixo
@@ -149,10 +150,9 @@ namespace ScreenPortal.Infrastructure.Protocol
         }
 
         /// <summary>
-        /// Verifica o Envelope sem o verificador de union gerado: no C# 25.2.10 o VerifyUnion passa ao
-        /// MessageVerify o tamanho da tabela (12 no Envelope) em vez do tipo do corpo. Com 10 membros isso caía no
-        /// default (true); com o membro 12 (ScreenReady) passou a verificar o corpo errado e rejeitar mensagens
-        /// válidas. Corpos malformados são pegos pelo try/catch de Decode.
+        /// Passo 1: verifica só o Envelope (identificador, tabela, protocol_version, body_type), sem a union.
+        /// O Verifier.VerifyUnion do runtime Google.FlatBuffers 25.2.10 (não o flatc) passa à ação de verificação
+        /// o tamanho da tabela em vez do tipo do corpo; ver <see cref="VerifyBody"/>.
         /// </summary>
         private static bool VerifyEnvelopeShell(Verifier verifier, uint tablePos)
         {
@@ -160,6 +160,21 @@ namespace ScreenPortal.Infrastructure.Protocol
                 && verifier.VerifyField(tablePos, 4 /*ProtocolVersion*/, 2, 2, false)
                 && verifier.VerifyField(tablePos, 6 /*BodyType*/, 1, 1, false)
                 && verifier.VerifyTableEnd(tablePos);
+        }
+
+        /// <summary>
+        /// Passo 2 (workaround do bug do runtime Google.FlatBuffers 25.2.10): o VerifyUnion entrega um type id errado,
+        /// então ignoramos o id recebido e despachamos o verificador gerado pelo BodyType lido do envelope (seguro após o
+        /// passo 1). Sem isto o corpo nunca seria verificado (vetores/strings com tamanho corrompido alocariam GBs).
+        /// Reavaliar ao atualizar o pacote Google.FlatBuffers. Um closure por Decode: canal de controle, não é o caminho de vídeo.
+        /// </summary>
+        private static bool VerifyBody(ByteBuffer bb)
+        {
+            byte bodyType = (byte)Fb.Envelope.GetRootAsEnvelope(bb).BodyType;
+            return new Verifier(bb).VerifyBuffer("SPCT", false, (v, tp) =>
+                v.VerifyTableStart(tp)
+                && v.VerifyUnion(tp, 6, 8, (v2, _, pos) => Fb.MessageVerify.Verify(v2, bodyType, pos), false)
+                && v.VerifyTableEnd(tp));
         }
 
         private static ControlMessage Read(Fb.Envelope e)

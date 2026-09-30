@@ -106,6 +106,37 @@ namespace ScreenPortal.Tests
         }
 
         [Test]
+        public void Decode_CorruptedVectorLength_IsInvalid()
+        {
+            var monitors = new[] { new MonitorDescriptor(1, 2560, 1080, "DISPLAY1", true) };
+            var bytes = ControlMessageCodec.Encode(new WelcomeMessage("PC", monitors));
+            bool patched = false;
+            // o vetor tem length == 1 (uint32 LE) seguido do offset do elemento; troca por um tamanho absurdo
+            for (int i = 8; i + 4 <= bytes.Length && !patched; i += 4)
+            {
+                if (bytes[i] == 1 && bytes[i + 1] == 0 && bytes[i + 2] == 0 && bytes[i + 3] == 0 && i + 8 <= bytes.Length)
+                {
+                    bytes[i + 3] = 0x7F;
+                    bytes[i + 2] = 0xFF;
+                    if (ControlMessageCodec.Decode(bytes).Status == DecodeStatus.Invalid) patched = true;
+                    else { bytes[i + 3] = 0; bytes[i + 2] = 0; }
+                }
+            }
+            Assert.That(patched, Is.True, "nenhum tamanho de vetor corrompido foi rejeitado");
+        }
+
+        [Test]
+        public void Decode_ValidPairingResultAndWelcome_AreOk()
+        {
+            var pr = ControlMessageCodec.Decode(ControlMessageCodec.Encode(new PairingResultMessage(true, "t")));
+            Assert.That(pr.Status, Is.EqualTo(DecodeStatus.Ok));
+            var w = ControlMessageCodec.Decode(ControlMessageCodec.Encode(new WelcomeMessage("PC",
+                new[] { new MonitorDescriptor(1, 2560, 1080, "DISPLAY1", true) },
+                new[] { new ScreenLeaseInfo(2, ScreenKind.Virtual, 3840, 2160) })));
+            Assert.That(w.Status, Is.EqualTo(DecodeStatus.Ok));
+        }
+
+        [Test]
         public void Decode_Garbage_IsInvalid()
         {
             Assert.That(ControlMessageCodec.Decode(new byte[] { 1, 2, 3 }).Status, Is.EqualTo(DecodeStatus.Invalid));
