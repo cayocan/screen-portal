@@ -80,7 +80,8 @@ namespace ScreenPortal.Presentation.Manipulation
             var preview = _controller.Preview;
             if (preview.Active)
             {
-                if (_views.TryGetView(preview.Screen, out var view)) view.ApplyTransform(preview.Pose, preview.WidthM, preview.HeightM);
+                var curve = CurvedGeometry.Of(preview.Curvature, preview.Placement, preview.WidthM, ws.Surface);
+                if (_views.TryGetView(preview.Screen, out var view)) view.ApplyTransform(preview.Pose, preview.WidthM, preview.HeightM, curve.RadiusM);
                 _previewing = preview.Screen;
                 DrawFrame(preview.Pose, preview.WidthM, preview.HeightM, DragColor, _controller.State == ManipulationState.Resizing);
                 DrawGuides(preview, ws.Surface);
@@ -105,7 +106,7 @@ namespace ScreenPortal.Presentation.Manipulation
         private void RestoreConfirmed(Workspace ws, ScreenId id)
         {
             if (ws.TryGetScreen(id, out var screen) && _views.TryGetView(id, out var view))
-                view.Apply(screen, ws.Surface.ToPose(screen.Placement));
+                view.Apply(screen, ws.Surface.ToPose(screen.Placement), CurvedGeometry.Of(screen, ws.Surface).RadiusM);
         }
 
         private void DrawRay(LineRenderer line, ManipulationInput input)

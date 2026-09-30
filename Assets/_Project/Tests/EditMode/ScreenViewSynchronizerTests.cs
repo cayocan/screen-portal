@@ -14,9 +14,14 @@ namespace ScreenPortal.Tests
         private sealed class FakeView : IScreenView
         {
             public readonly List<VirtualScreen> Applied = new List<VirtualScreen>();
+            public float LastRadius = -1f;
             public bool Disposed;
-            public void Apply(VirtualScreen screen, Pose pose) => Applied.Add(screen);
-            public void ApplyTransform(Pose pose, float widthMeters, float heightMeters) { }
+            public void Apply(VirtualScreen screen, Pose pose, float radiusM)
+            {
+                Applied.Add(screen);
+                LastRadius = radiusM;
+            }
+            public void ApplyTransform(Pose pose, float widthMeters, float heightMeters, float radiusM) { }
             public void Dispose() => Disposed = true;
         }
 
@@ -29,6 +34,25 @@ namespace ScreenPortal.Tests
                 Views[screen.Id] = view;
                 return view;
             }
+        }
+
+        [Test]
+        public void Apply_PassesTheCurvedRadius_AndReappliesWhenTheSurfaceChangesIt()
+        {
+            var store = new WorkspaceStore();
+            var factory = new FakeFactory();
+            var sync = new ScreenViewSynchronizer(store, factory);
+            sync.Start();
+            store.Dispatch(new CreateScreen(Resolution.Create(1920, 1080), Placement.OnSurface(0f, 30f, 1.3f), 1f, 0.6f));
+            var id = store.State.Screens[0].Id;
+            var view = factory.Views[id];
+            Assert.That(view.LastRadius, Is.EqualTo(CurvedGeometry.Of(store.State.Screens[0], store.State.Surface).RadiusM));
+            Assert.That(view.LastRadius, Is.GreaterThan(0f));
+            store.Dispatch(new SetLayoutMode(LayoutMode.Sphere)); // d muda de d·cos(el) para d
+            Assert.That(view.LastRadius, Is.EqualTo(1.3f / 0.6f).Within(1e-4f));
+            store.Dispatch(new SetScreenCurvature(id, 0f));
+            Assert.That(view.LastRadius, Is.EqualTo(0f));
+            sync.Dispose();
         }
 
         private static CreateScreen Create() => new CreateScreen(Resolution.Create(1920, 1080), Placement.Default, 1f);

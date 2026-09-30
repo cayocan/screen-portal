@@ -89,7 +89,7 @@ namespace ScreenPortal.Presentation.Screens
             SetLink(ScreenLinkState.Offline, string.Empty);
         }
 
-        public void Apply(VirtualScreen screen, Pose pose)
+        public void Apply(VirtualScreen screen, Pose pose, float radiusM)
         {
             // Resolução só muda via RecreateScreen (raro): recria a layer com a nova external surface.
             if (!screen.Resolution.Equals(_resolution))
@@ -98,11 +98,11 @@ namespace ScreenPortal.Presentation.Screens
                 BuildOverlay(screen.Resolution);
                 SetLink(_state, _detail);
             }
-            ApplyTransform(pose, screen.WidthMeters, screen.HeightMeters);
+            ApplyTransform(pose, screen.WidthMeters, screen.HeightMeters, radiusM);
             _root.name = string.IsNullOrEmpty(screen.Label) ? "Screen " + screen.Id.Value : screen.Label;
         }
 
-        public void ApplyTransform(Pose pose, float widthMeters, float heightMeters)
+        public void ApplyTransform(Pose pose, float widthMeters, float heightMeters, float radiusM)
         {
             _root.transform.SetLocalPositionAndRotation(pose.Position.ToUnity(), pose.Rotation.ToUnity());
             var size = new Vector3(widthMeters, heightMeters, 1f);

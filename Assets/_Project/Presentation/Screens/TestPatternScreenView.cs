@@ -54,9 +54,9 @@ namespace ScreenPortal.Presentation.Screens
             _label.text = screen.Label + "\n" + screen.Resolution.Width + "×" + screen.Resolution.Height;
         }
 
-        public void Apply(VirtualScreen screen, Pose pose) => ApplyTransform(pose, screen.WidthMeters, screen.HeightMeters);
+        public void Apply(VirtualScreen screen, Pose pose, float radiusM) => ApplyTransform(pose, screen.WidthMeters, screen.HeightMeters, radiusM);
 
-        public void ApplyTransform(Pose pose, float widthMeters, float heightMeters)
+        public void ApplyTransform(Pose pose, float widthMeters, float heightMeters, float radiusM)
         {
             _root.transform.SetLocalPositionAndRotation(pose.Position.ToUnity(), pose.Rotation.ToUnity());
             _quad.localScale = new Vector3(widthMeters, heightMeters, 1f);
