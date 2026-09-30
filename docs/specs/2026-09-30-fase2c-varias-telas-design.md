@@ -36,7 +36,10 @@ mesmo PC.
   fala com o host: o `HostSync` reage à workspace.
 - **Largura inicial:** mesma densidade para todas as resoluções — 2560 px ≈ 1,0 m (a 1,3 m), limitada por
   `ScreenLimits`. É só zoom; as alças ajustam depois.
-- **Posição inicial:** regra da 2B (primeiro espaço livre à direita da última tela).
+- **Posição inicial (revisada no Quest, 30/09):** a tela criada pelo menu nasce **à frente da visão**: no ponto da
+  superfície para onde a cabeça olha, na distância padrão (1,3 m). Se o ponto estiver ocupado, vai para o espaço livre
+  mais perto, à esquerda ou à direita, na mesma elevação (`SurfaceSlots.NearestFree`). O espelho automático da primeira
+  conexão mantém a regra da 2B (posição padrão, primeiro espaço livre à direita).
 
 **Menu de pulso:** "+ Tela de teste" sai do menu principal (fica em build de desenvolvimento) e entram
 **"+ Monitor virtual"** e **"+ Espelhar monitor"**.
@@ -98,9 +101,9 @@ mesmo PC.
 - **Estados visuais** (quad no eye buffer enquanto não há vídeo; a layer fica escondida até o primeiro quadro):
   "Criando monitor…" (`Pedido`) · "Conectando vídeo…" (`Pronto`) · vídeo (`Transmitindo`) · "Falha: <motivo>" ·
   "PC desconectado" (última imagem escurecida).
-- **Moldura e alças:** a layer é desenhada por cima do eye buffer. A moldura (faixa externa de 3 cm) não é coberta; as
-  alças dos cantos ficam metade escondidas — aceito na 2C, conferido no Quest; se incomodar, as alças vão para fora do
-  canto.
+- **Interface por cima das telas (revisado no Quest, 30/09, ADR 0010):** a layer é **Underlay**. Um furo no eye
+  buffer (alpha 0 + profundidade, shader `ScreenPortal/ScreenHole`) a revela. Moldura, alças, laser e menu são
+  desenhados na frente e ficam por cima da tela.
 - **`IScreenVideo` (Infrastructure):** no Quest, `NativeVideo.start/stop` do `.aar` (uma sessão por tela); no Editor
   e no Simulator, no-op. `takeStats` por sessão, 1×/s fora do caminho quente: marca o primeiro quadro (→
   `Transmitindo`) e alimenta o log.
@@ -130,3 +133,24 @@ STATUS: a 2D encolhe para contorno fantasma + recriar + resolução custom.
 
 **Riscos:** a espera de ~2 s até o monitor novo ser capturável deixa um atraso visível ("Criando monitor…"); o 4K pode
 exigir mais banda do que a 2A mediu.
+
+## 7. Desvios na implementação
+Do plano ([plans/2026-09-30-fase2c-varias-telas.md](../plans/2026-09-30-fase2c-varias-telas.md)):
+1. **Portas 9000 + n**, não 9100 + n: a porta de vídeo da 1B já é 9000 e a 9101 é do KFRQ.
+2. **Sem limpeza de órfãos no arranque:** o watchdog do SudoVDA remove os monitores quando o host para de pingar.
+3. **"PC desconectado" depois de já ter tido vídeo:** a layer fica visível e escurecida, sem texto.
+4. **O pipeline para na desconexão;** só o monitor fica 5 min. Na reconexão o `HostSync` pede o stream de novo.
+5. **Fila de trabalho na `HeadsetSession`:** Acquire/StartStream/Release rodam fora da thread de leitura do socket.
+6. **Ids de monitor físico estáveis** (número do `\.\DISPLAYn`); os monitores virtuais do app ficam fora do `Welcome`.
+7. **O Editor pareia uma vez só** (`PlayerPrefsPairingStore`).
+
+Do teste no Quest (30/09):
+8. **Interface por cima das telas:** layers Underlay reveladas por um furo no eye buffer (§5, ADR 0010).
+9. **Tela nova à frente da visão**, no espaço livre mais perto (§3).
+10. **Reorganizar os monitores no Windows:** o host recria a captura de uma tela quando o monitor dela muda de posição
+    no desktop; o pipeline novo continua os frameIds do anterior
+    ([verificação §4](../measurements/fase2c-simulator.md)).
+11. **Log do host em arquivo:** `serve` grava também em `%APPDATA%\ScreenPortal\host.log`; falha de pipeline registra o
+    `DeviceRemovedReason` e a carga de memória.
+12. **Posição das telas no mundo → arranjo do Windows** (pedido no teste): fica para a Fase 3, como o brief já prevê
+    (cursor espacial; sincronizar a topologia do Windows é o plano B).

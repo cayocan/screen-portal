@@ -34,6 +34,8 @@ namespace ScreenPortal.Tests
                 Assert.That(container.Resolve<ConnectionStateMachine>(), Is.Not.Null);
                 Assert.That(container.Resolve<ScreenManipulationController>(), Is.Not.Null);
                 Assert.That(container.Resolve<InteractionRouter>(), Is.Not.Null);
+                Assert.That(container.Resolve<ScreenPortal.App.Screens.HostSync>(), Is.Not.Null);
+                Assert.That(container.Resolve<ScreenPortal.App.Menu.WristMenu>(), Is.Not.Null);
             }
         }
     }

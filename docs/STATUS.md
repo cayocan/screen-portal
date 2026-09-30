@@ -1,6 +1,6 @@
 # Status do projeto
 
-**Fase atual:** **Fase 2 — multi-monitor livre**: 2A (29/09/2026) e 2B (30/09/2026) concluídas → próxima: **2C**.
+**Fase atual:** **Fase 2 — multi-monitor livre**: 2A (29/09), 2B e 2C (30/09/2026) concluídas → próximas: **2D/2E**.
 Brief: [brief.md](brief.md) v1.3.2 (ADRs 0002–0006).
 
 ## Fase 0 — resultado
@@ -28,7 +28,8 @@ ADRs: [0000](adr/0000-unity-project-at-repo-root.md) Unity na raiz · [0001](adr
 - `tools/host-loopback-test.ps1` — host sem headset. `tools/build-native.ps1` — recompila o `.aar`.
 
 ## Pendências levadas para frente
-- **2C:** espera de ~2 s antes de capturar um monitor recém-criado; resolver o HMONITOR na hora (ADR 0007). Medir 4K.
+- **Host:** recuperar de `DXGI_ERROR_DEVICE_REMOVED` (driver/TDR) sem reiniciar: recriar o `GpuDevice` e os pipelines.
+- **Telas sobrepostas** com layers Underlay: ordenar a `compositionDepth` pela distância se incomodar (ADR 0010).
 - **2F:** jitter do Wi-Fi (rajadas de ~1 s) e bitrate proporcional ao fps (ADR 0008).
 - **Fase 4a:** validar o shader de Passthrough Window com a zona manual e a oclusão overlay × janela.
 - Remover MRUK / `sceneSupport = Required` quando a cena de spike deixar de ser usada (ADR 0003).
@@ -52,8 +53,8 @@ Cada um com spec → plano → implementação → verificação. Ordem: **2A + 
 |---|---|---|---|---|
 | 2A | Spikes: driver de monitor virtual + capacidade do decoder | PC (admin) + Quest | — | ✅ SudoVDA ([ADR 0007](adr/0007-virtual-display-driver.md)); 4×60 fps sem perdas, foco a ~16 ms ([ADR 0008](adr/0008-decode-capacity.md)) |
 | 2B | Superfície de layout Cilindro/Esfera + manipulação (controle/mãos) + undo | Meta XR Simulator | — | ✅ Simulator 17/17 (bug do texto num olho só corrigido, palma calibrada) + Quest: todos os testes passaram — [spec](specs/2026-09-29-fase2b-manipulacao-design.md) · [plano](plans/2026-09-29-fase2b-manipulacao.md) · [verificação](measurements/fase2b-simulator.md) |
-| 2C | Várias telas: monitores virtuais sob comando do headset, N streams | PC + Quest | 2A | — |
-| 2D | Seletor "Novo monitor" + contorno fantasma + recriar | Simulator + Quest | 2B, 2C | — |
+| 2C | Várias telas: monitores virtuais sob comando do headset, N streams | PC + Quest | 2A | ✅ Simulator 1–7 + Quest: 5 telas a 60 fps, 4K, remover/undo, reconexão; UI por cima das telas (Underlay), tela nova à frente da visão, reorganizar monitores no Windows — [spec](specs/2026-09-30-fase2c-varias-telas-design.md) · [plano](plans/2026-09-30-fase2c-varias-telas.md) · [verificação](measurements/fase2c-simulator.md) · [ADR 0009](adr/0009-screen-leases-declarative-sync.md) · [ADR 0010](adr/0010-screens-as-underlay-layers.md) |
+| 2D | Contorno fantasma + recriar + resolução custom (o seletor veio na 2C) | Simulator + Quest | 2B, 2C | — |
 | 2E | Telas curvas (CylinderLayerPolicy, crossfade, medição) | Simulator + Quest | 2B, 2C | — |
 | 2F | Frame rate por tela + BandwidthBudget | testes + Quest | 2A, 2C | — |
 | 2G | Áudio do PC (WASAPI → Opus) | PC + Quest | — | — |

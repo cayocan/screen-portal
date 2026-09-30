@@ -1,4 +1,3 @@
-using System;
 using ScreenPortal.Domain.Commands;
 using ScreenPortal.Domain.Screens;
 
@@ -13,15 +12,14 @@ namespace ScreenPortal.App.Menu
             Resolution.Create(1920, 1080), Resolution.Create(2560, 1440), Resolution.Create(1440, 2560),
         };
 
-        public static bool IsTestScreen(VirtualScreen screen) =>
-            screen.Label.StartsWith(LabelPrefix, StringComparison.Ordinal);
+        public static bool IsTestScreen(VirtualScreen screen) => screen.Source.Kind == ScreenSourceKind.Test;
 
         /// <param name="index">0, 1, 2… → "Teste 1", "Teste 2"…</param>
         public static CreateScreen Next(int index)
         {
             var resolution = Cycle[index % Cycle.Length];
             float width = resolution.Orientation == Orientation.Portrait ? 0.6f : 1f;
-            return new CreateScreen(resolution, null, width, 0f, LabelPrefix + (index + 1));
+            return new CreateScreen(resolution, null, width, 0f, LabelPrefix + (index + 1), ScreenSource.Test);
         }
     }
 }

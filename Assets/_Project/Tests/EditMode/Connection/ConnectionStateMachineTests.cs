@@ -1,3 +1,4 @@
+using System.Collections.Generic;
 using NUnit.Framework;
 using ScreenPortal.App.Connection;
 using ScreenPortal.Domain.Layout;
@@ -85,47 +86,73 @@ namespace ScreenPortal.Tests
             Assert.That(r.Channel.Closes, Is.EqualTo(0));
 
             r.Channel.Push(ChannelEventKind.Message, ConnectionRig.Welcome);
-            r.Channel.Push(ChannelEventKind.Message, new StreamStartedMessage(0, 2560, 1080));
             r.Machine.Tick();
             Assert.That(r.Machine.State, Is.EqualTo(ConnectionState.Streaming));
         }
 
         [Test]
-        public void Welcome_CreatesScreenForPrimaryMonitor_AndRequestsStream()
+        public void Welcome_LinksImmediately_AndRaisesWelcomed()
         {
             var r = new ConnectionRig();
+            WelcomeMessage got = null;
+            r.Machine.Welcomed += w => got = w;
             r.GoToStreaming();
 
             Assert.That(r.Machine.State, Is.EqualTo(ConnectionState.Streaming));
             Assert.That(r.Machine.Status.Kind, Is.EqualTo(ConnectionStatusKind.Connected));
-            Assert.That(r.Store.State.Screens.Count, Is.EqualTo(1));
-            var screen = r.Store.State.Screens[0];
-            Assert.That(screen.Label, Is.EqualTo("monitor:1"));
-            Assert.That(screen.Resolution.Width, Is.EqualTo(2560));
-            Assert.That(r.Video.Starts, Is.EqualTo(1));
-            var start = r.Channel.Last<StartStreamMessage>();
-            Assert.That(start.MonitorId, Is.EqualTo(1u));
-            Assert.That(start.UdpPort, Is.EqualTo((ushort)9000));
+            Assert.That(r.Machine.IsLinked, Is.True);
+            Assert.That(got, Is.SameAs(ConnectionRig.Welcome));
             Assert.That(r.Pairing.LastHost, Is.EqualTo(ConnectionRig.Pc));
+            Assert.That(r.Channel.Count<StartStreamMessage>(), Is.EqualTo(0), "streams são do HostSync");
+            Assert.That(r.Store.State.Screens.Count, Is.EqualTo(0), "telas são do HostSync");
         }
 
         [Test]
-        public void SurfaceNotReady_RetriesStartStreamOnLaterTick()
+        public void Reconnect_GoesStraightToLastHost_RaisesLostThenWelcomedAgain()
         {
             var r = new ConnectionRig();
-            r.Video.Ready = false;
-            r.Pairing.Tokens["CAYO-PC"] = "tok";
-            r.Machine.Start();
-            r.Discovery.Host = ConnectionRig.Pc;
+            int welcomed = 0, lost = 0;
+            r.Machine.Welcomed += _ => welcomed++;
+            r.Machine.Lost += () => lost++;
+            r.GoToStreaming();
+            r.Discovery.Host = null; // prova que não depende do mDNS
+
+            r.Channel.Push(ChannelEventKind.Disconnected);
             r.Machine.Tick();
+            Assert.That(r.Machine.State, Is.EqualTo(ConnectionState.Reconnecting));
+            Assert.That(r.Machine.IsLinked, Is.False);
+            Assert.That(lost, Is.EqualTo(1));
+            r.Machine.Tick();
+            Assert.That(r.Channel.Connects[r.Channel.Connects.Count - 1], Is.EqualTo(ConnectionRig.Pc));
+
             r.Channel.Push(ChannelEventKind.Connected);
             r.Channel.Push(ChannelEventKind.Message, ConnectionRig.Welcome);
             r.Machine.Tick();
-            Assert.That(r.Channel.Count<StartStreamMessage>(), Is.EqualTo(0));
+            Assert.That(r.Machine.State, Is.EqualTo(ConnectionState.Streaming));
+            Assert.That(welcomed, Is.EqualTo(2));
+            Assert.That(r.Machine.IsLinked, Is.True);
+        }
 
-            r.Video.Ready = true;
+        [Test]
+        public void ScreenMessages_AreForwarded_AndSendOnlyWhileLinked()
+        {
+            var r = new ConnectionRig();
+            var got = new List<ControlMessage>();
+            r.Machine.ScreenMessage += m => got.Add(m);
+            r.Machine.Send(new ReleaseScreenMessage(1, 0));
+            Assert.That(r.Channel.Count<ReleaseScreenMessage>(), Is.EqualTo(0), "sem conexão não envia");
+
+            r.GoToStreaming();
+            r.Machine.Send(new ReleaseScreenMessage(1, 0));
+            Assert.That(r.Channel.Count<ReleaseScreenMessage>(), Is.EqualTo(1));
+
+            r.Channel.Push(ChannelEventKind.Message, new ScreenReadyMessage(1, 2560, 1440));
+            r.Channel.Push(ChannelEventKind.Message, new ScreenFailedMessage(2, "x"));
+            r.Channel.Push(ChannelEventKind.Message, new StreamStartedMessage(0, 2560, 1440));
+            r.Channel.Push(ChannelEventKind.Message, new StreamStoppedMessage(0, "y"));
             r.Machine.Tick();
-            Assert.That(r.Channel.Count<StartStreamMessage>(), Is.EqualTo(1));
+            Assert.That(got.Count, Is.EqualTo(4));
+            Assert.That(got[0], Is.TypeOf<ScreenReadyMessage>());
         }
 
         [Test]
@@ -150,36 +177,11 @@ namespace ScreenPortal.Tests
         }
 
         [Test]
-        public void Reconnect_GoesStraightToLastHost_AndReusesScreenAndDecoder()
-        {
-            var r = new ConnectionRig();
-            r.GoToStreaming();
-            r.Store.Dispatch(new MoveScreenOnSurface(r.Store.State.Screens[0].Id, -30f, 10f));
-            r.Discovery.Host = null; // prova que não depende do mDNS
-
-            r.Channel.Push(ChannelEventKind.Disconnected);
-            r.Machine.Tick();
-            Assert.That(r.Machine.State, Is.EqualTo(ConnectionState.Reconnecting));
-            r.Machine.Tick();
-            Assert.That(r.Channel.Connects[r.Channel.Connects.Count - 1], Is.EqualTo(ConnectionRig.Pc));
-
-            r.Channel.Push(ChannelEventKind.Connected);
-            r.Channel.Push(ChannelEventKind.Message, ConnectionRig.Welcome);
-            r.Machine.Tick();
-            r.Channel.Push(ChannelEventKind.Message, new StreamStartedMessage(0, 2560, 1080));
-            r.Machine.Tick();
-
-            Assert.That(r.Machine.State, Is.EqualTo(ConnectionState.Streaming));
-            Assert.That(r.Store.State.Screens.Count, Is.EqualTo(1), "não duplica a tela");
-            Assert.That(r.Store.State.Screens[0].Placement.AzimuthDeg, Is.EqualTo(-30f), "layout intacto");
-            Assert.That(r.Video.Starts, Is.EqualTo(1), "decoder continua o mesmo");
-            Assert.That(r.Channel.Count<StartStreamMessage>(), Is.EqualTo(2));
-        }
-
-        [Test]
         public void Reconnect_RetriesEvery250ms_AndGivesUpAfter10s()
         {
             var r = new ConnectionRig();
+            int lost = 0;
+            r.Machine.Lost += () => lost++;
             r.GoToStreaming();
             r.Channel.Push(ChannelEventKind.Disconnected);
             r.Machine.Tick();
@@ -199,7 +201,7 @@ namespace ScreenPortal.Tests
                 r.Advance(0.25, 0.25);
             }
             Assert.That(r.Machine.State, Is.EqualTo(ConnectionState.Discovering));
-            Assert.That(r.Video.Stops, Is.EqualTo(1));
+            Assert.That(lost, Is.EqualTo(1), "Lost só na queda, não a cada tentativa");
         }
 
         [Test]

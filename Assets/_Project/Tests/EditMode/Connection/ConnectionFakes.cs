@@ -81,24 +81,6 @@ namespace ScreenPortal.Tests
         }
     }
 
-    internal sealed class FakeVideo : IVideoStreamSink
-    {
-        public bool Ready = true;
-        public int Starts;
-        public int Stops;
-        public Resolution LastResolution;
-
-        public bool TryStart(ScreenId screen, ushort streamId, int udpPort, Resolution resolution)
-        {
-            if (!Ready) return false;
-            Starts++;
-            LastResolution = resolution;
-            return true;
-        }
-
-        public void Stop(ushort streamId) => Stops++;
-    }
-
     internal sealed class ConnectionRig
     {
         public static readonly HostEndpoint Pc = new HostEndpoint("CAYO-PC", "192.168.0.64", 9200);
@@ -109,14 +91,14 @@ namespace ScreenPortal.Tests
         public readonly FakeDiscovery Discovery = new FakeDiscovery();
         public readonly FakeChannel Channel = new FakeChannel();
         public readonly FakePairing Pairing = new FakePairing();
-        public readonly FakeVideo Video = new FakeVideo();
         public readonly WorkspaceStore Store = new WorkspaceStore();
+        public readonly CommandBus Bus;
         public readonly ConnectionStateMachine Machine;
 
         public ConnectionRig()
         {
-            var bus = new CommandBus(Store, new ICommandObserver[0]);
-            Machine = new ConnectionStateMachine(Discovery, Channel, Pairing, Clock, bus, Store, Video, new ConnectionOptions());
+            Bus = new CommandBus(Store, new ICommandObserver[0]);
+            Machine = new ConnectionStateMachine(Discovery, Channel, Pairing, Clock, new ConnectionOptions());
         }
 
         public void Advance(double seconds, double step = 0.05)
@@ -129,8 +111,8 @@ namespace ScreenPortal.Tests
             }
         }
 
-        /// <summary>Leva a máquina até Streaming com um host já pareado.</summary>
-        public void GoToStreaming()
+        /// <summary>Leva a máquina até Streaming (Welcome recebido) com um host já pareado.</summary>
+        public void GoToStreaming(WelcomeMessage welcome = null)
         {
             Pairing.Tokens["CAYO-PC"] = "tok";
             Machine.Start();
@@ -138,10 +120,47 @@ namespace ScreenPortal.Tests
             Machine.Tick();
             Channel.Push(ChannelEventKind.Connected);
             Machine.Tick();
-            Channel.Push(ChannelEventKind.Message, Welcome);
+            Channel.Push(ChannelEventKind.Message, welcome ?? Welcome);
             Machine.Tick();
-            Channel.Push(ChannelEventKind.Message, new StreamStartedMessage(0, 2560, 1080));
-            Machine.Tick();
+        }
+    }
+
+    internal sealed class FakeScreenVideo : IScreenVideo
+    {
+        public bool Ready = true;
+        public bool FirstFrame;
+        public int Opens;
+        public int Closes;
+        public ushort LastStreamId;
+        public int LastPort;
+        public Resolution LastResolution;
+        public readonly HashSet<ScreenId> Open = new HashSet<ScreenId>();
+
+        public bool TryOpen(ScreenId screen, ushort streamId, int udpPort, Resolution resolution)
+        {
+            if (!Ready) return false;
+            Opens++;
+            LastStreamId = streamId;
+            LastPort = udpPort;
+            LastResolution = resolution;
+            Open.Add(screen);
+            return true;
+        }
+
+        public void Close(ScreenId screen)
+        {
+            Closes++;
+            Open.Remove(screen);
+        }
+
+        public bool HasFirstFrame(ScreenId screen) => FirstFrame && Open.Contains(screen);
+
+        public int FirstFrameResets;
+
+        public void ResetFirstFrame(ScreenId screen)
+        {
+            FirstFrameResets++;
+            FirstFrame = false;
         }
     }
 }

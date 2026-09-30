@@ -9,6 +9,7 @@ namespace ScreenPortal.Infrastructure.Unity
         private static IntPtr s_class;
         private static IntPtr s_start;
         private static IntPtr s_stop;
+        private static IntPtr s_takeStats;
         private static readonly jvalue[] s_args5 = new jvalue[5];
         private static readonly jvalue[] s_args1 = new jvalue[1];
 
@@ -22,6 +23,7 @@ namespace ScreenPortal.Infrastructure.Unity
             AndroidJNI.DeleteLocalRef(local);
             s_start = AndroidJNI.GetStaticMethodID(s_class, "start", "(IILandroid/view/Surface;II)J");
             s_stop = AndroidJNI.GetStaticMethodID(s_class, "stop", "(J)V");
+            s_takeStats = AndroidJNI.GetStaticMethodID(s_class, "takeStats", "(J)Ljava/lang/String;");
         }
 
         public static long Start(int streamId, int port, IntPtr surface, int width, int height)
@@ -41,6 +43,15 @@ namespace ScreenPortal.Infrastructure.Unity
             EnsureInitialized();
             s_args1[0].j = handle;
             AndroidJNI.CallStaticVoidMethod(s_class, s_stop, s_args1);
+        }
+
+        /// <summary>Linha "SPSTAT,..." do intervalo desde a última chamada (chamar ~1×/s; aloca uma string).</summary>
+        public static string TakeStats(long handle)
+        {
+            if (handle == 0) return null;
+            EnsureInitialized();
+            s_args1[0].j = handle;
+            return AndroidJNI.CallStaticStringMethod(s_class, s_takeStats, s_args1);
         }
     }
 }

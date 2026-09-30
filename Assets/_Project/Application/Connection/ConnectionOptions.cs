@@ -16,8 +16,7 @@ namespace ScreenPortal.App.Connection
         public double RejectCooldownSeconds { get; set; } = 10.0;
         public double IncompatibleCooldownSeconds { get; set; } = 60.0;
         public double ShutdownCooldownSeconds { get; set; } = 3.0;
+        /// <summary>Porta base do vídeo no headset: a tela com stream_id n escuta em VideoPort + n (spec 2C §4).</summary>
         public int VideoPort { get; set; } = 9000;
-        public ushort StreamId { get; set; } = 0;
-        public float DefaultScreenWidthMeters { get; set; } = 1.4f;
     }
 }

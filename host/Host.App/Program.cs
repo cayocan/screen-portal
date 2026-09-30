@@ -7,7 +7,7 @@ using ScreenPortal.Host.Transport;
 
 // Screen Portal host.
 //
-//   ScreenPortalHost [serve] [--bitrate 20000]   (padrão) controle tcp/9200 + mDNS + pareamento + vídeo por headset
+//   ScreenPortalHost [serve] [--bitrate 20000] [--grace-minutes 5]   (padrão) controle tcp/9200 + mDNS + pareamento + monitores/vídeo por tela
 //
 // Ferramentas da Fase 0 (docs/phase0-runbook.md):
 //   Host.App stream  --target <ip> [--port 9000] [--streams 1] [--fps 60] [--bitrate 20000]
@@ -38,7 +38,17 @@ switch (opts.Command)
 
 static int RunServe(Args o, CancellationToken ct)
 {
-    static void Log(string message) => Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] {message}");
+    // Log no console e em %APPDATA%\ScreenPortal\host.log (recriado a cada serve; leitura compartilhada).
+    string logPath = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData), "ScreenPortal", "host.log");
+    Directory.CreateDirectory(Path.GetDirectoryName(logPath)!);
+    var logFile = new StreamWriter(new FileStream(logPath, FileMode.Create, FileAccess.Write, FileShare.ReadWrite)) { AutoFlush = true };
+    var logLock = new object();
+    void Log(string message)
+    {
+        string line = $"[{DateTime.Now:HH:mm:ss}] {message}";
+        Console.WriteLine(line);
+        lock (logLock) logFile.WriteLine(line);
+    }
 
     string pairingPath = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData), "ScreenPortal", "paired.json");
     var pairing = File.Exists(pairingPath)
@@ -56,18 +66,24 @@ static int RunServe(Args o, CancellationToken ct)
 
     using var gpu = new GpuDevice();
     using var clock = new ClockSyncServer();
-    using var streams = new ScreenPortal.Host.App.Control.StreamRegistry(gpu, o.Int("bitrate", 20_000), Log);
-    var monitors = new ScreenPortal.Host.App.Control.WindowsMonitorProvider();
+    int graceMinutes = o.Int("grace-minutes", 5);
+    if (graceMinutes < 1)
+    {
+        Log($"--grace-minutes {graceMinutes} inválido; usando 1.");
+        graceMinutes = 1;
+    }
+    using var screens = new ScreenPortal.Host.App.Control.ScreenHost(gpu, o.Int("bitrate", 20_000),
+        TimeSpan.FromMinutes(graceMinutes), Log);
     var approver = new ScreenPortal.Host.App.Control.MessageBoxPairingApprover();
     string hostName = Environment.MachineName;
 
     using var server = new ScreenPortal.Host.Transport.Control.ControlServer(
         ScreenPortal.Infrastructure.Protocol.ControlProtocol.Port,
-        connection => new ScreenPortal.Host.Transport.Control.HeadsetSession(connection, pairing, SavePairing, approver, monitors, streams,
-            hostName, () => ScreenPortal.Host.Domain.Pairing.PairingStore.NewPairingCode(System.Security.Cryptography.RandomNumberGenerator.GetInt32), Log),
+        connection => new ScreenPortal.Host.Transport.Control.HeadsetSession(connection, pairing, SavePairing, approver,
+            screens.PhysicalMonitors, screens, hostName, () => ScreenPortal.Host.Domain.Pairing.PairingStore.NewPairingCode(System.Security.Cryptography.RandomNumberGenerator.GetInt32), Log),
         Log);
     server.Start();
-    using var keyframes = new KeyframeRequestListener(KeyframeRequestListener.DefaultPort, streams.RequestKeyframe);
+    using var keyframes = new KeyframeRequestListener(KeyframeRequestListener.DefaultPort, screens.RequestKeyframe);
 
     using var mdns = new ScreenPortal.Host.App.Control.MdnsAdvertiser(Log);
     mdns.Start(hostName, ScreenPortal.Infrastructure.Protocol.ControlProtocol.Port, "1");
@@ -78,7 +94,7 @@ static int RunServe(Args o, CancellationToken ct)
     {
         double s = sw.Elapsed.TotalSeconds;
         sw.Restart();
-        if (server.ConnectionCount > 0) Log(streams.TakeStats(s));
+        if (server.ConnectionCount > 0) Log(screens.TakeStats(s));
     }
     return 0;
 }

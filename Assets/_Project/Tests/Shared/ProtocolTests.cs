@@ -47,14 +47,93 @@ namespace ScreenPortal.Tests
             var pr = (PairingResultMessage)RoundTrip(new PairingResultMessage(true, "t"));
             Assert.That(pr.Accepted, Is.True);
             Assert.That(pr.PairingToken, Is.EqualTo("t"));
-            var ss = (StartStreamMessage)RoundTrip(new StartStreamMessage(1, 9000, 0));
+            var ss = (StartStreamMessage)RoundTrip(new StartStreamMessage(7, 9000, 0));
             Assert.That(ss.UdpPort, Is.EqualTo((ushort)9000));
+            Assert.That(ss.ScreenKey, Is.EqualTo(7u));
             var st = (StreamStartedMessage)RoundTrip(new StreamStartedMessage(0, 2560, 1080));
             Assert.That(st.Height, Is.EqualTo(1080u));
             Assert.That(((StreamStoppedMessage)RoundTrip(new StreamStoppedMessage(0, "x"))).Reason, Is.EqualTo("x"));
             Assert.That(((PingMessage)RoundTrip(new PingMessage(123456789UL))).SentUs, Is.EqualTo(123456789UL));
             Assert.That(((PongMessage)RoundTrip(new PongMessage(42UL))).SentUs, Is.EqualTo(42UL));
             Assert.That(((ByeMessage)RoundTrip(new ByeMessage(ByeReason.PairingRejected))).Reason, Is.EqualTo(ByeReason.PairingRejected));
+        }
+
+        [Test]
+        public void ScreenMessages_RoundTrip()
+        {
+            var a = (AcquireScreenMessage)RoundTrip(new AcquireScreenMessage(3, ScreenKind.Mirror, 2560, 1080, 2));
+            Assert.That(a.ScreenKey, Is.EqualTo(3u));
+            Assert.That(a.ScreenKind, Is.EqualTo(ScreenKind.Mirror));
+            Assert.That(a.Width, Is.EqualTo(2560u));
+            Assert.That(a.Height, Is.EqualTo(1080u));
+            Assert.That(a.PhysicalMonitorId, Is.EqualTo(2u));
+
+            var ready = (ScreenReadyMessage)RoundTrip(new ScreenReadyMessage(3, 3840, 2160));
+            Assert.That(ready.ScreenKey, Is.EqualTo(3u));
+            Assert.That(ready.Height, Is.EqualTo(2160u));
+
+            var failed = (ScreenFailedMessage)RoundTrip(new ScreenFailedMessage(4, "SudoVDA não disponível"));
+            Assert.That(failed.ScreenKey, Is.EqualTo(4u));
+            Assert.That(failed.Reason, Is.EqualTo("SudoVDA não disponível"));
+
+            var release = (ReleaseScreenMessage)RoundTrip(new ReleaseScreenMessage(5, 10000));
+            Assert.That(release.ScreenKey, Is.EqualTo(5u));
+            Assert.That(release.GraceMs, Is.EqualTo(10000u));
+        }
+
+        [Test]
+        public void Welcome_RoundTripsLeases_AndDefaultsToEmpty()
+        {
+            var monitors = new[] { new MonitorDescriptor(1, 2560, 1080, "DISPLAY1", true) };
+            var m = (WelcomeMessage)RoundTrip(new WelcomeMessage("CAYO-PC", monitors, new[]
+            {
+                new ScreenLeaseInfo(2, ScreenKind.Virtual, 3840, 2160),
+                new ScreenLeaseInfo(5, ScreenKind.Mirror, 2560, 1080),
+            }));
+            Assert.That(m.Leases.Count, Is.EqualTo(2));
+            Assert.That(m.Leases[0].ScreenKey, Is.EqualTo(2u));
+            Assert.That(m.Leases[0].Width, Is.EqualTo(3840u));
+            Assert.That(m.Leases[1].Kind, Is.EqualTo(ScreenKind.Mirror));
+
+            var empty = (WelcomeMessage)RoundTrip(new WelcomeMessage("CAYO-PC", monitors));
+            Assert.That(empty.Leases.Count, Is.EqualTo(0));
+        }
+
+        [Test]
+        public void ProtocolVersion_Is2()
+        {
+            Assert.That(ControlProtocol.Version, Is.EqualTo((ushort)2));
+        }
+
+        [Test]
+        public void Decode_CorruptedVectorLength_IsInvalid()
+        {
+            var monitors = new[] { new MonitorDescriptor(1, 2560, 1080, "DISPLAY1", true) };
+            var bytes = ControlMessageCodec.Encode(new WelcomeMessage("PC", monitors));
+            bool patched = false;
+            // o vetor tem length == 1 (uint32 LE) seguido do offset do elemento; troca por um tamanho absurdo
+            for (int i = 8; i + 4 <= bytes.Length && !patched; i += 4)
+            {
+                if (bytes[i] == 1 && bytes[i + 1] == 0 && bytes[i + 2] == 0 && bytes[i + 3] == 0 && i + 8 <= bytes.Length)
+                {
+                    bytes[i + 3] = 0x7F;
+                    bytes[i + 2] = 0xFF;
+                    if (ControlMessageCodec.Decode(bytes).Status == DecodeStatus.Invalid) patched = true;
+                    else { bytes[i + 3] = 0; bytes[i + 2] = 0; }
+                }
+            }
+            Assert.That(patched, Is.True, "nenhum tamanho de vetor corrompido foi rejeitado");
+        }
+
+        [Test]
+        public void Decode_ValidPairingResultAndWelcome_AreOk()
+        {
+            var pr = ControlMessageCodec.Decode(ControlMessageCodec.Encode(new PairingResultMessage(true, "t")));
+            Assert.That(pr.Status, Is.EqualTo(DecodeStatus.Ok));
+            var w = ControlMessageCodec.Decode(ControlMessageCodec.Encode(new WelcomeMessage("PC",
+                new[] { new MonitorDescriptor(1, 2560, 1080, "DISPLAY1", true) },
+                new[] { new ScreenLeaseInfo(2, ScreenKind.Virtual, 3840, 2160) })));
+            Assert.That(w.Status, Is.EqualTo(DecodeStatus.Ok));
         }
 
         [Test]
@@ -67,10 +146,10 @@ namespace ScreenPortal.Tests
         [Test]
         public void Decode_OtherVersion_IsIncompatible()
         {
-            var bytes = ControlMessageCodec.Encode(new PingMessage(1), protocolVersion: 2);
+            var bytes = ControlMessageCodec.Encode(new PingMessage(1), protocolVersion: 1);
             var result = ControlMessageCodec.Decode(bytes);
             Assert.That(result.Status, Is.EqualTo(DecodeStatus.IncompatibleVersion));
-            Assert.That(result.Version, Is.EqualTo((ushort)2));
+            Assert.That(result.Version, Is.EqualTo((ushort)1));
         }
 
         [Test]

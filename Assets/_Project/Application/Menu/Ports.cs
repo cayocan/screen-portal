@@ -1,4 +1,6 @@
 using System;
+using System.Collections.Generic;
+using ScreenPortal.App.Connection;
 using ScreenPortal.Domain.Spatial;
 
 namespace ScreenPortal.App.Menu
@@ -27,5 +29,25 @@ namespace ScreenPortal.App.Menu
         bool Visible { get; }
         Pose Pose { get; }
         void Render(WristMenu menu, int hoverIndex);
+    }
+
+    /// <summary>O que o menu precisa saber do PC (implementado pelo HostSync).</summary>
+    public interface IHostCatalog
+    {
+        bool IsConnected { get; }
+        /// <summary>Monitores físicos do último Welcome (espelhar).</summary>
+        IReadOnlyList<MonitorDescriptor> PhysicalMonitors { get; }
+    }
+
+    public sealed class FixedHostCatalog : IHostCatalog
+    {
+        public FixedHostCatalog(bool connected, IReadOnlyList<MonitorDescriptor> monitors)
+        {
+            IsConnected = connected;
+            PhysicalMonitors = monitors ?? Array.Empty<MonitorDescriptor>();
+        }
+
+        public bool IsConnected { get; set; }
+        public IReadOnlyList<MonitorDescriptor> PhysicalMonitors { get; set; }
     }
 }

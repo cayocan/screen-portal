@@ -1,25 +1,19 @@
 using System;
-using ScreenPortal.Domain.Commands;
-using ScreenPortal.Domain.Screens;
 
 namespace ScreenPortal.App.Connection
 {
     /// <summary>
-    /// Ciclo de conexão do headset (brief §8.5, spec 1B §3):
+    /// Ciclo de conexão do headset (brief §8.5, spec 1B §3, 2C §5):
     /// Idle → Discovering → Connecting → Negotiating → Streaming ⇄ Degraded → Reconnecting.
-    /// Puro: tempo e I/O entram por portas; chamar <see cref="Tick"/> uma vez por frame na thread principal.
+    /// Só conexão: telas e streams são do <c>HostSync</c>, que ouve <see cref="Welcomed"/>, <see cref="Lost"/> e
+    /// <see cref="ScreenMessage"/> e envia por <see cref="Send"/>. Puro; <see cref="Tick"/> 1× por quadro.
     /// </summary>
     public sealed class ConnectionStateMachine
     {
-        public const string MonitorLabelPrefix = "monitor:";
-
         private readonly IHostDiscovery _discovery;
         private readonly IControlChannel _channel;
         private readonly IPairingStore _pairing;
         private readonly IClock _clock;
-        private readonly ICommandBus _bus;
-        private readonly WorkspaceStore _store;
-        private readonly IVideoStreamSink _video;
         private readonly ConnectionOptions _options;
 
         private HostEndpoint _host;
@@ -30,35 +24,31 @@ namespace ScreenPortal.App.Connection
         private bool _attemptInFlight;
         private bool _awaitingPairing;
         private bool _welcomed;
-        private bool _streamRequested;
-        private bool _videoStarted;
         private bool _hasConnectedBefore;
-        private MonitorDescriptor _monitor;
-        private ScreenId _screen;
+        private bool _linked;
         private string _blockedHost;
         private double _blockedUntil;
 
         public ConnectionState State { get; private set; } = ConnectionState.Idle;
         public ConnectionStatus Status { get; private set; } = new ConnectionStatus(ConnectionStatusKind.Idle);
-        public event Action<ConnectionStatus> StatusChanged;
+        /// <summary>true entre o Welcome e a queda: dá para falar com o host.</summary>
+        public bool IsLinked => _linked;
 
-        public ConnectionStateMachine(
-            IHostDiscovery discovery,
-            IControlChannel channel,
-            IPairingStore pairing,
-            IClock clock,
-            ICommandBus bus,
-            WorkspaceStore store,
-            IVideoStreamSink video,
+        public event Action<ConnectionStatus> StatusChanged;
+        /// <summary>Welcome recebido (conexão nova ou reconexão). IsLinked já é true.</summary>
+        public event Action<WelcomeMessage> Welcomed;
+        /// <summary>A conexão caiu (IsLinked já é false).</summary>
+        public event Action Lost;
+        /// <summary>ScreenReady, ScreenFailed, StreamStarted e StreamStopped.</summary>
+        public event Action<ControlMessage> ScreenMessage;
+
+        public ConnectionStateMachine(IHostDiscovery discovery, IControlChannel channel, IPairingStore pairing, IClock clock,
             ConnectionOptions options)
         {
             _discovery = discovery ?? throw new ArgumentNullException(nameof(discovery));
             _channel = channel ?? throw new ArgumentNullException(nameof(channel));
             _pairing = pairing ?? throw new ArgumentNullException(nameof(pairing));
             _clock = clock ?? throw new ArgumentNullException(nameof(clock));
-            _bus = bus ?? throw new ArgumentNullException(nameof(bus));
-            _store = store ?? throw new ArgumentNullException(nameof(store));
-            _video = video ?? throw new ArgumentNullException(nameof(video));
             _options = options ?? throw new ArgumentNullException(nameof(options));
         }
 
@@ -68,6 +58,12 @@ namespace ScreenPortal.App.Connection
             _hasConnectedBefore = _pairing.TryGetLastHost(out _);
             _discovery.Start();
             EnterDiscovering(new ConnectionStatus(ConnectionStatusKind.Searching));
+        }
+
+        /// <summary>Envia ao host se a conexão estiver de pé; senão descarta (o HostSync reenvia após o Welcome).</summary>
+        public void Send(ControlMessage message)
+        {
+            if (_linked) _channel.Send(message);
         }
 
         public void Tick()
@@ -90,7 +86,11 @@ namespace ScreenPortal.App.Connection
                     }
                     break;
                 case ConnectionState.Negotiating:
-                    TickNegotiating(now);
+                    if (!_welcomed && !_awaitingPairing && now - _stateSince > _options.NegotiateTimeoutSeconds)
+                    {
+                        _channel.Close();
+                        EnterDiscovering(new ConnectionStatus(ConnectionStatusKind.Searching));
+                    }
                     break;
                 case ConnectionState.Streaming:
                 case ConnectionState.Degraded:
@@ -119,17 +119,6 @@ namespace ScreenPortal.App.Connection
             }
         }
 
-        private void TickNegotiating(double now)
-        {
-            if (!_welcomed && !_awaitingPairing && now - _stateSince > _options.NegotiateTimeoutSeconds)
-            {
-                _channel.Close();
-                EnterDiscovering(new ConnectionStatus(ConnectionStatusKind.Searching));
-                return;
-            }
-            if (_welcomed && !_streamRequested) TryRequestStream();
-        }
-
         private void TickStreaming(double now)
         {
             if (now - _lastPingAt >= _options.PingIntervalSeconds)
@@ -137,7 +126,6 @@ namespace ScreenPortal.App.Connection
                 _lastPingAt = now;
                 _channel.Send(new PingMessage((ulong)(now * 1_000_000.0)));
             }
-
             double silence = now - _lastPongAt;
             if (State == ConnectionState.Streaming && silence > _options.DegradedAfterSeconds)
             {
@@ -155,7 +143,6 @@ namespace ScreenPortal.App.Connection
         {
             if (now - _stateSince > _options.ReconnectGiveUpSeconds)
             {
-                StopVideo();
                 EnterDiscovering(new ConnectionStatus(ConnectionStatusKind.Searching));
                 return;
             }
@@ -220,19 +207,13 @@ namespace ScreenPortal.App.Connection
                     }
                     break;
                 case WelcomeMessage welcome:
-                    OnWelcome(welcome);
+                    OnWelcome(welcome, now);
                     break;
+                case ScreenReadyMessage _:
+                case ScreenFailedMessage _:
                 case StreamStartedMessage _:
-                    if (State == ConnectionState.Negotiating)
-                    {
-                        _lastPongAt = now;
-                        _lastPingAt = now;
-                        _hasConnectedBefore = true;
-                        Enter(ConnectionState.Streaming, new ConnectionStatus(ConnectionStatusKind.Connected, _host.Name));
-                    }
-                    break;
                 case StreamStoppedMessage _:
-                    _streamRequested = false; // tenta de novo no próximo Tick
+                    ScreenMessage?.Invoke(message);
                     break;
                 case PingMessage ping:
                     _channel.Send(new PongMessage(ping.SentUs));
@@ -248,50 +229,18 @@ namespace ScreenPortal.App.Connection
             }
         }
 
-        private void OnWelcome(WelcomeMessage welcome)
+        private void OnWelcome(WelcomeMessage welcome, double now)
         {
+            if (State != ConnectionState.Negotiating) return;
             _welcomed = true;
             _awaitingPairing = false;
+            _hasConnectedBefore = true;
             _pairing.SaveLastHost(_host);
-
-            _monitor = null;
-            for (int i = 0; i < welcome.Monitors.Count; i++)
-                if (welcome.Monitors[i].IsPrimary) _monitor = welcome.Monitors[i];
-            if (_monitor == null && welcome.Monitors.Count > 0) _monitor = welcome.Monitors[0];
-            if (_monitor == null)
-            {
-                _channel.Close();
-                EnterDiscovering(new ConnectionStatus(ConnectionStatusKind.Searching));
-                return;
-            }
-
-            _screen = EnsureScreenFor(_monitor);
-            TryRequestStream();
-        }
-
-        /// <summary>Só cria a tela se ainda não existir (spec 1B §3: reconexão não duplica nem mexe no layout).</summary>
-        private ScreenId EnsureScreenFor(MonitorDescriptor monitor)
-        {
-            string label = MonitorLabelPrefix + monitor.Id;
-            var screens = _store.State.Screens;
-            for (int i = 0; i < screens.Count; i++)
-                if (screens[i].Label == label) return screens[i].Id;
-
-            var resolution = ResolutionFit.FromCapture((int)monitor.Width, (int)monitor.Height);
-            if (!resolution.IsValid) resolution = Resolution.Create(1920, 1080);
-            var result = _bus.Send(new CreateScreen(resolution, null,_options.DefaultScreenWidthMeters, label: label));
-            return result.Accepted ? _store.State.FocusedScreenId : ScreenId.None;
-        }
-
-        private void TryRequestStream()
-        {
-            if (_screen.IsNone || !_store.State.TryGetScreen(_screen, out var screen)) return;
-            if (!_videoStarted)
-                _videoStarted = _video.TryStart(_screen, _options.StreamId, _options.VideoPort, screen.Resolution);
-            if (!_videoStarted) return; // Surface da layer ainda não existe: tenta no próximo Tick
-
-            _channel.Send(new StartStreamMessage(_monitor.Id, (ushort)_options.VideoPort, _options.StreamId));
-            _streamRequested = true;
+            _lastPongAt = now;
+            _lastPingAt = now;
+            Enter(ConnectionState.Streaming, new ConnectionStatus(ConnectionStatusKind.Connected, _host.Name));
+            _linked = true;
+            Welcomed?.Invoke(welcome);
         }
 
         private void OnBye(ByeReason reason)
@@ -311,7 +260,6 @@ namespace ScreenPortal.App.Connection
                     break;
                 default:
                     _channel.Close();
-                    StopVideo();
                     EnterDiscovering(new ConnectionStatus(ConnectionStatusKind.Searching));
                     break;
             }
@@ -320,7 +268,6 @@ namespace ScreenPortal.App.Connection
         private void Block(ConnectionStatusKind statusKind, double cooldownSeconds)
         {
             _channel.Close();
-            StopVideo();
             _blockedHost = _host.Name;
             _blockedUntil = _clock.NowSeconds + cooldownSeconds;
             EnterDiscovering(new ConnectionStatus(statusKind, _host.Name));
@@ -328,35 +275,34 @@ namespace ScreenPortal.App.Connection
 
         private bool IsBlocked(HostEndpoint host, double now) => host.Name == _blockedHost && now < _blockedUntil;
 
-        private void StopVideo()
+        private void Unlink()
         {
-            if (_videoStarted) _video.Stop(_options.StreamId);
-            _videoStarted = false;
-            _streamRequested = false;
+            if (!_linked) return;
+            _linked = false;
+            Lost?.Invoke();
         }
 
         private void EnterNegotiating()
         {
             _welcomed = false;
             _awaitingPairing = false;
-            _streamRequested = false;
             Enter(ConnectionState.Negotiating, new ConnectionStatus(ConnectionStatusKind.Connecting, _host.Name));
             _channel.Send(new HelloMessage(_pairing.DeviceId, _options.DeviceName, _pairing.GetToken(_host.Name)));
         }
 
         private void EnterReconnecting()
         {
+            Unlink();
             _attemptInFlight = false;
             _lastAttemptAt = double.NegativeInfinity; // primeira tentativa no próximo Tick
-            _streamRequested = false;
             Enter(ConnectionState.Reconnecting, new ConnectionStatus(ConnectionStatusKind.Reconnecting, _host.Name));
         }
 
         private void EnterDiscovering(ConnectionStatus status)
         {
+            Unlink();
             _welcomed = false;
             _awaitingPairing = false;
-            _streamRequested = false;
             _attemptInFlight = false;
             Enter(ConnectionState.Discovering, status);
         }

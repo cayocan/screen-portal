@@ -1,15 +1,20 @@
 using ScreenPortal.App.Menu;
+using ScreenPortal.Domain.Screens;
 using UnityEngine;
 using Pose = ScreenPortal.Domain.Spatial.Pose;
 
 namespace ScreenPortal.Presentation.Menu
 {
     /// <summary>
-    /// Menu de pulso (spec 2B §5): aparece com a palma esquerda virada para o rosto ou segurando Menu (≡) no controle
-    /// esquerdo; fica acima da mão, virado para a cabeça. Acionado pelo raio da mão/controle direito (InteractionRouter).
+    /// Menu de pulso (spec 2B §5, 2C §3): aparece com a palma esquerda virada para o rosto ou segurando Menu (≡) no
+    /// controle esquerdo; fica acima da mão, virado para a cabeça. Páginas de tamanho variável; na página de
+    /// proporções cada botão mostra um frame na proporção. Acionado pelo raio da mão/controle direito (InteractionRouter).
     /// </summary>
     public sealed class WristMenuPanel : MonoBehaviour, IWristMenuPanel
     {
+        private const float FrameFill = 0.8f;      // o frame ocupa até 80% do botão
+        private const float FrameBorderM = 0.0015f;
+
         [SerializeField] private Transform anchor;
         [SerializeField] private Transform head;
         [SerializeField] private OVRHand leftHand;
@@ -20,13 +25,24 @@ namespace ScreenPortal.Presentation.Menu
         [SerializeField] private float heightAboveHandM = 0.12f;
 
         private GameObject _content;
+        private Transform _background;
         private TextMesh _status;
-        private TextMesh[] _labels;
-        private MeshRenderer[] _buttons;
+        private readonly TextMesh[] _labels = new TextMesh[WristMenu.MaxItems];
+        private readonly MeshRenderer[] _buttons = new MeshRenderer[WristMenu.MaxItems];
+        private readonly Transform[] _frames = new Transform[WristMenu.MaxItems];
+        private readonly Transform[] _frameInner = new Transform[WristMenu.MaxItems];
+        // Último valor aplicado: TextMesh.text refaz a malha a cada set, então só atribui quando muda. O WristMenu
+        // devolve strings em cache, por isso a comparação por referência basta.
+        private readonly string[] _shownLabels = new string[WristMenu.MaxItems];
+        private readonly Material[] _shownMaterials = new Material[WristMenu.MaxItems];
+        private string _shownStatus;
         private Material _normal;
         private Material _hover;
         private Material _disabled;
         private Material _text;
+        private MenuPage _layoutPage = (MenuPage)(-1);
+        private int _layoutCount = -1;
+        private Orientation _layoutOrientation;
 
         public bool Visible { get; private set; }
 
@@ -53,53 +69,104 @@ namespace ScreenPortal.Presentation.Menu
         public void Render(WristMenu menu, int hoverIndex)
         {
             if (!Visible) return;
-            var items = WristMenu.Items;
-            for (int i = 0; i < items.Length; i++)
+            int count = menu.ItemCount;
+            if (menu.Page != _layoutPage || count != _layoutCount || menu.Orientation != _layoutOrientation) Layout(menu, count);
+            for (int i = 0; i < count; i++)
             {
-                bool enabled = menu.IsEnabled(items[i]);
-                _labels[i].text = menu.Label(items[i]);
-                _buttons[i].sharedMaterial = !enabled ? _disabled : i == hoverIndex ? _hover : _normal;
+                string label = menu.Label(i);
+                if (!ReferenceEquals(label, _shownLabels[i]))
+                {
+                    _shownLabels[i] = label;
+                    _labels[i].text = label;
+                }
+                var material = !menu.IsEnabled(i) ? _disabled : i == hoverIndex ? _hover : _normal;
+                if (!ReferenceEquals(material, _shownMaterials[i]))
+                {
+                    _shownMaterials[i] = material;
+                    _buttons[i].sharedMaterial = material;
+                }
             }
-            _status.text = menu.StatusLine;
+            string status = menu.StatusLine;
+            if (!ReferenceEquals(status, _shownStatus))
+            {
+                _shownStatus = status;
+                _status.text = status;
+            }
+        }
+
+        private void Layout(WristMenu menu, int count)
+        {
+            _layoutPage = menu.Page;
+            _layoutCount = count;
+            _layoutOrientation = menu.Orientation;
+            float height = MenuLayout.PanelHeight(count);
+            _background.localScale = new Vector3(MenuLayout.PanelWidth, height, 1f);
+            _status.transform.localPosition = new Vector3(0f, height * 0.5f - MenuLayout.StatusHeightM * 0.5f, -0.002f);
+            for (int i = 0; i < WristMenu.MaxItems; i++)
+            {
+                bool used = i < count;
+                _buttons[i].gameObject.SetActive(used);
+                _labels[i].gameObject.SetActive(used);
+                float aspect = used ? menu.FrameAspect(i) : 0f;
+                _frames[i].gameObject.SetActive(aspect > 0f);
+                if (!used) continue;
+                MenuLayout.ButtonCenter(i, count, out float x, out float y);
+                _buttons[i].transform.localPosition = new Vector3(x, y, 0f);
+                _labels[i].transform.localPosition = new Vector3(x, y, -0.003f);
+                if (aspect > 0f) PlaceFrame(i, x, y, aspect);
+            }
+        }
+
+        private void PlaceFrame(int i, float x, float y, float aspect)
+        {
+            float maxW = MenuLayout.ButtonWidthM * FrameFill;
+            float h = MenuLayout.ButtonHeightM * FrameFill;
+            float w = h * aspect;
+            if (w > maxW)
+            {
+                w = maxW;
+                h = w / aspect;
+            }
+            _frames[i].localPosition = new Vector3(x, y, -0.001f);
+            _frames[i].localScale = new Vector3(w, h, 1f);
+            _frameInner[i].localScale = new Vector3(Mathf.Max(0f, 1f - 2f * FrameBorderM / w), Mathf.Max(0f, 1f - 2f * FrameBorderM / h), 1f);
         }
 
         private void Build()
         {
-            int count = WristMenu.Items.Length;
             _content = new GameObject("Content");
             _content.transform.SetParent(transform, false);
             _normal = Tinted(new Color(0.18f, 0.2f, 0.24f));
             _hover = Tinted(new Color(0.25f, 0.55f, 0.9f));
             _disabled = Tinted(new Color(0.1f, 0.1f, 0.12f));
+            var frameLine = Tinted(new Color(0.85f, 0.87f, 0.9f));
+            var frameFill = Tinted(new Color(0.12f, 0.13f, 0.16f));
 
-            var background = Quad("Background", Tinted(new Color(0.06f, 0.06f, 0.08f)));
-            background.localPosition = new Vector3(0f, 0f, 0.002f);
-            background.localScale = new Vector3(MenuLayout.PanelWidth, MenuLayout.PanelHeight(count), 1f);
-
-            _status = Text("Status", new Vector3(0f, MenuLayout.PanelHeight(count) * 0.5f - MenuLayout.StatusHeightM * 0.5f, -0.002f));
-            _labels = new TextMesh[count];
-            _buttons = new MeshRenderer[count];
-            for (int i = 0; i < count; i++)
+            _background = Quad("Background", Tinted(new Color(0.06f, 0.06f, 0.08f)), _content.transform);
+            _background.localPosition = new Vector3(0f, 0f, 0.002f);
+            _status = Text("Status", Vector3.zero);
+            for (int i = 0; i < WristMenu.MaxItems; i++)
             {
-                MenuLayout.ButtonCenter(i, count, out float x, out float y);
-                var button = Quad("Button" + i, _normal);
-                button.localPosition = new Vector3(x, y, 0f);
+                var button = Quad("Button" + i, _normal, _content.transform);
                 button.localScale = new Vector3(MenuLayout.ButtonWidthM, MenuLayout.ButtonHeightM, 1f);
                 _buttons[i] = button.GetComponent<MeshRenderer>();
-                _labels[i] = Text("Label" + i, new Vector3(x, y, -0.002f));
+                _frames[i] = Quad("Frame" + i, frameLine, _content.transform);
+                _frameInner[i] = Quad("FrameInner" + i, frameFill, _frames[i]);
+                _frameInner[i].localPosition = new Vector3(0f, 0f, -0.0005f);
+                _labels[i] = Text("Label" + i, Vector3.zero);
             }
             _content.SetActive(false);
         }
 
         private Material Tinted(Color color) => unlit != null ? new Material(unlit) { color = color } : null;
 
-        private Transform Quad(string name, Material material)
+        private static Transform Quad(string name, Material material, Transform parent)
         {
             var quad = GameObject.CreatePrimitive(PrimitiveType.Quad);
             quad.name = name;
             quad.GetComponent<Collider>().enabled = false;
             if (material != null) quad.GetComponent<MeshRenderer>().sharedMaterial = material;
-            quad.transform.SetParent(_content.transform, false);
+            quad.transform.SetParent(parent, false);
             return quad.transform;
         }
 

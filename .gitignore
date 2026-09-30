@@ -58,3 +58,4 @@ Thumbs.db
 # ---------- Harness dotnet dos testes puros da Unity ----------
 tests-dotnet/**/bin/
 tests-dotnet/**/obj/
+.superpowers/
