@@ -176,6 +176,34 @@ namespace ScreenPortal.Tests
         }
 
         [Test]
+        public void Reconnect_StaysConnecting_UntilANewFirstFrame()
+        {
+            var r = new Rig();
+            var id = r.AddVirtual();
+            r.Link();
+            r.Push(new ScreenReadyMessage((uint)id.Value, 2560, 1440));
+            r.Push(new StreamStartedMessage(0, 2560, 1440));
+            r.Video.FirstFrame = true;
+            r.Advance(1.1);
+            Assert.That(r.State(id), Is.EqualTo(ScreenLinkState.Live));
+
+            r.C.Channel.Push(ChannelEventKind.Disconnected);
+            r.Tick();
+            r.Tick();
+            r.C.Channel.Push(ChannelEventKind.Connected);
+            r.C.Channel.Push(ChannelEventKind.Message, NoMonitors);
+            r.Tick();
+            r.Push(new ScreenReadyMessage((uint)id.Value, 2560, 1440));
+            r.Push(new StreamStartedMessage(0, 2560, 1440));
+            r.Advance(2.1);
+            Assert.That(r.State(id), Is.EqualTo(ScreenLinkState.Connecting), "o quadro antigo não conta");
+
+            r.Video.FirstFrame = true; // chegou vídeo novo
+            r.Advance(1.1);
+            Assert.That(r.State(id), Is.EqualTo(ScreenLinkState.Live));
+        }
+
+        [Test]
         public void Welcome_ReleasesLeasesTheWorkspaceNoLongerHas()
         {
             var r = new Rig();

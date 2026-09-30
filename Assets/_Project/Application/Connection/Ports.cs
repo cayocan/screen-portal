@@ -48,6 +48,8 @@ namespace ScreenPortal.App.Connection
         bool TryOpen(ScreenId screen, ushort streamId, int udpPort, Resolution resolution);
         void Close(ScreenId screen);
         bool HasFirstFrame(ScreenId screen);
+        /// <summary>Esquece o primeiro quadro (antes de cada StartStream): a tela só fica Live com vídeo novo.</summary>
+        void ResetFirstFrame(ScreenId screen);
     }
 
     /// <summary>Implementado pela Presentation: a Surface (jobject) da compositor layer de uma tela.</summary>

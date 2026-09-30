@@ -56,5 +56,14 @@ namespace ScreenPortal.Infrastructure.Unity
             session.FirstFrame = SpStatLine.TryParseDecodedFps(line, out float fps) && fps > 0f;
             return session.FirstFrame;
         }
+
+        public void ResetFirstFrame(ScreenId screen)
+        {
+            if (!_sessions.TryGetValue(screen, out var session)) return;
+            session.FirstFrame = false;
+            // Descarta a janela de estatística aberta (pode conter quadros de antes da queda): o próximo
+            // HasFirstFrame só conta o que chegar depois deste StartStream.
+            if (session.Handle != 0) NativeVideoJni.TakeStats(session.Handle);
+        }
     }
 }

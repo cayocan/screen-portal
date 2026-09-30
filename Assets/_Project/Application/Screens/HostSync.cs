@@ -130,6 +130,7 @@ namespace ScreenPortal.App.Screens
                     }
                     if (!e.VideoOpen) e.VideoOpen = _video.TryOpen(e.Id, (ushort)e.Slot, Port(e.Slot), e.Resolution);
                     if (!e.VideoOpen) return; // Surface da layer ainda não existe: tenta no próximo quadro
+                    _video.ResetFirstFrame(e.Id); // depois de reconectar, o quadro antigo na layer não conta como Live
                     _connection.Send(new StartStreamMessage(Key(e.Id), (ushort)Port(e.Slot), (ushort)e.Slot));
                     SetPhase(e, Phase.Starting);
                     break;

@@ -154,5 +154,13 @@ namespace ScreenPortal.Tests
         }
 
         public bool HasFirstFrame(ScreenId screen) => FirstFrame && Open.Contains(screen);
+
+        public int FirstFrameResets;
+
+        public void ResetFirstFrame(ScreenId screen)
+        {
+            FirstFrameResets++;
+            FirstFrame = false;
+        }
     }
 }
