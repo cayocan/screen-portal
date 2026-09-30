@@ -354,6 +354,30 @@ namespace ScreenPortal.Tests
         }
 
         [Test]
+        public void UndoOfRecreate_AcquiresThePreviousSizeOnTheSameKey_WithoutReleasing()
+        {
+            var r = new Rig();
+            var id = r.AddVirtual();
+            r.Link();
+            r.Push(new ScreenReadyMessage((uint)id.Value, 2560, 1440));
+            r.C.Bus.Send(new RecreateScreen(id, Resolution.Create(1920, 1080)));
+            r.Tick();
+            r.Push(new ScreenReadyMessage((uint)id.Value, 1920, 1080));
+
+            r.C.Bus.Undo();
+            r.Tick();
+            var acquire = r.C.Channel.Last<AcquireScreenMessage>();
+            Assert.That(acquire.ScreenKey, Is.EqualTo((uint)id.Value));
+            Assert.That(acquire.Width, Is.EqualTo(2560u));
+            Assert.That(acquire.Height, Is.EqualTo(1440u));
+            Assert.That(r.C.Channel.Count<ReleaseScreenMessage>(), Is.EqualTo(0), "recriar não libera a chave");
+
+            r.Push(new ScreenReadyMessage((uint)id.Value, 2560, 1440));
+            Assert.That(r.Video.LastResolution, Is.EqualTo(Resolution.Create(2560, 1440)));
+            Assert.That(r.Video.LastPort, Is.EqualTo(9000));
+        }
+
+        [Test]
         public void ScreenFailed_WhileStreaming_ClosesTheDecoder()
         {
             var r = new Rig();
