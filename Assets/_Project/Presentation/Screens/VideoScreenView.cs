@@ -18,7 +18,6 @@ namespace ScreenPortal.Presentation.Screens
         private static readonly Vector4 Normal = Vector4.one;
 
         private readonly GameObject _root;       // pose (sem escala)
-        private readonly Transform _layer;       // escala = largura × altura
         private readonly Transform _statusQuad;  // escala = largura × altura
         private readonly TextMesh _statusText;
         private readonly Material _statusMaterial;
@@ -26,6 +25,10 @@ namespace ScreenPortal.Presentation.Screens
         private readonly System.Action<VideoScreenView> _onDisposed;
         private Resolution _resolution;
         private bool _everLive;
+        private ScreenLinkState _state = ScreenLinkState.Offline;
+        private string _detail = string.Empty;
+        private Vector3 _size = Vector3.one;
+        private Transform _layer;
 
         public OVROverlay Overlay { get; private set; }
         public ScreenId Id { get; }
@@ -36,9 +39,6 @@ namespace ScreenPortal.Presentation.Screens
             _onDisposed = onDisposed;
             _root = new GameObject("Screen " + screen.Id.Value);
             _root.transform.SetParent(parent, false);
-
-            _layer = new GameObject("Layer").transform;
-            _layer.SetParent(_root.transform, false);
 
             var quad = GameObject.CreatePrimitive(PrimitiveType.Quad);
             quad.name = "Status";
@@ -70,7 +70,12 @@ namespace ScreenPortal.Presentation.Screens
         public void Apply(VirtualScreen screen, Pose pose)
         {
             // Resolução só muda via RecreateScreen (raro): recria a layer com a nova external surface.
-            if (!screen.Resolution.Equals(_resolution)) BuildOverlay(screen.Resolution);
+            if (!screen.Resolution.Equals(_resolution))
+            {
+                _everLive = false; // a última imagem não vale no novo tamanho
+                BuildOverlay(screen.Resolution);
+                SetLink(_state, _detail);
+            }
             ApplyTransform(pose, screen.WidthMeters, screen.HeightMeters);
             _root.name = string.IsNullOrEmpty(screen.Label) ? "Screen " + screen.Id.Value : screen.Label;
         }
@@ -79,6 +84,7 @@ namespace ScreenPortal.Presentation.Screens
         {
             _root.transform.SetLocalPositionAndRotation(pose.Position.ToUnity(), pose.Rotation.ToUnity());
             var size = new Vector3(widthMeters, heightMeters, 1f);
+            _size = size;
             _layer.localScale = size;
             _statusQuad.localScale = size;
             _statusText.characterSize = 0.006f * widthMeters;
@@ -86,6 +92,8 @@ namespace ScreenPortal.Presentation.Screens
 
         public void SetLink(ScreenLinkState state, string detail)
         {
+            _state = state;
+            _detail = detail ?? string.Empty;
             if (state == ScreenLinkState.Live) _everLive = true;
             string text;
             switch (state)
@@ -93,7 +101,7 @@ namespace ScreenPortal.Presentation.Screens
                 case ScreenLinkState.Live: text = null; break;
                 case ScreenLinkState.Creating: text = "Criando monitor…"; break;
                 case ScreenLinkState.Connecting: text = "Conectando vídeo…"; break;
-                case ScreenLinkState.Failed: text = "Falha:\n" + detail; break;
+                case ScreenLinkState.Failed: text = "Falha:\n" + (_detail.Length > 60 ? _detail.Substring(0, 60) + "…" : _detail); break;
                 default: text = "PC desconectado"; break;
             }
             // Depois de já ter tido vídeo, só a falha troca a imagem por texto; o resto escurece a última imagem.
@@ -108,10 +116,14 @@ namespace ScreenPortal.Presentation.Screens
 
         private void BuildOverlay(Resolution resolution)
         {
-            if (Overlay != null) Object.Destroy(Overlay);
+            var old = _layer;
             _resolution = resolution;
 
-            var go = _layer.gameObject;
+            var go = new GameObject("Layer");
+            _layer = go.transform;
+            _layer.SetParent(_root.transform, false);
+            _layer.localScale = _size;
+            if (old != null) Object.Destroy(old.gameObject); // adiada: o decoder fecha antes da Surface antiga morrer
             go.SetActive(false); // configurar antes do OnEnable criar a layer
             var overlay = go.AddComponent<OVROverlay>();
             overlay.currentOverlayType = OVROverlay.OverlayType.Overlay;
