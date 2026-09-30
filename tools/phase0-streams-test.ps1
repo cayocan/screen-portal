@@ -6,12 +6,15 @@
 #      latência média < 50 ms, 0 descartes do decoder — spec 2A §3)
 #   Parâmetros extras do app (teste de texto): -AppExtras "--ei widthcm 200 --ei distcm 120 --ei sharpen 1"
 param([int]$Streams = 1, [int]$Seconds = 40, [int]$Bitrate = 20000, [int]$Fps = 60, [string]$Mix = "", [int]$Runs = 1,
-      [string]$Label = "", [string]$AppExtras = "", [string]$QuestIp = "192.168.0.171", [string]$Serial = "2G0YC1ZG410B1H",
+      [string]$Label = "", [string]$AppExtras = "", [string]$QuestIp = "192.168.0.171", [string]$Serial = "",
       [switch]$KeepRunning)
 
 $ErrorActionPreference = "Stop"
 $root = Split-Path $PSScriptRoot -Parent
-$adb = "D:\Unity Editor\6000.3.19f1\Editor\Data\PlaybackEngines\AndroidPlayer\SDK\platform-tools\adb.exe"
+. (Join-Path $PSScriptRoot "quest.ps1") -QuestIp $QuestIp   # USB se no cabo, senão Wi-Fi
+$adb = $QuestAdb
+if (-not $Serial) { $Serial = Get-QuestSerial }
+Write-Host "Quest: $Serial"
 $exe = Join-Path $root "host\Host.App\bin\Release\net10.0-windows10.0.22621.0\ScreenPortalHost.exe"
 $activity = "com.screenportal.app/com.unity3d.player.UnityPlayerGameActivity"
 $outDir = Join-Path $PSScriptRoot "out"

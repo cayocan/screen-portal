@@ -2,9 +2,10 @@
 #   powershell -ExecutionPolicy Bypass -File tools/phase0-collect.ps1 -Label "1stream-2560x1080" [-Seconds 60]
 param([Parameter(Mandatory)][string]$Label, [int]$Seconds = 60,
       [string]$Adb = "D:\Unity Editor\6000.3.19f1\Editor\Data\PlaybackEngines\AndroidPlayer\SDK\platform-tools\adb.exe",
-      [string]$Serial = "2G0YC1ZG410B1H", [switch]$FromBuffer)
+      [string]$Serial = "", [switch]$FromBuffer)
 
 $ErrorActionPreference = "Stop"
+if (-not $Serial) { . (Join-Path $PSScriptRoot "quest.ps1"); $Serial = Get-QuestSerial }   # USB se no cabo, senão Wi-Fi
 $root = Split-Path $PSScriptRoot -Parent
 $csv = Join-Path $root "docs\measurements\fase0-$Label.csv"
 
