@@ -1,5 +1,6 @@
 using NUnit.Framework;
 using ScreenPortal.Domain;
+using ScreenPortal.Domain.Layout;
 using ScreenPortal.Domain.Commands;
 using ScreenPortal.Domain.Screens;
 using ScreenPortal.Domain.Spatial;
@@ -9,7 +10,7 @@ namespace ScreenPortal.Tests
     public class CommandTests
     {
         private static readonly Resolution Ultrawide = Resolution.Create(2560, 1080);
-        private static readonly Pose Front = Pose.At(new Vec3(0f, 1.2f, 1.3f));
+        private static readonly Placement Front = Placement.Default;
 
         private static Workspace WithOneScreen(out ScreenId id)
         {
@@ -31,7 +32,7 @@ namespace ScreenPortal.Tests
             Assert.That(id, Is.EqualTo(new ScreenId(1)));
             var s = Get(ws, id);
             Assert.That(s.Resolution, Is.EqualTo(Ultrawide));
-            Assert.That(s.Pose, Is.EqualTo(Front));
+            Assert.That(s.Placement, Is.EqualTo(Front));
             Assert.That(s.WidthMeters, Is.EqualTo(1.4f));
         }
 
@@ -87,15 +88,17 @@ namespace ScreenPortal.Tests
         }
 
         [Test]
-        public void MoveScreen_ChangesOnlyPose()
+        public void MoveScreenOnSurface_ChangesOnlyPlacement_KeepsDistanceWhenOmitted()
         {
             var ws = WithOneScreen(out var id);
-            var target = Pose.At(new Vec3(-1f, 1.5f, 1f));
-            new MoveScreen(id, target).Apply(ws, out var next);
+            new MoveScreenOnSurface(id, -30f, 12f).Apply(ws, out var next);
             var s = Get(next, id);
-            Assert.That(s.Pose, Is.EqualTo(target));
+            Assert.That(s.Placement, Is.EqualTo(Placement.OnSurface(-30f, 12f, Front.DistanceM)));
             Assert.That(s.WidthMeters, Is.EqualTo(1.4f));
             Assert.That(s.Resolution, Is.EqualTo(Ultrawide));
+
+            new MoveScreenOnSurface(id, 5f, 0f, 2.2f).Apply(next, out next);
+            Assert.That(Get(next, id).Placement.DistanceM, Is.EqualTo(2.2f));
         }
 
         [Test]
@@ -104,7 +107,7 @@ namespace ScreenPortal.Tests
             var unknown = new ScreenId(42);
             ICommand[] commands =
             {
-                new RemoveScreen(unknown), new MoveScreen(unknown, Front), new ResizeScreen(unknown, 1f),
+                new RemoveScreen(unknown), new MoveScreenOnSurface(unknown, 10f, 0f), new ResizeScreen(unknown, 1f),
                 new SetScreenCurvature(unknown, 0.5f), new ToggleScreenCurvature(unknown),
                 new SetFrameRateMode(unknown, FrameRateMode.Video), new RecreateScreen(unknown, Ultrawide),
                 new SetFocus(unknown),
@@ -127,7 +130,7 @@ namespace ScreenPortal.Tests
             var s = Get(next, id);
             Assert.That(s.Resolution, Is.EqualTo(portrait));
             Assert.That(s.Orientation, Is.EqualTo(Orientation.Portrait));
-            Assert.That(s.Pose, Is.EqualTo(Front));
+            Assert.That(s.Placement, Is.EqualTo(Front));
             Assert.That(s.WidthMeters, Is.EqualTo(1.4f));
         }
 
@@ -152,7 +155,7 @@ namespace ScreenPortal.Tests
         public void SetFocus_IsNotUndoable_OthersAre()
         {
             Assert.That(new SetFocus(ScreenId.None).IsUndoable, Is.False);
-            Assert.That(new MoveScreen(new ScreenId(1), Front).IsUndoable, Is.True);
+            Assert.That(new MoveScreenOnSurface(new ScreenId(1), 10f, 0f).IsUndoable, Is.True);
             Assert.That(new CreateScreen(Ultrawide, Front, 1f).IsUndoable, Is.True);
         }
     }

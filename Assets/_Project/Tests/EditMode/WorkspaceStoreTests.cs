@@ -1,6 +1,7 @@
 using NUnit.Framework;
 using ScreenPortal.App;
 using ScreenPortal.Domain;
+using ScreenPortal.Domain.Layout;
 using ScreenPortal.Domain.Commands;
 using ScreenPortal.Domain.Screens;
 using ScreenPortal.Domain.Spatial;
@@ -10,7 +11,7 @@ namespace ScreenPortal.Tests
     public class WorkspaceStoreTests
     {
         private static readonly Resolution Hd = Resolution.Create(1920, 1080);
-        private static CreateScreen Create() => new CreateScreen(Hd, Pose.At(new Vec3(0f, 1.2f, 1.3f)), 1f);
+        private static CreateScreen Create() => new CreateScreen(Hd, Placement.Default, 1f);
 
         [Test]
         public void Dispatch_Accepted_ChangesStateAndRaisesEvent()

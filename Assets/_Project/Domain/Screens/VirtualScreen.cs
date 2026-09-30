@@ -1,5 +1,5 @@
 using System;
-using ScreenPortal.Domain.Spatial;
+using ScreenPortal.Domain.Layout;
 
 namespace ScreenPortal.Domain.Screens
 {
@@ -11,7 +11,8 @@ namespace ScreenPortal.Domain.Screens
     {
         public ScreenId Id { get; }
         public Resolution Resolution { get; }
-        public Pose Pose { get; }
+        /// <summary>Sobre a superfície ou solta; a pose 3D é <c>surface.ToPose(Placement)</c> (ADR 0005).</summary>
+        public Placement Placement { get; }
         public float WidthMeters { get; }
         /// <summary>0 = plana, 1 = envolvente (brief §10.2).</summary>
         public float Curvature { get; }
@@ -26,7 +27,7 @@ namespace ScreenPortal.Domain.Screens
         public VirtualScreen(
             ScreenId id,
             Resolution resolution,
-            Pose pose,
+            Placement placement,
             float widthMeters,
             float curvature = 0f,
             float lastNonZeroCurvature = ScreenLimits.DefaultCurvature,
@@ -38,7 +39,7 @@ namespace ScreenPortal.Domain.Screens
 
             Id = id;
             Resolution = resolution;
-            Pose = pose;
+            Placement = placement;
             WidthMeters = ScreenLimits.ClampWidth(widthMeters);
             Curvature = ScreenLimits.Clamp01(curvature);
             float last = ScreenLimits.Clamp01(lastNonZeroCurvature);
@@ -47,21 +48,21 @@ namespace ScreenPortal.Domain.Screens
             Label = label ?? string.Empty;
         }
 
-        public VirtualScreen WithPose(Pose pose) =>
-            new VirtualScreen(Id, Resolution, pose, WidthMeters, Curvature, LastNonZeroCurvature, FrameRateMode, Label);
+        public VirtualScreen WithPlacement(Placement placement) =>
+            new VirtualScreen(Id, Resolution, placement, WidthMeters, Curvature, LastNonZeroCurvature, FrameRateMode, Label);
 
         public VirtualScreen WithWidth(float widthMeters) =>
-            new VirtualScreen(Id, Resolution, Pose, widthMeters, Curvature, LastNonZeroCurvature, FrameRateMode, Label);
+            new VirtualScreen(Id, Resolution, Placement, widthMeters, Curvature, LastNonZeroCurvature, FrameRateMode, Label);
 
         public VirtualScreen WithCurvature(float curvature) =>
-            new VirtualScreen(Id, Resolution, Pose, WidthMeters, curvature, LastNonZeroCurvature, FrameRateMode, Label);
+            new VirtualScreen(Id, Resolution, Placement, WidthMeters, curvature, LastNonZeroCurvature, FrameRateMode, Label);
 
         public VirtualScreen WithFrameRateMode(FrameRateMode mode) =>
-            new VirtualScreen(Id, Resolution, Pose, WidthMeters, Curvature, LastNonZeroCurvature, mode, Label);
+            new VirtualScreen(Id, Resolution, Placement, WidthMeters, Curvature, LastNonZeroCurvature, mode, Label);
 
-        /// <summary>Só para <c>RecreateScreen</c> (ação explícita, brief §10.4). Mantém pose e largura física.</summary>
+        /// <summary>Só para <c>RecreateScreen</c> (ação explícita, brief §10.4). Mantém placement e largura física.</summary>
         public VirtualScreen WithResolution(Resolution resolution) =>
-            new VirtualScreen(Id, resolution, Pose, WidthMeters, Curvature, LastNonZeroCurvature, FrameRateMode, Label);
+            new VirtualScreen(Id, resolution, Placement, WidthMeters, Curvature, LastNonZeroCurvature, FrameRateMode, Label);
 
         public override string ToString() => $"{Id} {Resolution} {WidthMeters:0.00} m curv {Curvature:0.00} {FrameRateMode}";
     }

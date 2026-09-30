@@ -1,4 +1,3 @@
-using ScreenPortal.Domain.Spatial;
 
 namespace ScreenPortal.App.Connection
 {
@@ -19,7 +18,6 @@ namespace ScreenPortal.App.Connection
         public double ShutdownCooldownSeconds { get; set; } = 3.0;
         public int VideoPort { get; set; } = 9000;
         public ushort StreamId { get; set; } = 0;
-        public Pose DefaultScreenPose { get; set; } = Pose.At(new Vec3(0f, 1.2f, 1.3f));
         public float DefaultScreenWidthMeters { get; set; } = 1.4f;
     }
 }

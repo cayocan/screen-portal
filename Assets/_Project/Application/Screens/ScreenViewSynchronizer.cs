@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using ScreenPortal.Domain;
+using ScreenPortal.Domain.Layout;
 using ScreenPortal.Domain.Screens;
 
 namespace ScreenPortal.App.Screens
@@ -8,6 +9,7 @@ namespace ScreenPortal.App.Screens
     /// <summary>
     /// Observer do <see cref="WorkspaceStore"/>: cria, atualiza e descarta views para que elas espelhem
     /// o estado. Como <see cref="VirtualScreen"/> é imutável, "mudou" = outra instância (comparação por referência).
+    /// Superfície nova (outra instância) reaplica todas as telas: a pose é derivada dela.
     /// </summary>
     public sealed class ScreenViewSynchronizer : IDisposable
     {
@@ -21,6 +23,7 @@ namespace ScreenPortal.App.Screens
         {
             public IScreenView View;
             public VirtualScreen Applied;
+            public LayoutSurface Surface;
             public bool Seen;
         }
 
@@ -45,15 +48,17 @@ namespace ScreenPortal.App.Screens
         private void Sync(Workspace workspace)
         {
             var screens = workspace.Screens;
+            var surface = workspace.Surface;
             for (int i = 0; i < screens.Count; i++)
             {
                 var screen = screens[i];
                 if (_entries.TryGetValue(screen.Id, out var entry))
                 {
-                    if (!ReferenceEquals(entry.Applied, screen))
+                    if (!ReferenceEquals(entry.Applied, screen) || !ReferenceEquals(entry.Surface, surface))
                     {
-                        entry.View.Apply(screen);
+                        entry.View.Apply(screen, surface.ToPose(screen.Placement));
                         entry.Applied = screen;
+                        entry.Surface = surface;
                     }
                     entry.Seen = true;
                     _entries[screen.Id] = entry;
@@ -61,8 +66,8 @@ namespace ScreenPortal.App.Screens
                 else
                 {
                     var view = _factory.Create(screen);
-                    view.Apply(screen);
-                    _entries[screen.Id] = new Entry { View = view, Applied = screen, Seen = true };
+                    view.Apply(screen, surface.ToPose(screen.Placement));
+                    _entries[screen.Id] = new Entry { View = view, Applied = screen, Surface = surface, Seen = true };
                 }
             }
 

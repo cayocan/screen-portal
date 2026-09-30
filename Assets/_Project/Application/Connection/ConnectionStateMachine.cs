@@ -279,7 +279,7 @@ namespace ScreenPortal.App.Connection
 
             var resolution = ResolutionFit.FromCapture((int)monitor.Width, (int)monitor.Height);
             if (!resolution.IsValid) resolution = Resolution.Create(1920, 1080);
-            var result = _bus.Send(new CreateScreen(resolution, _options.DefaultScreenPose, _options.DefaultScreenWidthMeters, label: label));
+            var result = _bus.Send(new CreateScreen(resolution, null,_options.DefaultScreenWidthMeters, label: label));
             return result.Accepted ? _store.State.FocusedScreenId : ScreenId.None;
         }
 

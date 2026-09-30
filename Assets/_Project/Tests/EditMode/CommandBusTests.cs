@@ -1,6 +1,7 @@
 using System.Collections.Generic;
 using NUnit.Framework;
 using ScreenPortal.App;
+using ScreenPortal.Domain.Layout;
 using ScreenPortal.Domain.Commands;
 using ScreenPortal.Domain.Screens;
 using ScreenPortal.Domain.Spatial;
@@ -22,7 +23,7 @@ namespace ScreenPortal.Tests
             var observer = new RecordingObserver();
             var bus = new CommandBus(store, new ICommandObserver[] { observer });
 
-            var ok = new CreateScreen(Resolution.Create(1920, 1080), Pose.Identity, 1f);
+            var ok = new CreateScreen(Resolution.Create(1920, 1080), Placement.Default, 1f);
             var bad = new RemoveScreen(new ScreenId(99));
             bus.Send(ok);
             bus.Send(bad);
@@ -39,7 +40,7 @@ namespace ScreenPortal.Tests
         {
             var store = new WorkspaceStore();
             var bus = new CommandBus(store, new ICommandObserver[0]);
-            bus.Send(new CreateScreen(Resolution.Create(1920, 1080), Pose.Identity, 1f));
+            bus.Send(new CreateScreen(Resolution.Create(1920, 1080), Placement.Default, 1f));
 
             Assert.That(bus.Undo(), Is.True);
             Assert.That(store.State.Screens, Is.Empty);

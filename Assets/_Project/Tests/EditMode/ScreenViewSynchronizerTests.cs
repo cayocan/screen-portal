@@ -2,6 +2,7 @@ using System.Collections.Generic;
 using NUnit.Framework;
 using ScreenPortal.App;
 using ScreenPortal.App.Screens;
+using ScreenPortal.Domain.Layout;
 using ScreenPortal.Domain.Commands;
 using ScreenPortal.Domain.Screens;
 using ScreenPortal.Domain.Spatial;
@@ -14,7 +15,8 @@ namespace ScreenPortal.Tests
         {
             public readonly List<VirtualScreen> Applied = new List<VirtualScreen>();
             public bool Disposed;
-            public void Apply(VirtualScreen screen) => Applied.Add(screen);
+            public void Apply(VirtualScreen screen, Pose pose) => Applied.Add(screen);
+            public void ApplyTransform(Pose pose, float widthMeters, float heightMeters) { }
             public void Dispose() => Disposed = true;
         }
 
@@ -29,7 +31,7 @@ namespace ScreenPortal.Tests
             }
         }
 
-        private static CreateScreen Create() => new CreateScreen(Resolution.Create(1920, 1080), Pose.Identity, 1f);
+        private static CreateScreen Create() => new CreateScreen(Resolution.Create(1920, 1080), Placement.Default, 1f);
 
         [Test]
         public void Start_CreatesViewsForExistingScreens()

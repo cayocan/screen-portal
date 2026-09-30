@@ -10,7 +10,14 @@ namespace ScreenPortal.Domain.Commands
 
         protected ScreenCommand(ScreenId screenId) => ScreenId = screenId;
 
-        protected abstract VirtualScreen Transform(VirtualScreen screen);
+        /// <summary>Transformação que só depende da tela.</summary>
+        protected virtual VirtualScreen Transform(VirtualScreen screen) => screen;
+
+        /// <summary>Comandos que precisam da superfície sobrescrevem esta.</summary>
+        protected virtual VirtualScreen Transform(VirtualScreen screen, Workspace state) => Transform(screen);
+
+        /// <summary>null = válido; senão, o motivo da rejeição.</summary>
+        protected virtual string Validate(VirtualScreen screen, Workspace state) => null;
 
         public CommandResult Apply(Workspace state, out Workspace next)
         {
@@ -19,7 +26,13 @@ namespace ScreenPortal.Domain.Commands
                 next = state;
                 return CommandResult.Rejected(ScreenId + " não existe.");
             }
-            next = state.WithScreenReplaced(Transform(screen));
+            string error = Validate(screen, state);
+            if (error != null)
+            {
+                next = state;
+                return CommandResult.Rejected(ScreenId + ": " + error);
+            }
+            next = state.WithScreenReplaced(Transform(screen, state));
             return CommandResult.Ok;
         }
 

@@ -1,5 +1,6 @@
 using NUnit.Framework;
 using ScreenPortal.App.Connection;
+using ScreenPortal.Domain.Layout;
 using ScreenPortal.Domain.Commands;
 using ScreenPortal.Domain.Spatial;
 
@@ -153,7 +154,7 @@ namespace ScreenPortal.Tests
         {
             var r = new ConnectionRig();
             r.GoToStreaming();
-            r.Store.Dispatch(new MoveScreen(r.Store.State.Screens[0].Id, Pose.At(new Vec3(-1f, 1f, 1f))));
+            r.Store.Dispatch(new MoveScreenOnSurface(r.Store.State.Screens[0].Id, -30f, 10f));
             r.Discovery.Host = null; // prova que não depende do mDNS
 
             r.Channel.Push(ChannelEventKind.Disconnected);
@@ -170,7 +171,7 @@ namespace ScreenPortal.Tests
 
             Assert.That(r.Machine.State, Is.EqualTo(ConnectionState.Streaming));
             Assert.That(r.Store.State.Screens.Count, Is.EqualTo(1), "não duplica a tela");
-            Assert.That(r.Store.State.Screens[0].Pose.Position, Is.EqualTo(new Vec3(-1f, 1f, 1f)), "layout intacto");
+            Assert.That(r.Store.State.Screens[0].Placement.AzimuthDeg, Is.EqualTo(-30f), "layout intacto");
             Assert.That(r.Video.Starts, Is.EqualTo(1), "decoder continua o mesmo");
             Assert.That(r.Channel.Count<StartStreamMessage>(), Is.EqualTo(2));
         }

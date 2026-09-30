@@ -1,6 +1,7 @@
 using ScreenPortal.App.Screens;
 using ScreenPortal.Domain.Screens;
 using UnityEngine;
+using Pose = ScreenPortal.Domain.Spatial.Pose; // UnityEngine.Pose também existe
 using Resolution = ScreenPortal.Domain.Screens.Resolution; // UnityEngine.Resolution também existe
 
 namespace ScreenPortal.Presentation.Screens
@@ -29,15 +30,19 @@ namespace ScreenPortal.Presentation.Screens
             BuildOverlay(screen.Resolution);
         }
 
-        public void Apply(VirtualScreen screen)
+        public void Apply(VirtualScreen screen, Pose pose)
         {
             // Resolução só muda via RecreateScreen (raro): recria a layer com a nova external surface.
             if (!screen.Resolution.Equals(_resolution)) BuildOverlay(screen.Resolution);
-
-            var t = _root.transform;
-            t.SetLocalPositionAndRotation(screen.Pose.Position.ToUnity(), screen.Pose.Rotation.ToUnity());
-            t.localScale = new Vector3(screen.WidthMeters, screen.HeightMeters, 1f);
+            ApplyTransform(pose, screen.WidthMeters, screen.HeightMeters);
             _root.name = string.IsNullOrEmpty(screen.Label) ? "Screen " + screen.Id.Value : screen.Label;
+        }
+
+        public void ApplyTransform(Pose pose, float widthMeters, float heightMeters)
+        {
+            var t = _root.transform;
+            t.SetLocalPositionAndRotation(pose.Position.ToUnity(), pose.Rotation.ToUnity());
+            t.localScale = new Vector3(widthMeters, heightMeters, 1f);
         }
 
         private void BuildOverlay(Resolution resolution)

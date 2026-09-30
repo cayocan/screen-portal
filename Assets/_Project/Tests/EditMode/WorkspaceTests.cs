@@ -1,5 +1,6 @@
 using NUnit.Framework;
 using ScreenPortal.Domain;
+using ScreenPortal.Domain.Layout;
 using ScreenPortal.Domain.Screens;
 using ScreenPortal.Domain.Spatial;
 
@@ -8,7 +9,7 @@ namespace ScreenPortal.Tests
     public class WorkspaceTests
     {
         private static VirtualScreen Screen(int id) =>
-            new VirtualScreen(new ScreenId(id), Resolution.Create(1920, 1080), Pose.Identity, 1f);
+            new VirtualScreen(new ScreenId(id), Resolution.Create(1920, 1080), Placement.Default, 1f);
 
         [Test]
         public void Empty_HasNoScreensAndNoFocus()

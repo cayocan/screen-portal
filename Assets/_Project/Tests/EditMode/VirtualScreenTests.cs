@@ -1,4 +1,5 @@
 using NUnit.Framework;
+using ScreenPortal.Domain.Layout;
 using ScreenPortal.Domain.Screens;
 using ScreenPortal.Domain.Spatial;
 
@@ -7,7 +8,7 @@ namespace ScreenPortal.Tests
     public class VirtualScreenTests
     {
         private static VirtualScreen Screen(float width = 1.4f, float curvature = 0f) =>
-            new VirtualScreen(new ScreenId(1), Resolution.Create(2560, 1080), Pose.Identity, width, curvature);
+            new VirtualScreen(new ScreenId(1), Resolution.Create(2560, 1080), Placement.Default, width, curvature);
 
         [Test]
         public void HeightDerivesFromAspectRatio() =>
@@ -16,7 +17,7 @@ namespace ScreenPortal.Tests
         [Test]
         public void OrientationComesFromResolution()
         {
-            var portrait = new VirtualScreen(new ScreenId(1), Resolution.Create(1440, 2560), Pose.Identity, 0.6f);
+            var portrait = new VirtualScreen(new ScreenId(1), Resolution.Create(1440, 2560), Placement.Default, 0.6f);
             Assert.That(portrait.Orientation, Is.EqualTo(Orientation.Portrait));
             Assert.That(portrait.HeightMeters, Is.GreaterThan(portrait.WidthMeters));
         }
@@ -47,21 +48,21 @@ namespace ScreenPortal.Tests
         public void WithMethods_ReturnNewInstances_AndKeepOtherFields()
         {
             var s = Screen();
-            var moved = s.WithPose(Pose.At(new Vec3(1f, 2f, 3f)));
+            var moved = s.WithPlacement(Placement.OnSurface(20f, 5f, 2f));
             Assert.That(moved, Is.Not.SameAs(s));
             Assert.That(moved.Resolution, Is.EqualTo(s.Resolution));
             Assert.That(moved.WidthMeters, Is.EqualTo(s.WidthMeters));
-            Assert.That(s.Pose, Is.EqualTo(Pose.Identity));
+            Assert.That(s.Placement, Is.EqualTo(Placement.Default));
         }
 
         [Test]
         public void NoneId_IsRejected() =>
             Assert.Throws<System.ArgumentException>(() =>
-                new VirtualScreen(ScreenId.None, Resolution.Create(1920, 1080), Pose.Identity, 1f));
+                new VirtualScreen(ScreenId.None, Resolution.Create(1920, 1080), Placement.Default, 1f));
 
         [Test]
         public void InvalidResolution_IsRejected() =>
             Assert.Throws<System.ArgumentException>(() =>
-                new VirtualScreen(new ScreenId(1), default(Resolution), Pose.Identity, 1f));
+                new VirtualScreen(new ScreenId(1), default(Resolution), Placement.Default, 1f));
     }
 }
