@@ -206,6 +206,66 @@ namespace ScreenPortal.Tests
         }
 
         [Test]
+        public void CurvatureItem_NeedsAFocusedScreen()
+        {
+            var r = new Rig();
+            int index = r.Menu.IndexOf(MenuItemId.Curvature);
+            Assert.That(index, Is.GreaterThanOrEqualTo(0));
+            Assert.That(r.Menu.Label(index), Is.EqualTo("Curvatura ▸"));
+            Assert.That(r.Menu.IsEnabled(index), Is.False, "sem tela em foco");
+            r.Menu.Invoke(MenuItemId.Curvature);
+            Assert.That(r.Menu.Page, Is.EqualTo(MenuPage.Main));
+            r.Menu.Invoke(MenuItemId.AddTestScreen);
+            Assert.That(r.Menu.IsEnabled(index), Is.True);
+        }
+
+        [Test]
+        public void CurvaturePage_ListsPresets_MarksTheCurrent_AndSendsSetScreenCurvature()
+        {
+            var r = new Rig();
+            r.Menu.Invoke(MenuItemId.AddTestScreen);
+            r.Menu.Invoke(MenuItemId.Curvature);
+            Assert.That(r.Menu.Page, Is.EqualTo(MenuPage.Curvature));
+            Assert.That(r.Menu.ItemCount, Is.EqualTo(5));
+            Assert.That(r.Menu.Label(0), Is.EqualTo("● Plana"));
+            Assert.That(r.Menu.Label(1), Is.EqualTo("Suave"));
+            Assert.That(r.Menu.Label(2), Is.EqualTo("Média"));
+            Assert.That(r.Menu.Label(3), Is.EqualTo("Envolvente"));
+            Assert.That(r.Menu.Label(4), Is.EqualTo(WristMenu.BackLabel));
+            Assert.That(r.Menu.StatusLine, Is.EqualTo("Plana"));
+
+            r.Menu.Invoke(2); // Média
+            var screen = r.Store.State.Screens[0];
+            Assert.That(screen.Curvature, Is.EqualTo(0.6f));
+            Assert.That(r.Menu.Page, Is.EqualTo(MenuPage.Curvature), "fica na página para comparar");
+            Assert.That(r.Menu.Label(0), Is.EqualTo("Plana"));
+            Assert.That(r.Menu.Label(2), Is.EqualTo("● Média"));
+            Assert.That(r.Menu.StatusLine, Is.EqualTo(CurvedGeometry.Of(screen, r.Store.State.Surface).Label()));
+            Assert.That(r.Menu.StatusLine, Does.StartWith("Média · 60 % · ≈ "));
+
+            r.Menu.Invoke(MenuItemId.Undo);
+            Assert.That(r.Store.State.Screens[0].Curvature, Is.EqualTo(0f));
+            Assert.That(r.Store.State.Screens[0].Resolution, Is.EqualTo(screen.Resolution));
+
+            r.Menu.Invoke(4); // voltar
+            Assert.That(r.Menu.Page, Is.EqualTo(MenuPage.Main));
+        }
+
+        [Test]
+        public void CurvaturePage_WithoutFocus_DisablesPresets()
+        {
+            var r = new Rig();
+            r.Menu.Invoke(MenuItemId.AddTestScreen);
+            r.Menu.Invoke(MenuItemId.Curvature);
+            r.Menu.Invoke(MenuItemId.RemoveScreen); // o foco some (ex.: undo da criação)
+            Assert.That(r.Menu.IsEnabled(2), Is.False);
+            Assert.That(r.Menu.IsEnabled(4), Is.True, "voltar");
+            Assert.That(r.Menu.StatusLine, Is.EqualTo(CurvatureMenu.NoFocusStatus));
+            r.Menu.Invoke(2);
+            Assert.That(r.Store.State.Screens.Count, Is.EqualTo(0));
+        }
+
+        [Test]
         public void MenuLayout_ButtonAtFindsEachButtonCenter()
         {
             int n = new Rig().Menu.ItemCount;
