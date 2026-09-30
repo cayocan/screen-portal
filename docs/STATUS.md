@@ -51,7 +51,7 @@ Cada um com spec → plano → implementação → verificação. Ordem: **2A + 
 | # | Subprojeto | Onde se testa | Depende de | Estado |
 |---|---|---|---|---|
 | 2A | Spikes: driver de monitor virtual + capacidade do decoder | PC (admin) + Quest | — | ✅ SudoVDA ([ADR 0007](adr/0007-virtual-display-driver.md)); 4×60 fps sem perdas, foco a ~16 ms ([ADR 0008](adr/0008-decode-capacity.md)) |
-| 2B | Superfície de layout Cilindro/Esfera + manipulação (controle/mãos) + undo | Meta XR Simulator | — | 🔧 branch `phase2b/manipulation`: Tasks 1–12 prontas; **retomar na Task 13** (Simulator + Meta XR Operator) — [plano](plans/2026-09-29-fase2b-manipulacao.md) · [verificação](measurements/fase2b-simulator.md) |
+| 2B | Superfície de layout Cilindro/Esfera + manipulação (controle/mãos) + undo | Meta XR Simulator | — | 🔧 branch `phase2b/manipulation`: Tasks 1–12 prontas; Task 13 no Simulator ✅ (17/17, bug do texto num olho só corrigido, palma calibrada); **retomar na Task 13 Step 4** (conferência visual do Cayo) → Task 14 (Quest) — [plano](plans/2026-09-29-fase2b-manipulacao.md) · [verificação](measurements/fase2b-simulator.md) |
 | 2C | Várias telas: monitores virtuais sob comando do headset, N streams | PC + Quest | 2A | — |
 | 2D | Seletor "Novo monitor" + contorno fantasma + recriar | Simulator + Quest | 2B, 2C | — |
 | 2E | Telas curvas (CylinderLayerPolicy, crossfade, medição) | Simulator + Quest | 2B, 2C | — |
