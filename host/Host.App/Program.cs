@@ -38,7 +38,17 @@ switch (opts.Command)
 
 static int RunServe(Args o, CancellationToken ct)
 {
-    static void Log(string message) => Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] {message}");
+    // Log no console e em %APPDATA%\ScreenPortal\host.log (recriado a cada serve; leitura compartilhada).
+    string logPath = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData), "ScreenPortal", "host.log");
+    Directory.CreateDirectory(Path.GetDirectoryName(logPath)!);
+    var logFile = new StreamWriter(new FileStream(logPath, FileMode.Create, FileAccess.Write, FileShare.ReadWrite)) { AutoFlush = true };
+    var logLock = new object();
+    void Log(string message)
+    {
+        string line = $"[{DateTime.Now:HH:mm:ss}] {message}";
+        Console.WriteLine(line);
+        lock (logLock) logFile.WriteLine(line);
+    }
 
     string pairingPath = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData), "ScreenPortal", "paired.json");
     var pairing = File.Exists(pairingPath)
