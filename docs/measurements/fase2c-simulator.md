@@ -47,3 +47,20 @@ preparação da 2B). O Editor conecta em 127.0.0.1; o vídeo é no-op no Editor,
 - **Causa 2 (achada na correção):** o pipeline recriado recomeçava os frameIds em 0, e o receptor do headset descartava
   os quadros como atrasados (imagem congelada). Correção: o pipeline novo continua a numeração do anterior.
 - ✅ Verificado no Quest: acima, abaixo e à esquerda, a tela volta em ~1 s.
+
+## 5. Quest (30/09/2026) — roteiro final
+Verificado pelo Cayo no óculos (resultado visual; o log do host não foi conferido nos itens marcados com *).
+
+| # | Ação | Resultado |
+|---|---|---|
+| 1 | Conectar | ✅ espelho automático com vídeo |
+| 2 | 5 telas com vídeo (inclui 1440×3440 e retratos) | ✅ 60 fps, ~8–20 ms captura→encode; com 1440×3440, ~55 fps |
+| 3 | 4 telas incluindo uma 3840×2160* | ✅ sem travar |
+| 4 | 5ª tela | ✅ aviso |
+| 5 | Remover + X em < 10 s, com janela no monitor* | ✅ janela no lugar |
+| 6 | Remover e esperar > 10 s | ✅ monitor removido no Windows |
+| 7 | Óculos dorme e volta em < 5 min* | ✅ telas voltam com vídeo |
+| 8 | Wi-Fi cai no meio do stream | ✅ reconecta, sessão antiga substituída |
+| 9 | Interface por cima das telas (ADR 0010) | ✅ laser, menu, moldura e alças por cima; nitidez igual |
+| 10 | Tela nova à frente da visão | ✅ |
+| 11 | Reorganizar monitores no Windows (§4) | ✅ |
