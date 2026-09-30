@@ -15,6 +15,7 @@ namespace ScreenPortal.App.Manipulation
         private readonly IWristMenuPanel _panel;
         private readonly ICommandBus _bus;
         private bool _prevRightSelect;
+        private bool _prevPanelVisible;
 
         public ManipulationInput LastRight { get; private set; }
         public ManipulationInput LastLeft { get; private set; }
@@ -46,13 +47,16 @@ namespace ScreenPortal.App.Manipulation
 
             MenuHover = -1;
             bool rightSelect = right.SelectHeld;
-            int count = WristMenu.Items.Length;
-            if (_panel != null && _panel.Visible && !_manipulation.IsDragging && right.HasRay
+            bool panelVisible = _panel != null && _panel.Visible;
+            if (!panelVisible && _prevPanelVisible) _menu.OnHidden();
+            _prevPanelVisible = panelVisible;
+            int count = _menu.ItemCount;
+            if (panelVisible && !_manipulation.IsDragging && right.HasRay
                 && ScreenHitTest.Raycast(right.Origin, right.Direction, _panel.Pose, MenuLayout.PanelWidth, MenuLayout.PanelHeight(count),
                     out _, out float lx, out float ly))
             {
                 MenuHover = MenuLayout.ButtonAt(lx, ly, count);
-                if (MenuHover >= 0 && rightSelect && !_prevRightSelect) _menu.Invoke(WristMenu.Items[MenuHover]);
+                if (MenuHover >= 0 && rightSelect && !_prevRightSelect) _menu.Invoke(MenuHover);
                 right.HasRay = false; // SelectHeld continua: o controlador só pega a tela num gatilho novo
             }
             _prevRightSelect = rightSelect;

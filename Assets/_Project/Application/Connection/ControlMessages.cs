@@ -73,6 +73,8 @@ namespace ScreenPortal.App.Connection
         public uint Width { get; }
         public uint Height { get; }
         public string Name { get; }
+        /// <summary>Nome sem o prefixo do Windows (<c>\\.\DISPLAY2</c> → <c>DISPLAY2</c>) para mostrar no headset.</summary>
+        public string FriendlyName { get; }
         public bool IsPrimary { get; }
 
         public MonitorDescriptor(uint id, uint width, uint height, string name, bool isPrimary)
@@ -81,6 +83,7 @@ namespace ScreenPortal.App.Connection
             Width = width;
             Height = height;
             Name = name ?? string.Empty;
+            FriendlyName = Name.StartsWith(@"\\.\", StringComparison.Ordinal) ? Name.Substring(4) : Name;
             IsPrimary = isPrimary;
         }
     }

@@ -1,8 +1,10 @@
 using NUnit.Framework;
 using ScreenPortal.App;
+using ScreenPortal.App.Connection;
 using ScreenPortal.App.Manipulation;
 using ScreenPortal.App.Menu;
 using ScreenPortal.Domain.Layout;
+using ScreenPortal.Domain.Screens;
 using ScreenPortal.Domain.Spatial;
 
 namespace ScreenPortal.Tests
@@ -11,22 +13,31 @@ namespace ScreenPortal.Tests
     {
         private static readonly Pose Head = new Pose(new Vec3(0f, 1.3f, 0f), Quat.AngleAxis(30f, Vec3.Up));
 
+        private static readonly MonitorDescriptor[] Physical =
+        {
+            new MonitorDescriptor(1, 2560, 1080, @"\\.\DISPLAY1", true),
+            new MonitorDescriptor(2, 1920, 1080, @"\\.\DISPLAY2", false),
+        };
+
         private sealed class Rig
         {
             public readonly WorkspaceStore Store = new WorkspaceStore();
             public readonly CommandBus Bus;
+            public readonly FixedHostCatalog Host = new FixedHostCatalog(true, Physical);
             public readonly WristMenu Menu;
 
-            public Rig()
+            public Rig(bool connected = true, bool showTestScreens = true)
             {
+                Host.IsConnected = connected;
                 Bus = new CommandBus(Store, null);
-                Menu = new WristMenu(Store, Bus, new FixedHeadPose(Head));
+                Menu = new WristMenu(Store, Bus, new FixedHeadPose(Head), Host, showTestScreens);
             }
         }
 
         private sealed class FakeInput : IManipulationInput
         {
             public ManipulationInput Next;
+
             public bool Read(out ManipulationInput input)
             {
                 input = Next;
@@ -36,7 +47,7 @@ namespace ScreenPortal.Tests
 
         private sealed class FakePanel : IWristMenuPanel
         {
-            public bool Visible => true;
+            public bool Visible { get; set; } = true;
             public Pose Pose => Pose.At(new Vec3(0f, 1f, 0.4f));
             public int LastHover = -2;
             public void Render(WristMenu menu, int hoverIndex) => LastHover = hoverIndex;
@@ -46,14 +57,20 @@ namespace ScreenPortal.Tests
         public void AddTestScreen_CreatesNumberedTestScreens_AndUndoBecomesAvailable()
         {
             var r = new Rig();
-            Assert.That(r.Menu.IsEnabled(MenuItemId.Undo), Is.False);
+            Assert.That(r.Menu.IsEnabled(r.Menu.IndexOf(MenuItemId.Undo)), Is.False);
             r.Menu.Invoke(MenuItemId.AddTestScreen);
             r.Menu.Invoke(MenuItemId.AddTestScreen);
             Assert.That(r.Store.State.Screens.Count, Is.EqualTo(2));
             Assert.That(r.Store.State.Screens[0].Label, Is.EqualTo("Teste 1"));
-            Assert.That(TestScreens.IsTestScreen(r.Store.State.Screens[1]), Is.True);
-            Assert.That(r.Menu.IsEnabled(MenuItemId.Undo), Is.True);
+            Assert.That(r.Menu.IsEnabled(r.Menu.IndexOf(MenuItemId.Undo)), Is.True);
             Assert.That(r.Menu.StatusLine, Is.EqualTo("Cilindro · 2 telas"));
+        }
+
+        [Test]
+        public void TestScreenItem_OnlyInDevBuilds()
+        {
+            Assert.That(new Rig(showTestScreens: false).Menu.IndexOf(MenuItemId.AddTestScreen), Is.EqualTo(-1));
+            Assert.That(new Rig(showTestScreens: true).Menu.IndexOf(MenuItemId.AddTestScreen), Is.GreaterThanOrEqualTo(0));
         }
 
         [Test]
@@ -75,18 +92,112 @@ namespace ScreenPortal.Tests
         public void ReturnAndRemove_NeedAFocusedScreen()
         {
             var r = new Rig();
-            Assert.That(r.Menu.IsEnabled(MenuItemId.RemoveScreen), Is.False);
+            Assert.That(r.Menu.IsEnabled(r.Menu.IndexOf(MenuItemId.RemoveScreen)), Is.False);
             r.Menu.Invoke(MenuItemId.AddTestScreen);
-            Assert.That(r.Menu.IsEnabled(MenuItemId.RemoveScreen), Is.True);
-            Assert.That(r.Menu.IsEnabled(MenuItemId.ReturnToSurface), Is.False, "tela na superfície");
+            Assert.That(r.Menu.IsEnabled(r.Menu.IndexOf(MenuItemId.RemoveScreen)), Is.True);
+            Assert.That(r.Menu.IsEnabled(r.Menu.IndexOf(MenuItemId.ReturnToSurface)), Is.False, "tela na superfície");
             r.Menu.Invoke(MenuItemId.RemoveScreen);
             Assert.That(r.Store.State.Screens.Count, Is.EqualTo(0));
         }
 
         [Test]
+        public void Offline_CreateItemsAreDisabled_AndStatusAsksToConnect()
+        {
+            var r = new Rig(connected: false);
+            Assert.That(r.Menu.IsEnabled(r.Menu.IndexOf(MenuItemId.AddVirtual)), Is.False);
+            Assert.That(r.Menu.IsEnabled(r.Menu.IndexOf(MenuItemId.AddMirror)), Is.False);
+            Assert.That(r.Menu.StatusLine, Is.EqualTo("Cilindro · 0 telas · Conecte ao PC"));
+        }
+
+        [Test]
+        public void AddVirtual_AspectPage_HasOrientationSixFramesAndBack()
+        {
+            var r = new Rig();
+            r.Menu.Invoke(MenuItemId.AddVirtual);
+            Assert.That(r.Menu.Page, Is.EqualTo(MenuPage.Aspects));
+            Assert.That(r.Menu.ItemCount, Is.EqualTo(8));
+            Assert.That(r.Menu.Label(0), Is.EqualTo("Orientação: Paisagem"));
+            Assert.That(r.Menu.FrameAspect(0), Is.EqualTo(0f));
+            Assert.That(r.Menu.Label(1), Is.EqualTo("16:9"));
+            Assert.That(r.Menu.FrameAspect(1), Is.EqualTo(16f / 9f).Within(1e-5f));
+            Assert.That(r.Menu.Label(7), Is.EqualTo(WristMenu.BackLabel));
+
+            r.Menu.Invoke(0); // Paisagem → Retrato
+            Assert.That(r.Menu.Orientation, Is.EqualTo(Orientation.Portrait));
+            Assert.That(r.Menu.Label(1), Is.EqualTo("9:16"));
+            Assert.That(r.Menu.FrameAspect(1), Is.EqualTo(9f / 16f).Within(1e-5f));
+
+            r.Menu.Invoke(7); // voltar
+            Assert.That(r.Menu.Page, Is.EqualTo(MenuPage.Main));
+        }
+
+        [Test]
+        public void PickingAspectThenResolution_CreatesAVirtualScreen_AndReturnsToMain()
+        {
+            var r = new Rig();
+            r.Menu.Invoke(MenuItemId.AddVirtual);
+            r.Menu.Invoke(1); // 16:9
+            Assert.That(r.Menu.Page, Is.EqualTo(MenuPage.Resolutions));
+            Assert.That(r.Menu.ItemCount, Is.EqualTo(4));
+            Assert.That(r.Menu.Label(1), Is.EqualTo("2560×1440"));
+
+            r.Menu.Invoke(3); // voltar → proporções
+            Assert.That(r.Menu.Page, Is.EqualTo(MenuPage.Aspects));
+            r.Menu.Invoke(1);
+            r.Menu.Invoke(1); // 2560×1440
+
+            Assert.That(r.Menu.Page, Is.EqualTo(MenuPage.Main));
+            var screen = r.Store.State.Screens[0];
+            Assert.That(screen.Source, Is.EqualTo(ScreenSource.Virtual));
+            Assert.That(screen.Resolution, Is.EqualTo(Resolution.Create(2560, 1440)));
+            Assert.That(screen.WidthMeters, Is.EqualTo(1f).Within(1e-4f));
+            Assert.That(screen.Label, Is.EqualTo("2560×1440"));
+        }
+
+        [Test]
+        public void MirrorPage_ListsPhysicalMonitors_AndCreatesAMirror()
+        {
+            var r = new Rig();
+            r.Menu.Invoke(MenuItemId.AddMirror);
+            Assert.That(r.Menu.Page, Is.EqualTo(MenuPage.Mirrors));
+            Assert.That(r.Menu.ItemCount, Is.EqualTo(3));
+            Assert.That(r.Menu.Label(1), Is.EqualTo("DISPLAY2 · 1920×1080"));
+
+            r.Menu.Invoke(1);
+            var screen = r.Store.State.Screens[0];
+            Assert.That(screen.Source, Is.EqualTo(ScreenSource.Mirror(2)));
+            Assert.That(screen.Resolution, Is.EqualTo(Resolution.Create(1920, 1080)));
+            Assert.That(screen.Label, Is.EqualTo("DISPLAY2"));
+        }
+
+        [Test]
+        public void FifthVideoScreen_ShowsTheWarning_TestScreensDoNotCount_HidingClearsIt()
+        {
+            var r = new Rig();
+            r.Menu.Invoke(MenuItemId.AddTestScreen);
+            for (int i = 0; i < 4; i++)
+            {
+                r.Menu.Invoke(MenuItemId.AddVirtual);
+                r.Menu.Invoke(1);
+                r.Menu.Invoke(0);
+            }
+            Assert.That(r.Menu.StatusLine, Does.Not.Contain("Mais de 4"), "4 telas com vídeo + 1 de teste");
+
+            r.Menu.Invoke(MenuItemId.AddVirtual);
+            r.Menu.Invoke(1);
+            r.Menu.Invoke(0);
+            Assert.That(r.Store.State.Screens.Count, Is.EqualTo(6), "cria mesmo assim");
+            Assert.That(r.Menu.StatusLine, Is.EqualTo(WristMenu.TooManyNotice));
+
+            r.Menu.OnHidden();
+            Assert.That(r.Menu.StatusLine, Is.EqualTo("Cilindro · 6 telas"));
+            Assert.That(r.Menu.Page, Is.EqualTo(MenuPage.Main));
+        }
+
+        [Test]
         public void MenuLayout_ButtonAtFindsEachButtonCenter()
         {
-            int n = WristMenu.Items.Length;
+            int n = new Rig().Menu.ItemCount;
             for (int i = 0; i < n; i++)
             {
                 MenuLayout.ButtonCenter(i, n, out float x, out float y);
@@ -105,20 +216,35 @@ namespace ScreenPortal.Tests
             var controller = new ScreenManipulationController(r.Store, r.Bus);
             var router = new InteractionRouter(right, left, controller, r.Menu, panel, r.Bus);
 
-            int index = System.Array.IndexOf(WristMenu.Items, MenuItemId.AddTestScreen);
-            MenuLayout.ButtonCenter(index, WristMenu.Items.Length, out float x, out float y);
+            int index = r.Menu.IndexOf(MenuItemId.AddTestScreen);
+            MenuLayout.ButtonCenter(index, r.Menu.ItemCount, out float x, out float y);
             var eye = new Vec3(0f, 1f, 0f);
             var dir = (panel.Pose.Position + new Vec3(x, y, 0f) - eye).Normalized;
-
             right.Next = new ManipulationInput { HasRay = true, Origin = eye, Direction = dir };
             router.Tick();
             Assert.That(router.MenuHover, Is.EqualTo(index));
             Assert.That(panel.LastHover, Is.EqualTo(index));
+
             right.Next.SelectHeld = true;
             router.Tick();
             router.Tick(); // segurar não repete
             Assert.That(r.Store.State.Screens.Count, Is.EqualTo(1));
             Assert.That(controller.IsDragging, Is.False);
+        }
+
+        [Test]
+        public void Router_PanelHidden_ResetsTheMenuPage()
+        {
+            var r = new Rig();
+            var panel = new FakePanel();
+            var router = new InteractionRouter(NullManipulationInput.Instance, NullManipulationInput.Instance,
+                new ScreenManipulationController(r.Store, r.Bus), r.Menu, panel, r.Bus);
+            r.Menu.Invoke(MenuItemId.AddVirtual);
+            router.Tick();
+            Assert.That(r.Menu.Page, Is.EqualTo(MenuPage.Aspects));
+            panel.Visible = false;
+            router.Tick();
+            Assert.That(r.Menu.Page, Is.EqualTo(MenuPage.Main));
         }
 
         [Test]

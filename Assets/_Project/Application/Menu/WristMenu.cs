@@ -1,3 +1,6 @@
+using System;
+using System.Collections.Generic;
+using ScreenPortal.App.Connection;
 using ScreenPortal.Domain;
 using ScreenPortal.Domain.Commands;
 using ScreenPortal.Domain.Layout;
@@ -13,63 +16,136 @@ namespace ScreenPortal.App.Menu
         Recenter,
         AlignPosture,
         ToggleGrid,
-        AddTestScreen,
+        AddVirtual,
+        AddMirror,
         ReturnToSurface,
         RemoveScreen,
+        AddTestScreen,
     }
 
-    /// <summary>Ações do menu de pulso (spec 2B §5). Tudo vira Command (ou undo/redo) no bus.</summary>
+    public enum MenuPage
+    {
+        Main,
+        Aspects,
+        Resolutions,
+        Mirrors,
+    }
+
+    /// <summary>
+    /// Menu de pulso (spec 2B §5, 2C §3) com páginas: principal → proporções (frames) → resoluções, e espelhos.
+    /// Tudo vira Command (ou undo/redo) no bus. Itens por índice; sem alocação por quadro (rótulos em cache).
+    /// </summary>
     public sealed class WristMenu
     {
-        public static readonly MenuItemId[] Items =
+        public const int MaxItems = 12;
+        public const int ComfortableVideoScreens = 4;
+        public const string TooManyNotice = "Mais de 4 telas:\npode haver quedas e travamentos";
+        public const string BackLabel = "← Voltar";
+
+        private static readonly MenuItemId[] MainItems =
         {
             MenuItemId.Undo, MenuItemId.Redo, MenuItemId.ToggleMode, MenuItemId.Recenter, MenuItemId.AlignPosture,
-            MenuItemId.ToggleGrid, MenuItemId.AddTestScreen, MenuItemId.ReturnToSurface, MenuItemId.RemoveScreen,
+            MenuItemId.ToggleGrid, MenuItemId.AddVirtual, MenuItemId.AddMirror, MenuItemId.ReturnToSurface, MenuItemId.RemoveScreen,
+        };
+
+        private static readonly MenuItemId[] MainItemsWithTest =
+        {
+            MenuItemId.Undo, MenuItemId.Redo, MenuItemId.ToggleMode, MenuItemId.Recenter, MenuItemId.AlignPosture,
+            MenuItemId.ToggleGrid, MenuItemId.AddVirtual, MenuItemId.AddMirror, MenuItemId.ReturnToSurface, MenuItemId.RemoveScreen,
+            MenuItemId.AddTestScreen,
         };
 
         private readonly WorkspaceStore _store;
         private readonly ICommandBus _bus;
         private readonly IHeadPoseSource _head;
+        private readonly IHostCatalog _host;
+        private readonly MenuItemId[] _main;
         private int _testScreens;
+        private int _aspect;
+        private string _notice = string.Empty;
+
         private Workspace _statusFor;
+        private bool _statusConnected;
+        private string _statusNotice;
         private string _status = string.Empty;
 
-        public WristMenu(WorkspaceStore store, ICommandBus bus, IHeadPoseSource head)
+        private IReadOnlyList<MonitorDescriptor> _mirrorLabelsFor;
+        private string[] _mirrorLabels = Array.Empty<string>();
+
+        public MenuPage Page { get; private set; } = MenuPage.Main;
+        public Orientation Orientation { get; private set; } = Orientation.Landscape;
+
+        public WristMenu(WorkspaceStore store, ICommandBus bus, IHeadPoseSource head, IHostCatalog host = null, bool showTestScreens = false)
         {
             _store = store;
             _bus = bus;
             _head = head;
+            _host = host ?? new FixedHostCatalog(false, Array.Empty<MonitorDescriptor>());
+            _main = showTestScreens ? MainItemsWithTest : MainItems;
         }
 
-        /// <summary>Recalculada só quando o estado muda (sem alocar por quadro).</summary>
+        public int ItemCount
+        {
+            get
+            {
+                switch (Page)
+                {
+                    case MenuPage.Aspects: return ResolutionCatalog.AspectCount + 2; // orientação + proporções + voltar
+                    case MenuPage.Resolutions: return ResolutionCatalog.Count(_aspect) + 1;
+                    case MenuPage.Mirrors: return MirrorCount + 1;
+                    default: return _main.Length;
+                }
+            }
+        }
+
+        private int MirrorCount => Math.Min(_host.PhysicalMonitors.Count, MaxItems - 1);
+
+        private bool IsBack(int index) => Page != MenuPage.Main && index == ItemCount - 1;
+
+        public int IndexOf(MenuItemId id) => Array.IndexOf(_main, id);
+
+        /// <summary>Recalculada só quando o estado, a conexão ou o aviso mudam (sem alocar por quadro).</summary>
         public string StatusLine
         {
             get
             {
                 var ws = _store.State;
-                if (ReferenceEquals(ws, _statusFor)) return _status;
+                bool connected = _host.IsConnected;
+                if (ReferenceEquals(ws, _statusFor) && connected == _statusConnected && ReferenceEquals(_notice, _statusNotice))
+                    return _status;
                 _statusFor = ws;
+                _statusConnected = connected;
+                _statusNotice = _notice;
+                if (_notice.Length > 0)
+                {
+                    _status = _notice;
+                    return _status;
+                }
                 int n = ws.Screens.Count;
-                _status = (ws.Surface.Mode == LayoutMode.Cylinder ? "Cilindro" : "Esfera") + " · " + n + (n == 1 ? " tela" : " telas");
+                _status = (ws.Surface.Mode == LayoutMode.Cylinder ? "Cilindro" : "Esfera") + " · " + n + (n == 1 ? " tela" : " telas")
+                          + (connected ? string.Empty : " · Conecte ao PC");
                 return _status;
             }
         }
 
-        public bool IsEnabled(MenuItemId id)
+        public string Label(int index)
         {
-            var ws = _store.State;
-            switch (id)
+            if (IsBack(index)) return BackLabel;
+            switch (Page)
             {
-                case MenuItemId.Undo: return _store.CanUndo;
-                case MenuItemId.Redo: return _store.CanRedo;
-                case MenuItemId.RemoveScreen: return ws.Contains(ws.FocusedScreenId);
-                case MenuItemId.ReturnToSurface:
-                    return ws.TryGetScreen(ws.FocusedScreenId, out var focused) && focused.Placement.IsLoose;
-                default: return true;
+                case MenuPage.Aspects:
+                    if (index == 0) return Orientation == Orientation.Landscape ? "Orientação: Paisagem" : "Orientação: Retrato";
+                    return ResolutionCatalog.Name(index - 1, Orientation);
+                case MenuPage.Resolutions:
+                    return ResolutionCatalog.Label(_aspect, index, Orientation);
+                case MenuPage.Mirrors:
+                    return MirrorLabels()[index];
+                default:
+                    return Label(_main[index]);
             }
         }
 
-        public string Label(MenuItemId id)
+        private string Label(MenuItemId id)
         {
             var surface = _store.State.Surface;
             switch (id)
@@ -80,10 +156,96 @@ namespace ScreenPortal.App.Menu
                 case MenuItemId.Recenter: return "Recentrar";
                 case MenuItemId.AlignPosture: return "Alinhar à postura";
                 case MenuItemId.ToggleGrid: return surface.Snap.AngularGrid ? "Grade: ligada" : "Grade: desligada";
-                case MenuItemId.AddTestScreen: return "+ Tela de teste";
+                case MenuItemId.AddVirtual: return "+ Monitor virtual";
+                case MenuItemId.AddMirror: return "+ Espelhar monitor";
                 case MenuItemId.ReturnToSurface: return "Voltar à superfície";
                 case MenuItemId.RemoveScreen: return "Remover tela";
+                case MenuItemId.AddTestScreen: return "+ Tela de teste";
                 default: return id.ToString();
+            }
+        }
+
+        private string[] MirrorLabels()
+        {
+            var monitors = _host.PhysicalMonitors;
+            if (ReferenceEquals(monitors, _mirrorLabelsFor)) return _mirrorLabels;
+            _mirrorLabelsFor = monitors;
+            _mirrorLabels = new string[Math.Min(monitors.Count, MaxItems - 1)];
+            for (int i = 0; i < _mirrorLabels.Length; i++)
+                _mirrorLabels[i] = monitors[i].FriendlyName + " · " + monitors[i].Width + "×" + monitors[i].Height;
+            return _mirrorLabels;
+        }
+
+        public bool IsEnabled(int index)
+        {
+            if (IsBack(index)) return true;
+            switch (Page)
+            {
+                case MenuPage.Aspects: return index == 0 || _host.IsConnected;
+                case MenuPage.Resolutions:
+                case MenuPage.Mirrors: return _host.IsConnected;
+                default: return IsEnabled(_main[index]);
+            }
+        }
+
+        private bool IsEnabled(MenuItemId id)
+        {
+            var ws = _store.State;
+            switch (id)
+            {
+                case MenuItemId.Undo: return _store.CanUndo;
+                case MenuItemId.Redo: return _store.CanRedo;
+                case MenuItemId.RemoveScreen: return ws.Contains(ws.FocusedScreenId);
+                case MenuItemId.ReturnToSurface:
+                    return ws.TryGetScreen(ws.FocusedScreenId, out var focused) && focused.Placement.IsLoose;
+                case MenuItemId.AddVirtual:
+                case MenuItemId.AddMirror:
+                    return _host.IsConnected;
+                default: return true;
+            }
+        }
+
+        /// <summary>Largura/altura do frame de exemplo desenhado no botão; 0 = botão comum.</summary>
+        public float FrameAspect(int index) =>
+            Page == MenuPage.Aspects && index >= 1 && index <= ResolutionCatalog.AspectCount
+                ? ResolutionCatalog.FrameAspect(index - 1, Orientation)
+                : 0f;
+
+        public void Invoke(int index)
+        {
+            if (index < 0 || index >= ItemCount || !IsEnabled(index)) return;
+            if (IsBack(index))
+            {
+                Page = Page == MenuPage.Resolutions ? MenuPage.Aspects : MenuPage.Main;
+                return;
+            }
+            switch (Page)
+            {
+                case MenuPage.Aspects:
+                    if (index == 0)
+                    {
+                        Orientation = Orientation == Orientation.Landscape ? Orientation.Portrait : Orientation.Landscape;
+                        return;
+                    }
+                    _aspect = index - 1;
+                    Page = MenuPage.Resolutions;
+                    return;
+                case MenuPage.Resolutions:
+                {
+                    var resolution = ResolutionCatalog.Get(_aspect, index, Orientation);
+                    Create(resolution, ScreenSource.Virtual, ResolutionCatalog.Label(_aspect, index, Orientation));
+                    return;
+                }
+                case MenuPage.Mirrors:
+                {
+                    var monitor = _host.PhysicalMonitors[index];
+                    var resolution = ResolutionFit.FromCapture((int)monitor.Width, (int)monitor.Height);
+                    if (resolution.IsValid) Create(resolution, ScreenSource.Mirror(monitor.Id), monitor.FriendlyName);
+                    return;
+                }
+                default:
+                    Invoke(_main[index]);
+                    return;
             }
         }
 
@@ -112,6 +274,12 @@ namespace ScreenPortal.App.Menu
                 case MenuItemId.ToggleGrid:
                     _bus.Send(new SetSnapOptions(ws.Surface.Snap.WithAngularGrid(!ws.Surface.Snap.AngularGrid)));
                     break;
+                case MenuItemId.AddVirtual:
+                    Page = MenuPage.Aspects;
+                    break;
+                case MenuItemId.AddMirror:
+                    Page = MenuPage.Mirrors;
+                    break;
                 case MenuItemId.AddTestScreen:
                     _bus.Send(TestScreens.Next(_testScreens++));
                     break;
@@ -122,6 +290,28 @@ namespace ScreenPortal.App.Menu
                     _bus.Send(new RemoveScreen(ws.FocusedScreenId));
                     break;
             }
+        }
+
+        private void Create(Resolution resolution, ScreenSource source, string label)
+        {
+            var result = _bus.Send(new CreateScreen(resolution, null, ScreenSizing.InitialWidthMeters(resolution), 0f, label, source));
+            Page = MenuPage.Main;
+            if (result.Accepted && VideoScreens(_store.State) > ComfortableVideoScreens) _notice = TooManyNotice;
+        }
+
+        private static int VideoScreens(Workspace ws)
+        {
+            int n = 0;
+            for (int i = 0; i < ws.Screens.Count; i++)
+                if (ws.Screens[i].Source.HasVideo) n++;
+            return n;
+        }
+
+        /// <summary>O painel sumiu: volta à página principal e apaga o aviso.</summary>
+        public void OnHidden()
+        {
+            Page = MenuPage.Main;
+            _notice = string.Empty;
         }
     }
 }
