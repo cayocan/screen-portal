@@ -133,3 +133,24 @@ STATUS: a 2D encolhe para contorno fantasma + recriar + resolução custom.
 
 **Riscos:** a espera de ~2 s até o monitor novo ser capturável deixa um atraso visível ("Criando monitor…"); o 4K pode
 exigir mais banda do que a 2A mediu.
+
+## 7. Desvios na implementação
+Do plano ([plans/2026-09-30-fase2c-varias-telas.md](../plans/2026-09-30-fase2c-varias-telas.md)):
+1. **Portas 9000 + n**, não 9100 + n: a porta de vídeo da 1B já é 9000 e a 9101 é do KFRQ.
+2. **Sem limpeza de órfãos no arranque:** o watchdog do SudoVDA remove os monitores quando o host para de pingar.
+3. **"PC desconectado" depois de já ter tido vídeo:** a layer fica visível e escurecida, sem texto.
+4. **O pipeline para na desconexão;** só o monitor fica 5 min. Na reconexão o `HostSync` pede o stream de novo.
+5. **Fila de trabalho na `HeadsetSession`:** Acquire/StartStream/Release rodam fora da thread de leitura do socket.
+6. **Ids de monitor físico estáveis** (número do `\.\DISPLAYn`); os monitores virtuais do app ficam fora do `Welcome`.
+7. **O Editor pareia uma vez só** (`PlayerPrefsPairingStore`).
+
+Do teste no Quest (30/09):
+8. **Interface por cima das telas:** layers Underlay reveladas por um furo no eye buffer (§5, ADR 0010).
+9. **Tela nova à frente da visão**, no espaço livre mais perto (§3).
+10. **Reorganizar os monitores no Windows:** o host recria a captura de uma tela quando o monitor dela muda de posição
+    no desktop; o pipeline novo continua os frameIds do anterior
+    ([verificação §4](../measurements/fase2c-simulator.md)).
+11. **Log do host em arquivo:** `serve` grava também em `%APPDATA%\ScreenPortal\host.log`; falha de pipeline registra o
+    `DeviceRemovedReason` e a carga de memória.
+12. **Posição das telas no mundo → arranjo do Windows** (pedido no teste): fica para a Fase 3, como o brief já prevê
+    (cursor espacial; sincronizar a topologia do Windows é o plano B).
