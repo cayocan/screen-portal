@@ -13,9 +13,17 @@ public interface IMonitorProvider
     IReadOnlyList<MonitorDescriptor> GetMonitors();
 }
 
-/// <summary>Pipelines de v√≠deo por headset. TryStart reaproveita o pipeline do mesmo device (reconex√£o).</summary>
-public interface IStreamRegistry
+public readonly record struct ScreenAcquireResult(bool Ok, int Width, int Height, string Error);
+
+/// <summary>
+/// Monitores e streams por headset (spec 2C ß4, ADR 0009). Acquire/StartStream podem levar atÈ ~3 s (criar monitor,
+/// esperar a captura): a HeadsetSession chama fora da thread de leitura.
+/// </summary>
+public interface IScreenHost
 {
-    bool TryStart(string deviceId, string address, ushort udpPort, ushort streamId, MonitorDescriptor monitor, out int width, out int height);
-    void Release(string deviceId);
+    IReadOnlyList<ScreenLeaseInfo> Leases(string deviceId);
+    ScreenAcquireResult Acquire(string deviceId, AcquireScreenMessage request);
+    bool StartStream(string deviceId, uint screenKey, string address, ushort udpPort, ushort streamId, out int width, out int height);
+    void Release(string deviceId, uint screenKey, TimeSpan grace);
+    void Disconnected(string deviceId);
 }

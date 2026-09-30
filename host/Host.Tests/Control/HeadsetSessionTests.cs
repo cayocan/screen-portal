@@ -27,29 +27,61 @@ public class HeadsetSessionTests
         public IReadOnlyList<MonitorDescriptor> GetMonitors() => new[] { new MonitorDescriptor(1, 2560, 1080, "DISPLAY1", true) };
     }
 
-    internal sealed class FakeStreams : IStreamRegistry
+    internal sealed class FakeScreens : IScreenHost
     {
-        public int Starts, Releases;
+        public readonly List<string> Calls = new();
+        public bool FailAcquire;
         public string? LastAddress;
-        public bool TryStart(string deviceId, string address, ushort udpPort, ushort streamId, MonitorDescriptor monitor, out int width, out int height)
+        public ManualResetEventSlim? BlockAcquire;
+        public List<ScreenLeaseInfo> LeasesToReport = new();
+
+        public IReadOnlyList<ScreenLeaseInfo> Leases(string deviceId) => LeasesToReport;
+
+        public ScreenAcquireResult Acquire(string deviceId, AcquireScreenMessage request)
         {
-            Starts++;
+            BlockAcquire?.Wait(5000);
+            lock (Calls) Calls.Add($"acquire {request.ScreenKey}");
+            return FailAcquire ? new ScreenAcquireResult(false, 0, 0, "sem driver")
+                               : new ScreenAcquireResult(true, (int)request.Width, (int)request.Height, "");
+        }
+
+        public bool StartStream(string deviceId, uint screenKey, string address, ushort udpPort, ushort streamId, out int width, out int height)
+        {
+            lock (Calls) Calls.Add($"start {screenKey}:{udpPort}");
             LastAddress = address;
             width = 2560;
-            height = 1080;
+            height = 1440;
             return true;
         }
-        public void Release(string deviceId) => Releases++;
+
+        public void Release(string deviceId, uint screenKey, TimeSpan grace)
+        {
+            lock (Calls) Calls.Add($"release {screenKey} {grace.TotalMilliseconds}");
+        }
+
+        public void Disconnected(string deviceId)
+        {
+            lock (Calls) Calls.Add($"disconnected {deviceId}");
+        }
     }
 
-    private static (HeadsetSession session, FakeConnection conn, PairingStore pairing, FakeStreams streams, FakeApprover approver) Create(bool approve)
+    private static (HeadsetSession session, FakeConnection conn, PairingStore pairing, FakeScreens screens, FakeApprover approver) Create(bool approve)
     {
         var conn = new FakeConnection();
         var pairing = new PairingStore();
-        var streams = new FakeStreams();
+        var screens = new FakeScreens();
         var approver = new FakeApprover(approve);
-        var session = new HeadsetSession(conn, pairing, () => { }, approver, new FakeMonitors(), streams, "CAYO-PC", () => "482913", _ => { });
-        return (session, conn, pairing, streams, approver);
+        var session = new HeadsetSession(conn, pairing, () => { }, approver, new FakeMonitors(), screens, "CAYO-PC", () => "482913", _ => { });
+        return (session, conn, pairing, screens, approver);
+    }
+
+    private static HeadsetSession Welcomed(out FakeConnection conn, out FakeScreens screens)
+    {
+        var (session, c, pairing, s, _) = Create(approve: false);
+        session.OnMessage(new HelloMessage("dev-1", "Quest 3", pairing.Pair("dev-1", "Quest 3", DateTimeOffset.UnixEpoch)));
+        conn = c;
+        screens = s;
+        return session;
     }
 
     [Fact]
@@ -78,43 +110,77 @@ public class HeadsetSessionTests
         Assert.True(conn.Closed);
     }
 
+
     [Fact]
-    public void KnownDevice_IsWelcomedDirectly_AndCanStream()
+    public void KnownDevice_IsWelcomedWithLeases_ThenAcquiresStreamsReleasesAndDisconnects()
     {
-        var (session, conn, pairing, streams, _) = Create(approve: false);
-        string token = pairing.Pair("dev-1", "Quest 3", DateTimeOffset.UnixEpoch);
-        session.OnMessage(new HelloMessage("dev-1", "Quest 3", token));
-
+        var (session, conn, pairing, screens, _) = Create(approve: false);
+        screens.LeasesToReport.Add(new ScreenLeaseInfo(7, ScreenKind.Virtual, 3840, 2160));
+        session.OnMessage(new HelloMessage("dev-1", "Quest 3", pairing.Pair("dev-1", "Quest 3", DateTimeOffset.UnixEpoch)));
         Assert.Null(conn.Last<PairingRequiredMessage>());
-        Assert.NotNull(conn.Last<WelcomeMessage>());
+        Assert.Equal(7u, conn.Last<WelcomeMessage>()!.Leases[0].ScreenKey);
 
-        session.OnMessage(new StartStreamMessage(1, 9000, 0));
-        Assert.Equal(1, streams.Starts);
-        Assert.Equal("192.168.0.171", streams.LastAddress);
-        Assert.Equal(1080u, conn.Last<StreamStartedMessage>()!.Height);
+        session.OnMessage(new AcquireScreenMessage(7, ScreenKind.Virtual, 3840, 2160, 0));
+        session.OnMessage(new StartStreamMessage(7, 9000, 0));
+        session.OnMessage(new ReleaseScreenMessage(7, 10000));
+        session.Idle.Wait();
+        Assert.Equal(2160u, conn.Last<ScreenReadyMessage>()!.Height);
+        Assert.Equal(1440u, conn.Last<StreamStartedMessage>()!.Height);
+        Assert.Equal("192.168.0.171", screens.LastAddress);
+        Assert.Equal(new[] { "acquire 7", "start 7:9000", "release 7 10000" }, screens.Calls);
 
         session.OnMessage(new PingMessage(9));
         Assert.Equal(9UL, conn.Last<PongMessage>()!.SentUs);
 
         session.OnClosed();
-        Assert.Equal(1, streams.Releases);
+        session.Idle.Wait();
+        Assert.Equal("disconnected dev-1", screens.Calls[^1]);
     }
 
     [Fact]
-    public void StartStream_BeforeWelcome_IsIgnored()
+    public void AcquireFailure_ReportsScreenFailedWithTheReason()
     {
-        var (session, conn, _, streams, _) = Create(approve: false);
+        var session = Welcomed(out var conn, out var screens);
+        screens.FailAcquire = true;
+        session.OnMessage(new AcquireScreenMessage(3, ScreenKind.Virtual, 2560, 1440, 0));
+        session.Idle.Wait();
+        var failed = conn.Last<ScreenFailedMessage>()!;
+        Assert.Equal(3u, failed.ScreenKey);
+        Assert.Equal("sem driver", failed.Reason);
+    }
+
+    [Fact]
+    public void ScreenMessages_BeforeWelcome_AreIgnored()
+    {
+        var (session, conn, _, screens, _) = Create(approve: false);
+        session.OnMessage(new AcquireScreenMessage(1, ScreenKind.Virtual, 2560, 1440, 0));
         session.OnMessage(new StartStreamMessage(1, 9000, 0));
-        Assert.Equal(0, streams.Starts);
-        Assert.Null(conn.Last<StreamStartedMessage>());
+        session.Idle.Wait();
+        Assert.Empty(screens.Calls);
+        Assert.Null(conn.Last<ScreenReadyMessage>());
     }
 
     [Fact]
-    public void UnknownMonitor_ReportsStreamStopped()
+    public void SlowAcquire_DoesNotBlockPingOnTheReadThread()
     {
-        var (session, conn, pairing, _, _) = Create(approve: false);
-        session.OnMessage(new HelloMessage("dev-1", "Quest", pairing.Pair("dev-1", "Quest", DateTimeOffset.UnixEpoch)));
-        session.OnMessage(new StartStreamMessage(99, 9000, 0));
-        Assert.NotNull(conn.Last<StreamStoppedMessage>());
+        var session = Welcomed(out var conn, out var screens);
+        screens.BlockAcquire = new ManualResetEventSlim(false);
+        session.OnMessage(new AcquireScreenMessage(1, ScreenKind.Virtual, 2560, 1440, 0)); // volta na hora
+        session.OnMessage(new PingMessage(5));
+        Assert.Equal(5UL, conn.Last<PongMessage>()!.SentUs);
+        Assert.Null(conn.Last<ScreenReadyMessage>());
+        screens.BlockAcquire.Set();
+        session.Idle.Wait();
+        Assert.NotNull(conn.Last<ScreenReadyMessage>());
+    }
+
+    [Fact]
+    public void ReleaseIsFullyHandled_BeforeALaterStartStream()
+    {
+        var session = Welcomed(out _, out var screens);
+        session.OnMessage(new ReleaseScreenMessage(1, 0));
+        session.OnMessage(new StartStreamMessage(2, 9000, 0));
+        session.Idle.Wait();
+        Assert.Equal(new[] { "release 1 0", "start 2:9000" }, screens.Calls);
     }
 }

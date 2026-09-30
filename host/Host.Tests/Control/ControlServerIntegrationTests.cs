@@ -31,9 +31,9 @@ public class ControlServerIntegrationTests(ITestOutputHelper output)
     public void PairsStreamsAndReconnectsUnderThreeSeconds()
     {
         var pairing = new PairingStore();
-        var streams = new HeadsetSessionTests.FakeStreams();
+        var screens = new HeadsetSessionTests.FakeScreens();
         using var server = new ControlServer(0, conn => new HeadsetSession(conn, pairing, () => { },
-            new HeadsetSessionTests.FakeApprover(true), new HeadsetSessionTests.FakeMonitors(), streams,
+            new HeadsetSessionTests.FakeApprover(true), new HeadsetSessionTests.FakeMonitors(), screens,
             "TEST-PC", () => "123456", _ => { }), _ => { });
         server.Start();
 
@@ -63,7 +63,7 @@ public class ControlServerIntegrationTests(ITestOutputHelper output)
         var pairing = new PairingStore();
         using var server = new ControlServer(0, conn => new HeadsetSession(conn, pairing, () => { },
             new HeadsetSessionTests.FakeApprover(true), new HeadsetSessionTests.FakeMonitors(),
-            new HeadsetSessionTests.FakeStreams(), "TEST-PC", () => "123456", _ => { }), _ => { });
+            new HeadsetSessionTests.FakeScreens(), "TEST-PC", () => "123456", _ => { }), _ => { });
         server.Start();
 
         using var channel = new TcpControlChannel(2000);
