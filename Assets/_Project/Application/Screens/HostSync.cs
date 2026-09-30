@@ -41,6 +41,8 @@ namespace ScreenPortal.App.Screens
             public ScreenId Id;
             public ScreenSource Source;
             public Resolution Resolution;
+            /// <summary>Forma da layer (spec 2E): trocar recria a layer e a Surface do decoder.</summary>
+            public bool Curved;
             public Phase Phase;
             public int Slot = -1;
             public bool VideoOpen;
@@ -152,10 +154,11 @@ namespace ScreenPortal.App.Screens
             {
                 var s = screens[i];
                 if (!s.Source.HasVideo) continue;
+                bool curved = s.Curvature > 0f;
                 var e = Find(s.Id);
                 if (e == null)
                 {
-                    e = new Entry { Id = s.Id, Source = s.Source, Resolution = s.Resolution, Phase = Phase.Unlinked };
+                    e = new Entry { Id = s.Id, Source = s.Source, Resolution = s.Resolution, Curved = curved, Phase = Phase.Unlinked };
                     _entries.Add(e);
                     Report(e);
                 }
@@ -168,6 +171,18 @@ namespace ScreenPortal.App.Screens
                     e.StreamFailures = 0;
                     SetPhase(e, Phase.Unlinked);
                 }
+                else if (curved != e.Curved)
+                {
+                    // spec 2E: plana ↔ curva recria a layer (Surface nova). O monitor e o slot ficam; o decoder reabre na
+                    // Surface nova e o StartStream repetido faz o host mandar um IDR.
+                    CloseDecoder(e);
+                    if (e.Phase == Phase.Starting || e.Phase == Phase.Streaming || e.Phase == Phase.Live)
+                    {
+                        e.NotBefore = 0;
+                        SetPhase(e, Phase.Ready);
+                    }
+                }
+                e.Curved = curved;
                 e.Seen = true;
             }
             for (int i = _entries.Count - 1; i >= 0; i--)
