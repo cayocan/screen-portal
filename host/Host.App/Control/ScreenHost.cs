@@ -4,6 +4,7 @@ using ScreenPortal.App.Connection;
 using ScreenPortal.Domain.Screens;
 using ScreenPortal.Host.App.Display;
 using ScreenPortal.Host.Capture;
+using ScreenPortal.Host.Domain.Display;
 using ScreenPortal.Host.Domain.Screens;
 using ScreenPortal.Host.Encode;
 using ScreenPortal.Host.Transport.Control;
@@ -161,39 +162,48 @@ public sealed class ScreenHost : IScreenHost, IDisposable
                 height = live.Height;
                 return true;
             }
-            live.Pipeline?.Dispose();
-            live.Pipeline = null;
+            if (!StartPipeline(live, screenKey, address, udpPort, streamId)) return false;
+            width = live.Width;
+            height = live.Height;
+            return true;
+        }
+    }
+
+    /// <summary>(Re)cria a captura e o pipeline de uma tela (chamar com _lock). O pipeline novo começa com IDR.</summary>
+    private bool StartPipeline(Live live, uint screenKey, string address, ushort udpPort, ushort streamId)
+    {
+        live.Pipeline?.Dispose();
+        live.Pipeline = null;
+        RebuildKeyframeTargets();
+        WgcMonitorCapture? capture = null;
+        StreamPipeline? pipeline = null;
+        try
+        {
+            capture = CaptureWithRetry(live.DisplayName, out var captured);
+            live.Captured = captured;
+            string display = live.DisplayName;
+            capture.Diagnostic += message => _log($"vídeo: tela {screenKey} ({display}): {message}");
+            _log($"vídeo: tela {screenKey} captura {capture.Width}×{capture.Height} de {display}");
+            var fit = ResolutionFit.FromCapture(capture.Width, capture.Height);
+            var settings = new EncoderSettings(fit.Width, fit.Height, 60, _bitrateKbps);
+            pipeline = new StreamPipeline(_gpu, capture, settings, new IPEndPoint(IPAddress.Parse(address), udpPort), 1, null, streamId);
+            pipeline.Start();
+            live.Pipeline = pipeline;
+            live.Address = address;
+            live.Port = udpPort;
+            live.StreamId = streamId;
+            live.Width = fit.Width;
+            live.Height = fit.Height;
             RebuildKeyframeTargets();
-            WgcMonitorCapture? capture = null;
-            StreamPipeline? pipeline = null;
-            try
-            {
-                capture = CaptureWithRetry(live.DisplayName, out var captured);
-                live.Captured = captured;
-                string display = live.DisplayName;
-                capture.Diagnostic += message => _log($"vídeo: tela {screenKey} ({display}): {message}");
-                _log($"vídeo: tela {screenKey} captura {capture.Width}×{capture.Height} de {display}");
-                var fit = ResolutionFit.FromCapture(capture.Width, capture.Height);
-                var settings = new EncoderSettings(fit.Width, fit.Height, 60, _bitrateKbps);
-                pipeline = new StreamPipeline(_gpu, capture, settings, new IPEndPoint(IPAddress.Parse(address), udpPort), 1, null, streamId);
-                pipeline.Start();
-                live.Pipeline = pipeline;
-                live.Address = address;
-                live.Port = udpPort;
-                live.StreamId = streamId;
-                live.Width = width = fit.Width;
-                live.Height = height = fit.Height;
-                RebuildKeyframeTargets();
-                _log($"vídeo: {pipeline.Description} → {address}:{udpPort} (tela {screenKey})");
-                return true;
-            }
-            catch (Exception e)
-            {
-                if (pipeline != null) pipeline.Dispose(); else capture?.Dispose(); // o pipeline descarta a captura
-                _log($"vídeo: falha ao iniciar a tela {screenKey} ({e.GetType().Name}: {e.Message})");
-                LogDeviceState();
-                return false;
-            }
+            _log($"vídeo: {pipeline.Description} → {address}:{udpPort} (tela {screenKey})");
+            return true;
+        }
+        catch (Exception e)
+        {
+            if (pipeline != null) pipeline.Dispose(); else capture?.Dispose(); // o pipeline descarta a captura
+            _log($"vídeo: falha ao iniciar a tela {screenKey} ({e.GetType().Name}: {e.Message})");
+            LogDeviceState();
+            return false;
         }
     }
 
@@ -263,15 +273,16 @@ public sealed class ScreenHost : IScreenHost, IDisposable
                 DisposeLive(lease.DeviceId, lease.ScreenKey);
                 _log($"telas: {lease.DeviceId}/{lease.ScreenKey} expirou ({lease.DisplayName} {(lease.Kind == ScreenLeaseKind.Virtual ? "removido" : "stream encerrado")})");
             }
-            LogDisplayChanges();
+            FollowDisplayChanges();
         }
     }
 
     /// <summary>
-    /// Diagnóstico (bug 2: tela preta depois de reorganizar os monitores no Windows): registra quando o display de uma
-    /// tela com stream muda de HMONITOR, posição ou tamanho em relação ao que estava ao criar a captura.
+    /// Bug 2 da 2C: depois que o monitor muda de posição no desktop (o usuário reorganiza os monitores no Windows ou
+    /// outro monitor é removido), a sessão WGC antiga continua mandando quadros, mas pretos ou deslocados. Quando a
+    /// posição de uma tela com stream muda, a captura é recriada no mesmo destino (porta e stream id).
     /// </summary>
-    private void LogDisplayChanges() // chamar com _lock
+    private void FollowDisplayChanges() // chamar com _lock
     {
         if (!_live.Values.Any(l => l.Pipeline != null && l.Captured != null)) return;
         var now = Win32Displays.Snapshot();
@@ -279,12 +290,13 @@ public sealed class ScreenHost : IScreenHost, IDisposable
         {
             if (live.Pipeline == null || live.Captured is not { } before) continue;
             var after = now.FirstOrDefault(d => d.DeviceName.Equals(live.DisplayName, StringComparison.OrdinalIgnoreCase));
-            if (after == before) continue;
-            _log(after == null
-                ? $"diag: tela {key.Item2} ({live.DisplayName}) sumiu do desktop"
-                : $"diag: tela {key.Item2} ({live.DisplayName}) mudou: HMONITOR 0x{before.HMonitor:X} → 0x{after.HMonitor:X}, " +
-                  $"posição {before.Bounds.X},{before.Bounds.Y} {before.Bounds.Width}×{before.Bounds.Height} → {after.Bounds.X},{after.Bounds.Y} {after.Bounds.Width}×{after.Bounds.Height}");
-            live.Captured = after;
+            if (after == null || !CaptureRebind.Needed(before.Bounds, after.Bounds))
+            {
+                if (after != null) live.Captured = after; // só o HMONITOR mudou: a captura segue válida
+                continue;
+            }
+            _log($"vídeo: tela {key.Item2} ({live.DisplayName}) mudou de {before.Bounds.X},{before.Bounds.Y} para {after.Bounds.X},{after.Bounds.Y}; recriando a captura");
+            StartPipeline(live, key.Item2, live.Address, live.Port, live.StreamId);
         }
     }
 
