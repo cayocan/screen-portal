@@ -124,6 +124,24 @@ public class PacketizationTests
         Assert.Equal(0, reassembler.FramesDropped);
     }
 
+    [Fact]
+    public void RecreatedPipeline_ContinuesTheFrameIds_SoTheReceiverKeepsAcceptingFrames()
+    {
+        // Bug 2 da 2C: ao recriar a captura de uma tela, o packetizer novo recomeçava em 0 e o headset descartava
+        // todos os quadros como atrasados (imagem congelada).
+        var sink = new ListSink();
+        var before = new VideoPacketizer(7);
+        for (int i = 0; i < 100; i++) before.Packetize(Payload(500, i), keyframe: i == 0, (ulong)i, sink);
+        var after = new VideoPacketizer(7, firstFrameId: before.NextFrameId);
+        after.Packetize(Payload(500, 999), keyframe: true, 100, sink);
+
+        int count = 0;
+        var reassembler = new FrameReassembler();
+        foreach (var p in sink.Packets) reassembler.Push(p, (_, in _) => count++);
+
+        Assert.Equal(101, count);
+    }
+
     [Theory]
     [InlineData(0u, 1u, true)]
     [InlineData(1u, 0u, false)]

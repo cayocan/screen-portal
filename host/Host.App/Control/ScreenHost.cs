@@ -173,6 +173,8 @@ public sealed class ScreenHost : IScreenHost, IDisposable
     private bool StartPipeline(Live live, uint screenKey, string address, ushort udpPort, ushort streamId)
     {
         live.Pipeline?.Dispose();
+        // O headset descarta frameIds que não sejam mais novos que o último: o pipeline novo segue a numeração.
+        uint firstFrameId = live.Pipeline?.NextFrameId ?? 0;
         live.Pipeline = null;
         RebuildKeyframeTargets();
         WgcMonitorCapture? capture = null;
@@ -186,7 +188,7 @@ public sealed class ScreenHost : IScreenHost, IDisposable
             _log($"vídeo: tela {screenKey} captura {capture.Width}×{capture.Height} de {display}");
             var fit = ResolutionFit.FromCapture(capture.Width, capture.Height);
             var settings = new EncoderSettings(fit.Width, fit.Height, 60, _bitrateKbps);
-            pipeline = new StreamPipeline(_gpu, capture, settings, new IPEndPoint(IPAddress.Parse(address), udpPort), 1, null, streamId);
+            pipeline = new StreamPipeline(_gpu, capture, settings, new IPEndPoint(IPAddress.Parse(address), udpPort), 1, null, streamId, firstFrameId);
             pipeline.Start();
             live.Pipeline = pipeline;
             live.Address = address;
