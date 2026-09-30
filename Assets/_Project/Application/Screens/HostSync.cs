@@ -20,6 +20,9 @@ namespace ScreenPortal.App.Screens
         public const uint RemoveGraceMs = 10000;
         public const int MaxStreams = 16;
         public const double StreamRetrySeconds = 1.0;
+        /// <summary>StreamStopped seguidos até a tela ir para Failed (espera entre tentativas: 1 s, 2 s, ...).</summary>
+        public const int MaxStreamFailures = 3;
+        public const string StreamFailedPrefix = "Falha ao iniciar o vídeo: ";
         public const double FirstFramePollSeconds = 1.0;
 
         private enum Phase
@@ -44,6 +47,7 @@ namespace ScreenPortal.App.Screens
             public double NotBefore;
             public string Detail = string.Empty;
             public int Reported = -1;
+            public int StreamFailures; // StreamStopped seguidos; zera em StreamStarted, recriação e reconexão
             public bool Seen;
         }
 
@@ -160,6 +164,7 @@ namespace ScreenPortal.App.Screens
                     CloseDecoder(e); // o slot (porta/stream_id) continua com a tela
                     e.Source = s.Source;
                     e.Resolution = s.Resolution;
+                    e.StreamFailures = 0;
                     SetPhase(e, Phase.Unlinked);
                 }
                 e.Seen = true;
@@ -182,7 +187,11 @@ namespace ScreenPortal.App.Screens
             for (int i = 0; i < leases.Count; i++)
                 if (Find(new ScreenId((int)leases[i].ScreenKey)) == null)
                     _connection.Send(new ReleaseScreenMessage(leases[i].ScreenKey, RemoveGraceMs));
-            for (int i = 0; i < _entries.Count; i++) SetPhase(_entries[i], Phase.Unlinked); // pede de novo: o host reata
+            for (int i = 0; i < _entries.Count; i++) // pede de novo: o host reata
+            {
+                _entries[i].StreamFailures = 0;
+                SetPhase(_entries[i], Phase.Unlinked);
+            }
             if (!_autoMirrorDone)
             {
                 _autoMirrorDone = true;
@@ -230,6 +239,7 @@ namespace ScreenPortal.App.Screens
                     e = FindBySlot(started.StreamId);
                     if (e != null && e.Phase == Phase.Starting)
                     {
+                        e.StreamFailures = 0;
                         e.NotBefore = _clock.NowSeconds;
                         SetPhase(e, Phase.Streaming);
                     }
@@ -238,7 +248,15 @@ namespace ScreenPortal.App.Screens
                     e = FindBySlot(stopped.StreamId);
                     if (e != null && (e.Phase == Phase.Starting || e.Phase == Phase.Streaming || e.Phase == Phase.Live))
                     {
-                        e.NotBefore = _clock.NowSeconds + StreamRetrySeconds;
+                        // Um host que nunca consegue iniciar o stream não pode ser chamado para sempre (cada tentativa
+                        // segura o lock dele até ~3 s): espera dobrando e desiste após MaxStreamFailures seguidos.
+                        e.StreamFailures++;
+                        if (e.StreamFailures >= MaxStreamFailures)
+                        {
+                            Fail(e, StreamFailedPrefix + stopped.Reason); // só na transição: aloca uma vez
+                            break;
+                        }
+                        e.NotBefore = _clock.NowSeconds + StreamRetrySeconds * (1 << (e.StreamFailures - 1));
                         SetPhase(e, Phase.Ready);
                     }
                     break;

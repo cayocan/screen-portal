@@ -218,6 +218,60 @@ namespace ScreenPortal.Tests
         }
 
         [Test]
+        public void StreamStopped_BacksOff_AndFailsAfterThreeInARow_WithTheHostReason()
+        {
+            var r = new Rig();
+            var id = r.AddVirtual();
+            r.Link();
+            r.Push(new ScreenReadyMessage((uint)id.Value, 2560, 1440));
+            Assert.That(r.C.Channel.Count<StartStreamMessage>(), Is.EqualTo(1));
+
+            r.Push(new StreamStoppedMessage(0, "sem captura"));
+            r.Advance(1.1); // 1ª falha: 1 s
+            Assert.That(r.C.Channel.Count<StartStreamMessage>(), Is.EqualTo(2));
+
+            r.Push(new StreamStoppedMessage(0, "sem captura"));
+            r.Advance(1.5); // 2ª falha: 2 s
+            Assert.That(r.C.Channel.Count<StartStreamMessage>(), Is.EqualTo(2));
+            r.Advance(0.6);
+            Assert.That(r.C.Channel.Count<StartStreamMessage>(), Is.EqualTo(3));
+
+            r.Push(new StreamStoppedMessage(0, "sem captura")); // 3ª falha seguida: desiste
+            Assert.That(r.Sync.TryGetLink(id, out var state, out var detail), Is.True);
+            Assert.That(state, Is.EqualTo(ScreenLinkState.Failed));
+            Assert.That(detail, Is.EqualTo("Falha ao iniciar o vídeo: sem captura"));
+            Assert.That(r.Video.Open.Contains(id), Is.False, "decoder fechado");
+            r.Advance(10);
+            Assert.That(r.C.Channel.Count<StartStreamMessage>(), Is.EqualTo(3), "sem novas tentativas");
+
+            var other = r.AddVirtual(); // o slot 0 voltou para o pool
+            r.Tick();
+            r.Push(new ScreenReadyMessage((uint)other.Value, 2560, 1440));
+            Assert.That(r.C.Channel.Last<StartStreamMessage>().StreamId, Is.EqualTo((ushort)0));
+        }
+
+        [Test]
+        public void StreamStarted_BetweenStops_ResetsTheFailureCount()
+        {
+            var r = new Rig();
+            var id = r.AddVirtual();
+            r.Link();
+            r.Push(new ScreenReadyMessage((uint)id.Value, 2560, 1440));
+
+            r.Push(new StreamStoppedMessage(0, "x"));
+            r.Advance(1.1);
+            r.Push(new StreamStoppedMessage(0, "x"));
+            r.Advance(2.1);
+            r.Push(new StreamStartedMessage(0, 2560, 1440)); // funcionou: zera
+            r.Push(new StreamStoppedMessage(0, "x"));
+            Assert.That(r.State(id), Is.EqualTo(ScreenLinkState.Connecting));
+            r.Advance(1.1); // de volta ao primeiro degrau (1 s)
+            Assert.That(r.C.Channel.Count<StartStreamMessage>(), Is.EqualTo(4));
+            r.Push(new StreamStoppedMessage(0, "x"));
+            Assert.That(r.State(id), Is.EqualTo(ScreenLinkState.Connecting));
+        }
+
+        [Test]
         public void TestScreens_AreIgnored()
         {
             var r = new Rig();
