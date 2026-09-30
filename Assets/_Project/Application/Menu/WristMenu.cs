@@ -21,6 +21,7 @@ namespace ScreenPortal.App.Menu
         ReturnToSurface,
         RemoveScreen,
         AddTestScreen,
+        Recreate,
     }
 
     public enum MenuPage
@@ -32,7 +33,8 @@ namespace ScreenPortal.App.Menu
     }
 
     /// <summary>
-    /// Menu de pulso (spec 2B §5, 2C §3) com páginas: principal → proporções (frames) → resoluções, e espelhos.
+    /// Menu de pulso (spec 2B §5, 2C §3) com páginas: principal → proporções (frames) → resoluções, e espelhos; o modo
+    /// recriar (2D §3) reusa proporções → resoluções para a tela em foco.
     /// Tudo vira Command (ou undo/redo) no bus. Itens por índice; sem alocação por quadro (rótulos em cache).
     /// </summary>
     public sealed class WristMenu
@@ -41,18 +43,22 @@ namespace ScreenPortal.App.Menu
         public const int ComfortableVideoScreens = 4;
         public const string TooManyNotice = "Mais de 4 telas:\npode haver quedas e travamentos";
         public const string BackLabel = "← Voltar";
+        public const string RecreateLabel = "Recriar ▸";
+        public const string RecreateTitlePrefix = "Recriar: ";
+        public const string CurrentSuffix = " · atual";
 
         private static readonly MenuItemId[] MainItems =
         {
             MenuItemId.Undo, MenuItemId.Redo, MenuItemId.ToggleMode, MenuItemId.Recenter, MenuItemId.AlignPosture,
             MenuItemId.ToggleGrid, MenuItemId.AddVirtual, MenuItemId.AddMirror, MenuItemId.ReturnToSurface, MenuItemId.RemoveScreen,
+            MenuItemId.Recreate,
         };
 
         private static readonly MenuItemId[] MainItemsWithTest =
         {
             MenuItemId.Undo, MenuItemId.Redo, MenuItemId.ToggleMode, MenuItemId.Recenter, MenuItemId.AlignPosture,
             MenuItemId.ToggleGrid, MenuItemId.AddVirtual, MenuItemId.AddMirror, MenuItemId.ReturnToSurface, MenuItemId.RemoveScreen,
-            MenuItemId.AddTestScreen,
+            MenuItemId.Recreate, MenuItemId.AddTestScreen,
         };
 
         private readonly WorkspaceStore _store;
@@ -71,6 +77,14 @@ namespace ScreenPortal.App.Menu
 
         private IReadOnlyList<MonitorDescriptor> _mirrorLabelsFor;
         private string[] _mirrorLabels = Array.Empty<string>();
+
+        // Modo recriar (spec 2D §3): tela alvo fixada ao entrar; textos montados uma vez (o painel lê a cada quadro).
+        private ScreenId _recreate = ScreenId.None;
+        private Resolution _recreateFrom;
+        private string _recreateTitle = string.Empty;
+        private string _recreateCurrentLabel = string.Empty;
+
+        public bool IsRecreating => !_recreate.IsNone;
 
         public MenuPage Page { get; private set; } = MenuPage.Main;
         public Orientation Orientation { get; private set; } = Orientation.Landscape;
@@ -109,6 +123,7 @@ namespace ScreenPortal.App.Menu
         {
             get
             {
+                if (IsRecreating) return _recreateTitle;
                 var ws = _store.State;
                 bool connected = _host.IsConnected;
                 if (ReferenceEquals(ws, _statusFor) && connected == _statusConnected && ReferenceEquals(_notice, _statusNotice))
@@ -137,6 +152,7 @@ namespace ScreenPortal.App.Menu
                     if (index == 0) return Orientation == Orientation.Landscape ? "Orientação: Paisagem" : "Orientação: Retrato";
                     return ResolutionCatalog.Name(index - 1, Orientation);
                 case MenuPage.Resolutions:
+                    if (IsCurrent(index)) return _recreateCurrentLabel;
                     return ResolutionCatalog.Label(_aspect, index, Orientation);
                 case MenuPage.Mirrors:
                     return MirrorLabels()[index];
@@ -161,6 +177,7 @@ namespace ScreenPortal.App.Menu
                 case MenuItemId.ReturnToSurface: return "Voltar à superfície";
                 case MenuItemId.RemoveScreen: return "Remover tela";
                 case MenuItemId.AddTestScreen: return "+ Tela de teste";
+                case MenuItemId.Recreate: return RecreateLabel;
                 default: return id.ToString();
             }
         }
@@ -182,7 +199,7 @@ namespace ScreenPortal.App.Menu
             switch (Page)
             {
                 case MenuPage.Aspects: return index == 0 || _host.IsConnected;
-                case MenuPage.Resolutions:
+                case MenuPage.Resolutions: return _host.IsConnected && !IsCurrent(index);
                 case MenuPage.Mirrors: return _host.IsConnected;
                 default: return IsEnabled(_main[index]);
             }
@@ -201,6 +218,9 @@ namespace ScreenPortal.App.Menu
                 case MenuItemId.AddVirtual:
                 case MenuItemId.AddMirror:
                     return _host.IsConnected;
+                case MenuItemId.Recreate:
+                    return _host.IsConnected && ws.TryGetScreen(ws.FocusedScreenId, out var target)
+                           && target.Source.Kind == ScreenSourceKind.Virtual;
                 default: return true;
             }
         }
@@ -217,6 +237,7 @@ namespace ScreenPortal.App.Menu
             if (IsBack(index))
             {
                 Page = Page == MenuPage.Resolutions ? MenuPage.Aspects : MenuPage.Main;
+                if (Page == MenuPage.Main) ExitRecreate();
                 return;
             }
             switch (Page)
@@ -233,7 +254,8 @@ namespace ScreenPortal.App.Menu
                 case MenuPage.Resolutions:
                 {
                     var resolution = ResolutionCatalog.Get(_aspect, index, Orientation);
-                    Create(resolution, ScreenSource.Virtual, ResolutionCatalog.Label(_aspect, index, Orientation));
+                    if (IsRecreating) Recreate(resolution);
+                    else Create(resolution, ScreenSource.Virtual, ResolutionCatalog.Label(_aspect, index, Orientation));
                     return;
                 }
                 case MenuPage.Mirrors:
@@ -289,6 +311,9 @@ namespace ScreenPortal.App.Menu
                 case MenuItemId.RemoveScreen:
                     _bus.Send(new RemoveScreen(ws.FocusedScreenId));
                     break;
+                case MenuItemId.Recreate:
+                    EnterRecreate(ws);
+                    break;
             }
         }
 
@@ -299,6 +324,33 @@ namespace ScreenPortal.App.Menu
             Page = MenuPage.Main;
             if (result.Accepted && VideoScreens(_store.State) > ComfortableVideoScreens) _notice = TooManyNotice;
         }
+
+        private void EnterRecreate(Workspace ws)
+        {
+            ws.TryGetScreen(ws.FocusedScreenId, out var target);
+            _recreate = target.Id;
+            _recreateFrom = target.Resolution;
+            _recreateTitle = RecreateTitlePrefix + target.Label;
+            _recreateCurrentLabel = target.Resolution + CurrentSuffix;
+            Orientation = target.Orientation; // a atual aparece marcada sem trocar a orientação
+            Page = MenuPage.Aspects;
+        }
+
+        private void Recreate(Resolution resolution)
+        {
+            _bus.Send(new RecreateScreen(_recreate, resolution)); // undo recria na anterior (ADR 0012)
+            ExitRecreate();
+            Page = MenuPage.Main;
+        }
+
+        private void ExitRecreate()
+        {
+            _recreate = ScreenId.None;
+            _recreateTitle = string.Empty;
+        }
+
+        private bool IsCurrent(int index) =>
+            IsRecreating && ResolutionCatalog.Get(_aspect, index, Orientation).Equals(_recreateFrom);
 
         private static int VideoScreens(Workspace ws)
         {
@@ -313,6 +365,7 @@ namespace ScreenPortal.App.Menu
         {
             Page = MenuPage.Main;
             _notice = string.Empty;
+            ExitRecreate();
         }
     }
 }

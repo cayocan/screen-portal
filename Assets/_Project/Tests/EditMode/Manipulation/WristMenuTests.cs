@@ -273,5 +273,148 @@ namespace ScreenPortal.Tests
             router.Tick();
             Assert.That(r.Store.State.Screens.Count, Is.EqualTo(1));
         }
+
+        private static void AddVirtual2560(Rig r)
+        {
+            r.Menu.Invoke(MenuItemId.AddVirtual);
+            r.Menu.Invoke(1); // 16:9
+            r.Menu.Invoke(1); // 2560×1440
+        }
+
+        [Test]
+        public void Recreate_DisabledWithoutPc_WithoutFocus_OrWhenTheFocusIsNotAVirtualMonitor()
+        {
+            var r = new Rig();
+            int item = r.Menu.IndexOf(MenuItemId.Recreate);
+            Assert.That(r.Menu.Label(item), Is.EqualTo(WristMenu.RecreateLabel));
+            Assert.That(r.Menu.IsEnabled(item), Is.False, "sem tela em foco");
+
+            r.Menu.Invoke(MenuItemId.AddTestScreen);
+            Assert.That(r.Menu.IsEnabled(item), Is.False, "tela de teste");
+            r.Menu.Invoke(MenuItemId.AddMirror);
+            r.Menu.Invoke(1);
+            Assert.That(r.Menu.IsEnabled(item), Is.False, "espelho");
+
+            AddVirtual2560(r);
+            Assert.That(r.Menu.IsEnabled(item), Is.True);
+            r.Host.IsConnected = false;
+            Assert.That(r.Menu.IsEnabled(item), Is.False, "sem PC");
+        }
+
+        [Test]
+        public void Recreate_OpensTheAspects_WithTheTitle_AndMarksTheCurrentResolution()
+        {
+            var r = new Rig();
+            AddVirtual2560(r);
+            r.Menu.Invoke(MenuItemId.Recreate);
+            Assert.That(r.Menu.IsRecreating, Is.True);
+            Assert.That(r.Menu.Page, Is.EqualTo(MenuPage.Aspects));
+            Assert.That(r.Menu.Orientation, Is.EqualTo(Orientation.Landscape));
+            Assert.That(r.Menu.StatusLine, Is.EqualTo("Recriar: 2560×1440"));
+
+            r.Menu.Invoke(1); // 16:9
+            Assert.That(r.Menu.Page, Is.EqualTo(MenuPage.Resolutions));
+            Assert.That(r.Menu.Label(0), Is.EqualTo("1920×1080"));
+            Assert.That(r.Menu.IsEnabled(0), Is.True);
+            Assert.That(r.Menu.Label(1), Is.EqualTo("2560×1440 · atual"));
+            Assert.That(r.Menu.IsEnabled(1), Is.False);
+
+            var before = r.Store.State;
+            r.Menu.Invoke(1); // apagado: nada acontece
+            Assert.That(r.Store.State, Is.SameAs(before));
+            Assert.That(r.Menu.Page, Is.EqualTo(MenuPage.Resolutions));
+        }
+
+        [Test]
+        public void Recreate_StartsInTheOrientationOfTheFocusedScreen()
+        {
+            var r = new Rig();
+            r.Menu.Invoke(MenuItemId.AddVirtual);
+            r.Menu.Invoke(0); // Paisagem → Retrato
+            r.Menu.Invoke(1); // 9:16
+            r.Menu.Invoke(1); // 1440×2560
+            Assert.That(r.Store.State.Screens[0].Resolution, Is.EqualTo(Resolution.Create(1440, 2560)));
+
+            r.Menu.Invoke(MenuItemId.AddVirtual);
+            r.Menu.Invoke(0); // Retrato → Paisagem
+            r.Menu.Invoke(r.Menu.ItemCount - 1); // voltar
+            Assert.That(r.Menu.Orientation, Is.EqualTo(Orientation.Landscape));
+
+            r.Menu.Invoke(MenuItemId.Recreate);
+            Assert.That(r.Menu.Orientation, Is.EqualTo(Orientation.Portrait));
+            r.Menu.Invoke(1); // 9:16
+            Assert.That(r.Menu.Label(1), Is.EqualTo("1440×2560 · atual"));
+        }
+
+        [Test]
+        public void PickingAResolution_SendsRecreateScreen_ReturnsToMain_AndUndoRestores()
+        {
+            var r = new Rig();
+            AddVirtual2560(r);
+            var id = r.Store.State.FocusedScreenId;
+            float width = r.Store.State.Screens[0].WidthMeters;
+
+            r.Menu.Invoke(MenuItemId.Recreate);
+            r.Menu.Invoke(0); // Paisagem → Retrato
+            r.Menu.Invoke(1); // 9:16
+            r.Menu.Invoke(1); // 1440×2560
+
+            Assert.That(r.Menu.Page, Is.EqualTo(MenuPage.Main));
+            Assert.That(r.Menu.IsRecreating, Is.False);
+            Assert.That(r.Store.State.Screens.Count, Is.EqualTo(1));
+            var screen = r.Store.State.Screens[0];
+            Assert.That(screen.Id, Is.EqualTo(id));
+            Assert.That(screen.Resolution, Is.EqualTo(Resolution.Create(1440, 2560)));
+            Assert.That(screen.WidthMeters, Is.EqualTo(width).Within(1e-5f), "mesma largura; a altura segue a proporção");
+            Assert.That(r.Menu.StatusLine, Is.EqualTo("Cilindro · 1 tela"));
+
+            r.Menu.Invoke(MenuItemId.Undo);
+            Assert.That(r.Store.State.Screens[0].Resolution, Is.EqualTo(Resolution.Create(2560, 1440)));
+        }
+
+        [Test]
+        public void Back_LeavesRecreateMode_WithoutSendingAnything()
+        {
+            var r = new Rig();
+            AddVirtual2560(r);
+            var before = r.Store.State;
+
+            r.Menu.Invoke(MenuItemId.Recreate);
+            r.Menu.Invoke(1); // 16:9
+            r.Menu.Invoke(r.Menu.ItemCount - 1); // voltar → proporções, ainda recriando
+            Assert.That(r.Menu.Page, Is.EqualTo(MenuPage.Aspects));
+            Assert.That(r.Menu.IsRecreating, Is.True);
+            r.Menu.Invoke(r.Menu.ItemCount - 1); // voltar → principal
+            Assert.That(r.Menu.Page, Is.EqualTo(MenuPage.Main));
+            Assert.That(r.Menu.IsRecreating, Is.False);
+            Assert.That(r.Store.State, Is.SameAs(before));
+            Assert.That(r.Menu.StatusLine, Is.EqualTo("Cilindro · 1 tela"));
+
+            r.Menu.Invoke(MenuItemId.AddVirtual); // "+ Monitor virtual" não marca nada
+            r.Menu.Invoke(1);
+            Assert.That(r.Menu.Label(1), Is.EqualTo("2560×1440"));
+            Assert.That(r.Menu.IsEnabled(1), Is.True);
+
+            r.Menu.OnHidden();
+            r.Menu.Invoke(MenuItemId.Recreate);
+            r.Menu.OnHidden(); // esconder o painel também sai do modo
+            Assert.That(r.Menu.IsRecreating, Is.False);
+            Assert.That(r.Store.State, Is.SameAs(before));
+        }
+
+        [Test]
+        public void Recreate_DoesNotShowTheTooManyScreensWarning()
+        {
+            var r = new Rig();
+            for (int i = 0; i < 5; i++) AddVirtual2560(r);
+            Assert.That(r.Menu.StatusLine, Is.EqualTo(WristMenu.TooManyNotice));
+            r.Menu.OnHidden();
+
+            r.Menu.Invoke(MenuItemId.Recreate);
+            r.Menu.Invoke(1);
+            r.Menu.Invoke(0); // 1920×1080
+            Assert.That(r.Store.State.Screens.Count, Is.EqualTo(5));
+            Assert.That(r.Menu.StatusLine, Is.EqualTo("Cilindro · 5 telas"));
+        }
     }
 }
