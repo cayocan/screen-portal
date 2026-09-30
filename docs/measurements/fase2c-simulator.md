@@ -35,3 +35,15 @@ preparação da 2B). O Editor conecta em 127.0.0.1; o vídeo é no-op no Editor,
   atualização de driver ou TDR. Proposta: detectar a remoção, recriar o `GpuDevice` e os pipelines, e pedir IDR.
   Diagnóstico já no código: em falha de pipeline o host registra `DeviceRemovedReason` e a carga de memória.
 - **Ambiente:** o driver VDD que sobrou do spike da 2A (monitor 800×600, `ROOT\DISPLAY\0003`) foi removido.
+
+## 4. Quest (30/09/2026) — bug 2: tela preta depois de reorganizar os monitores no Windows
+- **Sintoma:** mover um monitor virtual para cima, para baixo ou para a esquerda do monitor 1 e clicar em Aplicar deixava a
+  tela preta no headset. Nas laterais a imagem voltava. O host seguia capturando e codificando a 60 fps.
+- **Causa 1:** a sessão WGC fica presa à área do desktop onde o monitor estava ao criar a captura (o HMONITOR não
+  muda). Quando o monitor sai dessa área, os quadros vêm pretos. O mesmo deslocamento explica a imagem "puxada para a
+  esquerda" vista antes ao remover outro monitor.
+  Correção: o host compara a posição de cada tela com stream a cada 1 s e recria a captura quando ela muda
+  (`CaptureRebind`, `ScreenHost.FollowDisplayChanges`).
+- **Causa 2 (achada na correção):** o pipeline recriado recomeçava os frameIds em 0, e o receptor do headset descartava
+  os quadros como atrasados (imagem congelada). Correção: o pipeline novo continua a numeração do anterior.
+- ✅ Verificado no Quest: acima, abaixo e à esquerda, a tela volta em ~1 s.
