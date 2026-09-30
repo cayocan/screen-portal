@@ -111,6 +111,8 @@ public sealed class ScreenHost : IScreenHost, IDisposable
 
     private ScreenAcquireResult CreateVirtual(string deviceId, AcquireScreenMessage request)
     {
+        // Tamanho vem da rede: validar antes do driver (e antes do cast uint → int).
+        if (!ScreenAcquireResult.TryValidateVirtualSize(request.Width, request.Height, out var invalid)) return invalid;
         try
         {
             _driver ??= SudoVdaDriver.Open(_log);

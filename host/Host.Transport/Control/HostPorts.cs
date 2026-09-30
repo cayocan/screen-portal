@@ -1,4 +1,5 @@
 using ScreenPortal.App.Connection;
+using ScreenPortal.Domain.Screens;
 
 namespace ScreenPortal.Host.Transport.Control;
 
@@ -13,7 +14,26 @@ public interface IMonitorProvider
     IReadOnlyList<MonitorDescriptor> GetMonitors();
 }
 
-public readonly record struct ScreenAcquireResult(bool Ok, int Width, int Height, string Error);
+public readonly record struct ScreenAcquireResult(bool Ok, int Width, int Height, string Error)
+{
+    /// <summary>
+    /// Valida o tamanho pedido pela rede para um monitor virtual antes de chegar ao driver (uint → int sem estouro,
+    /// regras da <see cref="Resolution"/>).
+    /// </summary>
+    public static bool TryValidateVirtualSize(uint width, uint height, out ScreenAcquireResult failure)
+    {
+        string error;
+        if (width > Resolution.MaxDimension || height > Resolution.MaxDimension)
+            error = $"lado maior que {Resolution.MaxDimension}.";
+        else if (Resolution.TryCreate((int)width, (int)height, out _, out error))
+        {
+            failure = default;
+            return true;
+        }
+        failure = new ScreenAcquireResult(false, 0, 0, "Resolução inválida: " + error);
+        return false;
+    }
+}
 
 /// <summary>
 /// Monitores e streams por headset (spec 2C §4, ADR 0009). Acquire/StartStream podem levar até ~3 s (criar monitor,
