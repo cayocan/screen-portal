@@ -2,7 +2,7 @@ using ScreenPortal.App.Connection;
 
 namespace ScreenPortal.Host.Transport.Control;
 
-/// <summary>Pergunta ao usuÃ¡rio do PC se o headset pode ver a tela (spec 1B Â§2).</summary>
+/// <summary>Pergunta ao usuário do PC se o headset pode ver a tela (spec 1B §2).</summary>
 public interface IPairingApprover
 {
     Task<bool> ApproveAsync(string deviceName, string code);
