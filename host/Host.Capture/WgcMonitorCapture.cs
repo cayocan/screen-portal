@@ -29,6 +29,9 @@ public sealed unsafe class WgcMonitorCapture : ICaptureSource
     private readonly object _frameLock = new();
     private bool _disposed;
 
+    /// <summary>Diagnóstico (2C): mudança de tamanho da captura e fechamento do item pelo Windows.</summary>
+    public event Action<string>? Diagnostic;
+
     public string Name => $"WGC monitor ({_item.DisplayName})";
     public int Width => _item.Size.Width;
     public int Height => _item.Size.Height;
@@ -81,6 +84,7 @@ public sealed unsafe class WgcMonitorCapture : ICaptureSource
         _pool = Direct3D11CaptureFramePool.CreateFreeThreaded(
             _gpu.WinRtDevice, DirectXPixelFormat.B8G8R8A8UIntNormalized, 2, _poolSize);
         _pool.FrameArrived += OnFrameArrived;
+        _item.Closed += OnItemClosed;
 
         _session = _pool.CreateCaptureSession(_item);
         _session.IsCursorCaptureEnabled = _captureCursor;
@@ -112,6 +116,7 @@ public sealed unsafe class WgcMonitorCapture : ICaptureSource
             // Tamanho mudou (janela redimensionada, ou monitor recém-criado cujo item.Size ainda era o antigo):
             // recria o pool. O frame precisa ser liberado ANTES do Recreate — liberar depois é 0xC0000005.
             frame.Dispose();
+            Diagnostic?.Invoke($"tamanho da captura mudou {_poolSize.Width}×{_poolSize.Height} → {size.Width}×{size.Height}");
             _poolSize = size;
             pool.Recreate(_gpu.WinRtDevice, DirectXPixelFormat.B8G8R8A8UIntNormalized, 2, size);
             return;
@@ -124,6 +129,9 @@ public sealed unsafe class WgcMonitorCapture : ICaptureSource
         using var texture = new ID3D11Texture2D(GetTexturePointer(frame.Surface));
         _sink!.OnFrame(texture, size.Width, size.Height, captureUs);
     }
+
+    private void OnItemClosed(GraphicsCaptureItem sender, object args) =>
+        Diagnostic?.Invoke("item de captura fechado pelo Windows (monitor removido ou topologia mudou)");
 
     /// <summary>IDirect3DDxgiInterfaceAccess::GetInterface (vtable slot 3). Devolve ponteiro com AddRef.</summary>
     private static IntPtr GetTexturePointer(IDirect3DSurface surface)
@@ -150,6 +158,7 @@ public sealed unsafe class WgcMonitorCapture : ICaptureSource
             _disposed = true;
         }
         if (_pool is not null) _pool.FrameArrived -= OnFrameArrived;
+        _item.Closed -= OnItemClosed;
         _session?.Dispose();
         _pool?.Dispose();
     }

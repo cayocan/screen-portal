@@ -168,6 +168,9 @@ public sealed class ScreenHost : IScreenHost, IDisposable
             try
             {
                 capture = CaptureWithRetry(live.DisplayName);
+                string display = live.DisplayName;
+                capture.Diagnostic += message => _log($"vídeo: tela {screenKey} ({display}): {message}");
+                _log($"vídeo: tela {screenKey} captura {capture.Width}×{capture.Height} de {display}");
                 var fit = ResolutionFit.FromCapture(capture.Width, capture.Height);
                 var settings = new EncoderSettings(fit.Width, fit.Height, 60, _bitrateKbps);
                 pipeline = new StreamPipeline(_gpu, capture, settings, new IPEndPoint(IPAddress.Parse(address), udpPort), 1, null, streamId);
