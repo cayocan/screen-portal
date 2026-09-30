@@ -124,4 +124,35 @@ namespace ScreenPortal.Tests
             Machine.Tick();
         }
     }
+
+    internal sealed class FakeScreenVideo : IScreenVideo
+    {
+        public bool Ready = true;
+        public bool FirstFrame;
+        public int Opens;
+        public int Closes;
+        public ushort LastStreamId;
+        public int LastPort;
+        public Resolution LastResolution;
+        public readonly HashSet<ScreenId> Open = new HashSet<ScreenId>();
+
+        public bool TryOpen(ScreenId screen, ushort streamId, int udpPort, Resolution resolution)
+        {
+            if (!Ready) return false;
+            Opens++;
+            LastStreamId = streamId;
+            LastPort = udpPort;
+            LastResolution = resolution;
+            Open.Add(screen);
+            return true;
+        }
+
+        public void Close(ScreenId screen)
+        {
+            Closes++;
+            Open.Remove(screen);
+        }
+
+        public bool HasFirstFrame(ScreenId screen) => FirstFrame && Open.Contains(screen);
+    }
 }
