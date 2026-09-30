@@ -1,4 +1,4 @@
-# Canal de controle — v1
+# Canal de controle — v2 (Fase 2C)
 
 Schema: `protocol/control.fbs` (FlatBuffers 25.2.10). C# gerado: `Assets/_Project/Infrastructure/Shared/Protocol/Generated/ControlProtocol.g.cs`
 (`tools/gen-protocol.ps1`). Codec único: `ControlMessageCodec.cs` (usado pela Unity e pelo host via `host/Host.Shared`).
@@ -22,3 +22,18 @@ Schema: `protocol/control.fbs` (FlatBuffers 25.2.10). C# gerado: `Assets/_Projec
 **Handshake:** Hello → (token válido) Welcome · (sem token) PairingRequired → diálogo no PC → PairingResult → Welcome.
 Depois do Welcome: o headset prepara o decoder e envia StartStream; o host transmite (protocol/video-packet-v1.md) para o
 IP de origem da conexão e responde StreamStarted. Ping a cada 500 ms (headset); o host responde Pong.
+
+## v2 (Fase 2C) — telas sob comando do headset
+
+`protocol_version` = 2 (v1 e v2 não conversam: `Bye(IncompatibleVersion)`). A chave de uma tela é o `ScreenId` da
+workspace (`screen_key`), nunca reutilizado; undo restaura o mesmo id e, portanto, o mesmo monitor.
+
+| Mensagem | Sentido | Campos | Resposta |
+|---|---|---|---|
+| `AcquireScreen` | headset → host | `screen_key, kind (Virtual/Mirror), width, height, physical_monitor_id` | `ScreenReady{screen_key,width,height}` ou `ScreenFailed{screen_key,reason}` |
+| `StartStream` | headset → host | `screen_key, udp_port, stream_id` (`monitor_id` = 0, legado) | `StreamStarted` / `StreamStopped` |
+| `ReleaseScreen` | headset → host | `screen_key, grace_ms` | — (para o stream; remove o monitor após o prazo; `AcquireScreen` da mesma chave antes disso reata) |
+| `Welcome.leases` | host → headset | `[ScreenLease{screen_key, kind, width, height}]` | aluguéis ainda vivos deste headset |
+
+Desconexão: o host aplica 5 min (padrão) a todos os aluguéis do headset. Espelho nunca remove nada no Windows: expirar só
+encerra o stream. Portas de vídeo do headset: 9000 + `stream_id`. Detalhes: ADR 0009.

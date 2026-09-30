@@ -15,6 +15,10 @@ namespace ScreenPortal.App.Connection
         Ping,
         Pong,
         Bye,
+        AcquireScreen,
+        ScreenReady,
+        ScreenFailed,
+        ReleaseScreen,
     }
 
     public enum ByeReason
@@ -23,6 +27,13 @@ namespace ScreenPortal.App.Connection
         IncompatibleVersion,
         PairingRejected,
         Replaced,
+    }
+
+    /// <summary>Tipo de monitor pedido ao host (spec 2C §4).</summary>
+    public enum ScreenKind
+    {
+        Virtual = 0,
+        Mirror = 1,
     }
 
     /// <summary>Mensagem do canal de controle, independente de FlatBuffers (o codec fica na Infrastructure).</summary>
@@ -93,24 +104,28 @@ namespace ScreenPortal.App.Connection
         public override ControlMessageKind Kind => ControlMessageKind.Welcome;
         public string HostName { get; }
         public IReadOnlyList<MonitorDescriptor> Monitors { get; }
+        /// <summary>Monitores que o host ainda mantém para este headset (v2).</summary>
+        public IReadOnlyList<ScreenLeaseInfo> Leases { get; }
 
-        public WelcomeMessage(string hostName, IReadOnlyList<MonitorDescriptor> monitors)
+        public WelcomeMessage(string hostName, IReadOnlyList<MonitorDescriptor> monitors, IReadOnlyList<ScreenLeaseInfo> leases = null)
         {
             HostName = hostName ?? string.Empty;
             Monitors = monitors ?? Array.Empty<MonitorDescriptor>();
+            Leases = leases ?? Array.Empty<ScreenLeaseInfo>();
         }
     }
 
     public sealed class StartStreamMessage : ControlMessage
     {
         public override ControlMessageKind Kind => ControlMessageKind.StartStream;
-        public uint MonitorId { get; }
+        /// <summary>Tela (= ScreenId) cujo monitor o host deve transmitir (v2).</summary>
+        public uint ScreenKey { get; }
         public ushort UdpPort { get; }
         public ushort StreamId { get; }
 
-        public StartStreamMessage(uint monitorId, ushort udpPort, ushort streamId)
+        public StartStreamMessage(uint screenKey, ushort udpPort, ushort streamId)
         {
-            MonitorId = monitorId;
+            ScreenKey = screenKey;
             UdpPort = udpPort;
             StreamId = streamId;
         }
@@ -166,5 +181,83 @@ namespace ScreenPortal.App.Connection
         public ByeReason Reason { get; }
 
         public ByeMessage(ByeReason reason) => Reason = reason;
+    }
+
+    public sealed class ScreenLeaseInfo
+    {
+        public uint ScreenKey { get; }
+        public ScreenKind Kind { get; }
+        public uint Width { get; }
+        public uint Height { get; }
+
+        public ScreenLeaseInfo(uint screenKey, ScreenKind kind, uint width, uint height)
+        {
+            ScreenKey = screenKey;
+            Kind = kind;
+            Width = width;
+            Height = height;
+        }
+    }
+
+    /// <summary>Headset → host: crie (ou reate) o monitor desta tela.</summary>
+    public sealed class AcquireScreenMessage : ControlMessage
+    {
+        public override ControlMessageKind Kind => ControlMessageKind.AcquireScreen;
+        public uint ScreenKey { get; }
+        public ScreenKind ScreenKind { get; }
+        public uint Width { get; }
+        public uint Height { get; }
+        public uint PhysicalMonitorId { get; }
+
+        public AcquireScreenMessage(uint screenKey, ScreenKind kind, uint width, uint height, uint physicalMonitorId)
+        {
+            ScreenKey = screenKey;
+            ScreenKind = kind;
+            Width = width;
+            Height = height;
+            PhysicalMonitorId = physicalMonitorId;
+        }
+    }
+
+    public sealed class ScreenReadyMessage : ControlMessage
+    {
+        public override ControlMessageKind Kind => ControlMessageKind.ScreenReady;
+        public uint ScreenKey { get; }
+        public uint Width { get; }
+        public uint Height { get; }
+
+        public ScreenReadyMessage(uint screenKey, uint width, uint height)
+        {
+            ScreenKey = screenKey;
+            Width = width;
+            Height = height;
+        }
+    }
+
+    public sealed class ScreenFailedMessage : ControlMessage
+    {
+        public override ControlMessageKind Kind => ControlMessageKind.ScreenFailed;
+        public uint ScreenKey { get; }
+        public string Reason { get; }
+
+        public ScreenFailedMessage(uint screenKey, string reason)
+        {
+            ScreenKey = screenKey;
+            Reason = reason ?? string.Empty;
+        }
+    }
+
+    /// <summary>Headset → host: pare o stream e remova o monitor depois de <see cref="GraceMs"/> (undo reata).</summary>
+    public sealed class ReleaseScreenMessage : ControlMessage
+    {
+        public override ControlMessageKind Kind => ControlMessageKind.ReleaseScreen;
+        public uint ScreenKey { get; }
+        public uint GraceMs { get; }
+
+        public ReleaseScreenMessage(uint screenKey, uint graceMs)
+        {
+            ScreenKey = screenKey;
+            GraceMs = graceMs;
+        }
     }
 }

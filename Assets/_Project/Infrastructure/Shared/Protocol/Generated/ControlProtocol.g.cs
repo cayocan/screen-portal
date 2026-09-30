@@ -18,6 +18,12 @@ public enum ByeReason : byte
   Replaced = 3,
 };
 
+public enum ScreenKind : byte
+{
+  Virtual = 0,
+  Mirror = 1,
+};
+
 public enum Message : byte
 {
   NONE = 0,
@@ -31,6 +37,10 @@ public enum Message : byte
   Ping = 8,
   Pong = 9,
   Bye = 10,
+  AcquireScreen = 11,
+  ScreenReady = 12,
+  ScreenFailed = 13,
+  ReleaseScreen = 14,
 };
 
 
@@ -71,6 +81,18 @@ static public class MessageVerify
         break;
       case Message.Bye:
         result = ScreenPortal.Protocol.Fb.ByeVerify.Verify(verifier, tablePos);
+        break;
+      case Message.AcquireScreen:
+        result = ScreenPortal.Protocol.Fb.AcquireScreenVerify.Verify(verifier, tablePos);
+        break;
+      case Message.ScreenReady:
+        result = ScreenPortal.Protocol.Fb.ScreenReadyVerify.Verify(verifier, tablePos);
+        break;
+      case Message.ScreenFailed:
+        result = ScreenPortal.Protocol.Fb.ScreenFailedVerify.Verify(verifier, tablePos);
+        break;
+      case Message.ReleaseScreen:
+        result = ScreenPortal.Protocol.Fb.ReleaseScreenVerify.Verify(verifier, tablePos);
         break;
       default: result = true;
         break;
@@ -298,6 +320,58 @@ static public class MonitorInfoVerify
       && verifier.VerifyTableEnd(tablePos);
   }
 }
+public struct ScreenLease : IFlatbufferObject
+{
+  private Table __p;
+  public ByteBuffer ByteBuffer { get { return __p.bb; } }
+  public static void ValidateVersion() { FlatBufferConstants.FLATBUFFERS_25_2_10(); }
+  public static ScreenLease GetRootAsScreenLease(ByteBuffer _bb) { return GetRootAsScreenLease(_bb, new ScreenLease()); }
+  public static ScreenLease GetRootAsScreenLease(ByteBuffer _bb, ScreenLease obj) { return (obj.__assign(_bb.GetInt(_bb.Position) + _bb.Position, _bb)); }
+  public void __init(int _i, ByteBuffer _bb) { __p = new Table(_i, _bb); }
+  public ScreenLease __assign(int _i, ByteBuffer _bb) { __init(_i, _bb); return this; }
+
+  public uint ScreenKey { get { int o = __p.__offset(4); return o != 0 ? __p.bb.GetUint(o + __p.bb_pos) : (uint)0; } }
+  public ScreenPortal.Protocol.Fb.ScreenKind Kind { get { int o = __p.__offset(6); return o != 0 ? (ScreenPortal.Protocol.Fb.ScreenKind)__p.bb.Get(o + __p.bb_pos) : ScreenPortal.Protocol.Fb.ScreenKind.Virtual; } }
+  public uint Width { get { int o = __p.__offset(8); return o != 0 ? __p.bb.GetUint(o + __p.bb_pos) : (uint)0; } }
+  public uint Height { get { int o = __p.__offset(10); return o != 0 ? __p.bb.GetUint(o + __p.bb_pos) : (uint)0; } }
+
+  public static Offset<ScreenPortal.Protocol.Fb.ScreenLease> CreateScreenLease(FlatBufferBuilder builder,
+      uint screen_key = 0,
+      ScreenPortal.Protocol.Fb.ScreenKind kind = ScreenPortal.Protocol.Fb.ScreenKind.Virtual,
+      uint width = 0,
+      uint height = 0) {
+    builder.StartTable(4);
+    ScreenLease.AddHeight(builder, height);
+    ScreenLease.AddWidth(builder, width);
+    ScreenLease.AddScreenKey(builder, screen_key);
+    ScreenLease.AddKind(builder, kind);
+    return ScreenLease.EndScreenLease(builder);
+  }
+
+  public static void StartScreenLease(FlatBufferBuilder builder) { builder.StartTable(4); }
+  public static void AddScreenKey(FlatBufferBuilder builder, uint screenKey) { builder.AddUint(0, screenKey, 0); }
+  public static void AddKind(FlatBufferBuilder builder, ScreenPortal.Protocol.Fb.ScreenKind kind) { builder.AddByte(1, (byte)kind, 0); }
+  public static void AddWidth(FlatBufferBuilder builder, uint width) { builder.AddUint(2, width, 0); }
+  public static void AddHeight(FlatBufferBuilder builder, uint height) { builder.AddUint(3, height, 0); }
+  public static Offset<ScreenPortal.Protocol.Fb.ScreenLease> EndScreenLease(FlatBufferBuilder builder) {
+    int o = builder.EndTable();
+    return new Offset<ScreenPortal.Protocol.Fb.ScreenLease>(o);
+  }
+}
+
+
+static public class ScreenLeaseVerify
+{
+  static public bool Verify(Google.FlatBuffers.Verifier verifier, uint tablePos)
+  {
+    return verifier.VerifyTableStart(tablePos)
+      && verifier.VerifyField(tablePos, 4 /*ScreenKey*/, 4 /*uint*/, 4, false)
+      && verifier.VerifyField(tablePos, 6 /*Kind*/, 1 /*ScreenPortal.Protocol.Fb.ScreenKind*/, 1, false)
+      && verifier.VerifyField(tablePos, 8 /*Width*/, 4 /*uint*/, 4, false)
+      && verifier.VerifyField(tablePos, 10 /*Height*/, 4 /*uint*/, 4, false)
+      && verifier.VerifyTableEnd(tablePos);
+  }
+}
 public struct Welcome : IFlatbufferObject
 {
   private Table __p;
@@ -317,17 +391,21 @@ public struct Welcome : IFlatbufferObject
   public byte[] GetHostNameArray() { return __p.__vector_as_array<byte>(4); }
   public ScreenPortal.Protocol.Fb.MonitorInfo? Monitors(int j) { int o = __p.__offset(6); return o != 0 ? (ScreenPortal.Protocol.Fb.MonitorInfo?)(new ScreenPortal.Protocol.Fb.MonitorInfo()).__assign(__p.__indirect(__p.__vector(o) + j * 4), __p.bb) : null; }
   public int MonitorsLength { get { int o = __p.__offset(6); return o != 0 ? __p.__vector_len(o) : 0; } }
+  public ScreenPortal.Protocol.Fb.ScreenLease? Leases(int j) { int o = __p.__offset(8); return o != 0 ? (ScreenPortal.Protocol.Fb.ScreenLease?)(new ScreenPortal.Protocol.Fb.ScreenLease()).__assign(__p.__indirect(__p.__vector(o) + j * 4), __p.bb) : null; }
+  public int LeasesLength { get { int o = __p.__offset(8); return o != 0 ? __p.__vector_len(o) : 0; } }
 
   public static Offset<ScreenPortal.Protocol.Fb.Welcome> CreateWelcome(FlatBufferBuilder builder,
       StringOffset host_nameOffset = default(StringOffset),
-      VectorOffset monitorsOffset = default(VectorOffset)) {
-    builder.StartTable(2);
+      VectorOffset monitorsOffset = default(VectorOffset),
+      VectorOffset leasesOffset = default(VectorOffset)) {
+    builder.StartTable(3);
+    Welcome.AddLeases(builder, leasesOffset);
     Welcome.AddMonitors(builder, monitorsOffset);
     Welcome.AddHostName(builder, host_nameOffset);
     return Welcome.EndWelcome(builder);
   }
 
-  public static void StartWelcome(FlatBufferBuilder builder) { builder.StartTable(2); }
+  public static void StartWelcome(FlatBufferBuilder builder) { builder.StartTable(3); }
   public static void AddHostName(FlatBufferBuilder builder, StringOffset hostNameOffset) { builder.AddOffset(0, hostNameOffset.Value, 0); }
   public static void AddMonitors(FlatBufferBuilder builder, VectorOffset monitorsOffset) { builder.AddOffset(1, monitorsOffset.Value, 0); }
   public static VectorOffset CreateMonitorsVector(FlatBufferBuilder builder, Offset<ScreenPortal.Protocol.Fb.MonitorInfo>[] data) { builder.StartVector(4, data.Length, 4); for (int i = data.Length - 1; i >= 0; i--) builder.AddOffset(data[i].Value); return builder.EndVector(); }
@@ -335,6 +413,12 @@ public struct Welcome : IFlatbufferObject
   public static VectorOffset CreateMonitorsVectorBlock(FlatBufferBuilder builder, ArraySegment<Offset<ScreenPortal.Protocol.Fb.MonitorInfo>> data) { builder.StartVector(4, data.Count, 4); builder.Add(data); return builder.EndVector(); }
   public static VectorOffset CreateMonitorsVectorBlock(FlatBufferBuilder builder, IntPtr dataPtr, int sizeInBytes) { builder.StartVector(1, sizeInBytes, 1); builder.Add<Offset<ScreenPortal.Protocol.Fb.MonitorInfo>>(dataPtr, sizeInBytes); return builder.EndVector(); }
   public static void StartMonitorsVector(FlatBufferBuilder builder, int numElems) { builder.StartVector(4, numElems, 4); }
+  public static void AddLeases(FlatBufferBuilder builder, VectorOffset leasesOffset) { builder.AddOffset(2, leasesOffset.Value, 0); }
+  public static VectorOffset CreateLeasesVector(FlatBufferBuilder builder, Offset<ScreenPortal.Protocol.Fb.ScreenLease>[] data) { builder.StartVector(4, data.Length, 4); for (int i = data.Length - 1; i >= 0; i--) builder.AddOffset(data[i].Value); return builder.EndVector(); }
+  public static VectorOffset CreateLeasesVectorBlock(FlatBufferBuilder builder, Offset<ScreenPortal.Protocol.Fb.ScreenLease>[] data) { builder.StartVector(4, data.Length, 4); builder.Add(data); return builder.EndVector(); }
+  public static VectorOffset CreateLeasesVectorBlock(FlatBufferBuilder builder, ArraySegment<Offset<ScreenPortal.Protocol.Fb.ScreenLease>> data) { builder.StartVector(4, data.Count, 4); builder.Add(data); return builder.EndVector(); }
+  public static VectorOffset CreateLeasesVectorBlock(FlatBufferBuilder builder, IntPtr dataPtr, int sizeInBytes) { builder.StartVector(1, sizeInBytes, 1); builder.Add<Offset<ScreenPortal.Protocol.Fb.ScreenLease>>(dataPtr, sizeInBytes); return builder.EndVector(); }
+  public static void StartLeasesVector(FlatBufferBuilder builder, int numElems) { builder.StartVector(4, numElems, 4); }
   public static Offset<ScreenPortal.Protocol.Fb.Welcome> EndWelcome(FlatBufferBuilder builder) {
     int o = builder.EndTable();
     return new Offset<ScreenPortal.Protocol.Fb.Welcome>(o);
@@ -349,6 +433,7 @@ static public class WelcomeVerify
     return verifier.VerifyTableStart(tablePos)
       && verifier.VerifyString(tablePos, 4 /*HostName*/, false)
       && verifier.VerifyVectorOfTables(tablePos, 6 /*Monitors*/, ScreenPortal.Protocol.Fb.MonitorInfoVerify.Verify, false)
+      && verifier.VerifyVectorOfTables(tablePos, 8 /*Leases*/, ScreenPortal.Protocol.Fb.ScreenLeaseVerify.Verify, false)
       && verifier.VerifyTableEnd(tablePos);
   }
 }
@@ -365,22 +450,26 @@ public struct StartStream : IFlatbufferObject
   public uint MonitorId { get { int o = __p.__offset(4); return o != 0 ? __p.bb.GetUint(o + __p.bb_pos) : (uint)0; } }
   public ushort UdpPort { get { int o = __p.__offset(6); return o != 0 ? __p.bb.GetUshort(o + __p.bb_pos) : (ushort)0; } }
   public ushort StreamId { get { int o = __p.__offset(8); return o != 0 ? __p.bb.GetUshort(o + __p.bb_pos) : (ushort)0; } }
+  public uint ScreenKey { get { int o = __p.__offset(10); return o != 0 ? __p.bb.GetUint(o + __p.bb_pos) : (uint)0; } }
 
   public static Offset<ScreenPortal.Protocol.Fb.StartStream> CreateStartStream(FlatBufferBuilder builder,
       uint monitor_id = 0,
       ushort udp_port = 0,
-      ushort stream_id = 0) {
-    builder.StartTable(3);
+      ushort stream_id = 0,
+      uint screen_key = 0) {
+    builder.StartTable(4);
+    StartStream.AddScreenKey(builder, screen_key);
     StartStream.AddMonitorId(builder, monitor_id);
     StartStream.AddStreamId(builder, stream_id);
     StartStream.AddUdpPort(builder, udp_port);
     return StartStream.EndStartStream(builder);
   }
 
-  public static void StartStartStream(FlatBufferBuilder builder) { builder.StartTable(3); }
+  public static void StartStartStream(FlatBufferBuilder builder) { builder.StartTable(4); }
   public static void AddMonitorId(FlatBufferBuilder builder, uint monitorId) { builder.AddUint(0, monitorId, 0); }
   public static void AddUdpPort(FlatBufferBuilder builder, ushort udpPort) { builder.AddUshort(1, udpPort, 0); }
   public static void AddStreamId(FlatBufferBuilder builder, ushort streamId) { builder.AddUshort(2, streamId, 0); }
+  public static void AddScreenKey(FlatBufferBuilder builder, uint screenKey) { builder.AddUint(3, screenKey, 0); }
   public static Offset<ScreenPortal.Protocol.Fb.StartStream> EndStartStream(FlatBufferBuilder builder) {
     int o = builder.EndTable();
     return new Offset<ScreenPortal.Protocol.Fb.StartStream>(o);
@@ -396,6 +485,7 @@ static public class StartStreamVerify
       && verifier.VerifyField(tablePos, 4 /*MonitorId*/, 4 /*uint*/, 4, false)
       && verifier.VerifyField(tablePos, 6 /*UdpPort*/, 2 /*ushort*/, 2, false)
       && verifier.VerifyField(tablePos, 8 /*StreamId*/, 2 /*ushort*/, 2, false)
+      && verifier.VerifyField(tablePos, 10 /*ScreenKey*/, 4 /*uint*/, 4, false)
       && verifier.VerifyTableEnd(tablePos);
   }
 }
@@ -605,6 +695,200 @@ static public class ByeVerify
       && verifier.VerifyTableEnd(tablePos);
   }
 }
+public struct AcquireScreen : IFlatbufferObject
+{
+  private Table __p;
+  public ByteBuffer ByteBuffer { get { return __p.bb; } }
+  public static void ValidateVersion() { FlatBufferConstants.FLATBUFFERS_25_2_10(); }
+  public static AcquireScreen GetRootAsAcquireScreen(ByteBuffer _bb) { return GetRootAsAcquireScreen(_bb, new AcquireScreen()); }
+  public static AcquireScreen GetRootAsAcquireScreen(ByteBuffer _bb, AcquireScreen obj) { return (obj.__assign(_bb.GetInt(_bb.Position) + _bb.Position, _bb)); }
+  public void __init(int _i, ByteBuffer _bb) { __p = new Table(_i, _bb); }
+  public AcquireScreen __assign(int _i, ByteBuffer _bb) { __init(_i, _bb); return this; }
+
+  public uint ScreenKey { get { int o = __p.__offset(4); return o != 0 ? __p.bb.GetUint(o + __p.bb_pos) : (uint)0; } }
+  public ScreenPortal.Protocol.Fb.ScreenKind Kind { get { int o = __p.__offset(6); return o != 0 ? (ScreenPortal.Protocol.Fb.ScreenKind)__p.bb.Get(o + __p.bb_pos) : ScreenPortal.Protocol.Fb.ScreenKind.Virtual; } }
+  public uint Width { get { int o = __p.__offset(8); return o != 0 ? __p.bb.GetUint(o + __p.bb_pos) : (uint)0; } }
+  public uint Height { get { int o = __p.__offset(10); return o != 0 ? __p.bb.GetUint(o + __p.bb_pos) : (uint)0; } }
+  public uint PhysicalMonitorId { get { int o = __p.__offset(12); return o != 0 ? __p.bb.GetUint(o + __p.bb_pos) : (uint)0; } }
+
+  public static Offset<ScreenPortal.Protocol.Fb.AcquireScreen> CreateAcquireScreen(FlatBufferBuilder builder,
+      uint screen_key = 0,
+      ScreenPortal.Protocol.Fb.ScreenKind kind = ScreenPortal.Protocol.Fb.ScreenKind.Virtual,
+      uint width = 0,
+      uint height = 0,
+      uint physical_monitor_id = 0) {
+    builder.StartTable(5);
+    AcquireScreen.AddPhysicalMonitorId(builder, physical_monitor_id);
+    AcquireScreen.AddHeight(builder, height);
+    AcquireScreen.AddWidth(builder, width);
+    AcquireScreen.AddScreenKey(builder, screen_key);
+    AcquireScreen.AddKind(builder, kind);
+    return AcquireScreen.EndAcquireScreen(builder);
+  }
+
+  public static void StartAcquireScreen(FlatBufferBuilder builder) { builder.StartTable(5); }
+  public static void AddScreenKey(FlatBufferBuilder builder, uint screenKey) { builder.AddUint(0, screenKey, 0); }
+  public static void AddKind(FlatBufferBuilder builder, ScreenPortal.Protocol.Fb.ScreenKind kind) { builder.AddByte(1, (byte)kind, 0); }
+  public static void AddWidth(FlatBufferBuilder builder, uint width) { builder.AddUint(2, width, 0); }
+  public static void AddHeight(FlatBufferBuilder builder, uint height) { builder.AddUint(3, height, 0); }
+  public static void AddPhysicalMonitorId(FlatBufferBuilder builder, uint physicalMonitorId) { builder.AddUint(4, physicalMonitorId, 0); }
+  public static Offset<ScreenPortal.Protocol.Fb.AcquireScreen> EndAcquireScreen(FlatBufferBuilder builder) {
+    int o = builder.EndTable();
+    return new Offset<ScreenPortal.Protocol.Fb.AcquireScreen>(o);
+  }
+}
+
+
+static public class AcquireScreenVerify
+{
+  static public bool Verify(Google.FlatBuffers.Verifier verifier, uint tablePos)
+  {
+    return verifier.VerifyTableStart(tablePos)
+      && verifier.VerifyField(tablePos, 4 /*ScreenKey*/, 4 /*uint*/, 4, false)
+      && verifier.VerifyField(tablePos, 6 /*Kind*/, 1 /*ScreenPortal.Protocol.Fb.ScreenKind*/, 1, false)
+      && verifier.VerifyField(tablePos, 8 /*Width*/, 4 /*uint*/, 4, false)
+      && verifier.VerifyField(tablePos, 10 /*Height*/, 4 /*uint*/, 4, false)
+      && verifier.VerifyField(tablePos, 12 /*PhysicalMonitorId*/, 4 /*uint*/, 4, false)
+      && verifier.VerifyTableEnd(tablePos);
+  }
+}
+public struct ScreenReady : IFlatbufferObject
+{
+  private Table __p;
+  public ByteBuffer ByteBuffer { get { return __p.bb; } }
+  public static void ValidateVersion() { FlatBufferConstants.FLATBUFFERS_25_2_10(); }
+  public static ScreenReady GetRootAsScreenReady(ByteBuffer _bb) { return GetRootAsScreenReady(_bb, new ScreenReady()); }
+  public static ScreenReady GetRootAsScreenReady(ByteBuffer _bb, ScreenReady obj) { return (obj.__assign(_bb.GetInt(_bb.Position) + _bb.Position, _bb)); }
+  public void __init(int _i, ByteBuffer _bb) { __p = new Table(_i, _bb); }
+  public ScreenReady __assign(int _i, ByteBuffer _bb) { __init(_i, _bb); return this; }
+
+  public uint ScreenKey { get { int o = __p.__offset(4); return o != 0 ? __p.bb.GetUint(o + __p.bb_pos) : (uint)0; } }
+  public uint Width { get { int o = __p.__offset(6); return o != 0 ? __p.bb.GetUint(o + __p.bb_pos) : (uint)0; } }
+  public uint Height { get { int o = __p.__offset(8); return o != 0 ? __p.bb.GetUint(o + __p.bb_pos) : (uint)0; } }
+
+  public static Offset<ScreenPortal.Protocol.Fb.ScreenReady> CreateScreenReady(FlatBufferBuilder builder,
+      uint screen_key = 0,
+      uint width = 0,
+      uint height = 0) {
+    builder.StartTable(3);
+    ScreenReady.AddHeight(builder, height);
+    ScreenReady.AddWidth(builder, width);
+    ScreenReady.AddScreenKey(builder, screen_key);
+    return ScreenReady.EndScreenReady(builder);
+  }
+
+  public static void StartScreenReady(FlatBufferBuilder builder) { builder.StartTable(3); }
+  public static void AddScreenKey(FlatBufferBuilder builder, uint screenKey) { builder.AddUint(0, screenKey, 0); }
+  public static void AddWidth(FlatBufferBuilder builder, uint width) { builder.AddUint(1, width, 0); }
+  public static void AddHeight(FlatBufferBuilder builder, uint height) { builder.AddUint(2, height, 0); }
+  public static Offset<ScreenPortal.Protocol.Fb.ScreenReady> EndScreenReady(FlatBufferBuilder builder) {
+    int o = builder.EndTable();
+    return new Offset<ScreenPortal.Protocol.Fb.ScreenReady>(o);
+  }
+}
+
+
+static public class ScreenReadyVerify
+{
+  static public bool Verify(Google.FlatBuffers.Verifier verifier, uint tablePos)
+  {
+    return verifier.VerifyTableStart(tablePos)
+      && verifier.VerifyField(tablePos, 4 /*ScreenKey*/, 4 /*uint*/, 4, false)
+      && verifier.VerifyField(tablePos, 6 /*Width*/, 4 /*uint*/, 4, false)
+      && verifier.VerifyField(tablePos, 8 /*Height*/, 4 /*uint*/, 4, false)
+      && verifier.VerifyTableEnd(tablePos);
+  }
+}
+public struct ScreenFailed : IFlatbufferObject
+{
+  private Table __p;
+  public ByteBuffer ByteBuffer { get { return __p.bb; } }
+  public static void ValidateVersion() { FlatBufferConstants.FLATBUFFERS_25_2_10(); }
+  public static ScreenFailed GetRootAsScreenFailed(ByteBuffer _bb) { return GetRootAsScreenFailed(_bb, new ScreenFailed()); }
+  public static ScreenFailed GetRootAsScreenFailed(ByteBuffer _bb, ScreenFailed obj) { return (obj.__assign(_bb.GetInt(_bb.Position) + _bb.Position, _bb)); }
+  public void __init(int _i, ByteBuffer _bb) { __p = new Table(_i, _bb); }
+  public ScreenFailed __assign(int _i, ByteBuffer _bb) { __init(_i, _bb); return this; }
+
+  public uint ScreenKey { get { int o = __p.__offset(4); return o != 0 ? __p.bb.GetUint(o + __p.bb_pos) : (uint)0; } }
+  public string Reason { get { int o = __p.__offset(6); return o != 0 ? __p.__string(o + __p.bb_pos) : null; } }
+#if ENABLE_SPAN_T
+  public Span<byte> GetReasonBytes() { return __p.__vector_as_span<byte>(6, 1); }
+#else
+  public ArraySegment<byte>? GetReasonBytes() { return __p.__vector_as_arraysegment(6); }
+#endif
+  public byte[] GetReasonArray() { return __p.__vector_as_array<byte>(6); }
+
+  public static Offset<ScreenPortal.Protocol.Fb.ScreenFailed> CreateScreenFailed(FlatBufferBuilder builder,
+      uint screen_key = 0,
+      StringOffset reasonOffset = default(StringOffset)) {
+    builder.StartTable(2);
+    ScreenFailed.AddReason(builder, reasonOffset);
+    ScreenFailed.AddScreenKey(builder, screen_key);
+    return ScreenFailed.EndScreenFailed(builder);
+  }
+
+  public static void StartScreenFailed(FlatBufferBuilder builder) { builder.StartTable(2); }
+  public static void AddScreenKey(FlatBufferBuilder builder, uint screenKey) { builder.AddUint(0, screenKey, 0); }
+  public static void AddReason(FlatBufferBuilder builder, StringOffset reasonOffset) { builder.AddOffset(1, reasonOffset.Value, 0); }
+  public static Offset<ScreenPortal.Protocol.Fb.ScreenFailed> EndScreenFailed(FlatBufferBuilder builder) {
+    int o = builder.EndTable();
+    return new Offset<ScreenPortal.Protocol.Fb.ScreenFailed>(o);
+  }
+}
+
+
+static public class ScreenFailedVerify
+{
+  static public bool Verify(Google.FlatBuffers.Verifier verifier, uint tablePos)
+  {
+    return verifier.VerifyTableStart(tablePos)
+      && verifier.VerifyField(tablePos, 4 /*ScreenKey*/, 4 /*uint*/, 4, false)
+      && verifier.VerifyString(tablePos, 6 /*Reason*/, false)
+      && verifier.VerifyTableEnd(tablePos);
+  }
+}
+public struct ReleaseScreen : IFlatbufferObject
+{
+  private Table __p;
+  public ByteBuffer ByteBuffer { get { return __p.bb; } }
+  public static void ValidateVersion() { FlatBufferConstants.FLATBUFFERS_25_2_10(); }
+  public static ReleaseScreen GetRootAsReleaseScreen(ByteBuffer _bb) { return GetRootAsReleaseScreen(_bb, new ReleaseScreen()); }
+  public static ReleaseScreen GetRootAsReleaseScreen(ByteBuffer _bb, ReleaseScreen obj) { return (obj.__assign(_bb.GetInt(_bb.Position) + _bb.Position, _bb)); }
+  public void __init(int _i, ByteBuffer _bb) { __p = new Table(_i, _bb); }
+  public ReleaseScreen __assign(int _i, ByteBuffer _bb) { __init(_i, _bb); return this; }
+
+  public uint ScreenKey { get { int o = __p.__offset(4); return o != 0 ? __p.bb.GetUint(o + __p.bb_pos) : (uint)0; } }
+  public uint GraceMs { get { int o = __p.__offset(6); return o != 0 ? __p.bb.GetUint(o + __p.bb_pos) : (uint)0; } }
+
+  public static Offset<ScreenPortal.Protocol.Fb.ReleaseScreen> CreateReleaseScreen(FlatBufferBuilder builder,
+      uint screen_key = 0,
+      uint grace_ms = 0) {
+    builder.StartTable(2);
+    ReleaseScreen.AddGraceMs(builder, grace_ms);
+    ReleaseScreen.AddScreenKey(builder, screen_key);
+    return ReleaseScreen.EndReleaseScreen(builder);
+  }
+
+  public static void StartReleaseScreen(FlatBufferBuilder builder) { builder.StartTable(2); }
+  public static void AddScreenKey(FlatBufferBuilder builder, uint screenKey) { builder.AddUint(0, screenKey, 0); }
+  public static void AddGraceMs(FlatBufferBuilder builder, uint graceMs) { builder.AddUint(1, graceMs, 0); }
+  public static Offset<ScreenPortal.Protocol.Fb.ReleaseScreen> EndReleaseScreen(FlatBufferBuilder builder) {
+    int o = builder.EndTable();
+    return new Offset<ScreenPortal.Protocol.Fb.ReleaseScreen>(o);
+  }
+}
+
+
+static public class ReleaseScreenVerify
+{
+  static public bool Verify(Google.FlatBuffers.Verifier verifier, uint tablePos)
+  {
+    return verifier.VerifyTableStart(tablePos)
+      && verifier.VerifyField(tablePos, 4 /*ScreenKey*/, 4 /*uint*/, 4, false)
+      && verifier.VerifyField(tablePos, 6 /*GraceMs*/, 4 /*uint*/, 4, false)
+      && verifier.VerifyTableEnd(tablePos);
+  }
+}
 public struct Envelope : IFlatbufferObject
 {
   private Table __p;
@@ -630,6 +914,10 @@ public struct Envelope : IFlatbufferObject
   public ScreenPortal.Protocol.Fb.Ping BodyAsPing() { return Body<ScreenPortal.Protocol.Fb.Ping>().Value; }
   public ScreenPortal.Protocol.Fb.Pong BodyAsPong() { return Body<ScreenPortal.Protocol.Fb.Pong>().Value; }
   public ScreenPortal.Protocol.Fb.Bye BodyAsBye() { return Body<ScreenPortal.Protocol.Fb.Bye>().Value; }
+  public ScreenPortal.Protocol.Fb.AcquireScreen BodyAsAcquireScreen() { return Body<ScreenPortal.Protocol.Fb.AcquireScreen>().Value; }
+  public ScreenPortal.Protocol.Fb.ScreenReady BodyAsScreenReady() { return Body<ScreenPortal.Protocol.Fb.ScreenReady>().Value; }
+  public ScreenPortal.Protocol.Fb.ScreenFailed BodyAsScreenFailed() { return Body<ScreenPortal.Protocol.Fb.ScreenFailed>().Value; }
+  public ScreenPortal.Protocol.Fb.ReleaseScreen BodyAsReleaseScreen() { return Body<ScreenPortal.Protocol.Fb.ReleaseScreen>().Value; }
 
   public static Offset<ScreenPortal.Protocol.Fb.Envelope> CreateEnvelope(FlatBufferBuilder builder,
       ushort protocol_version = 0,

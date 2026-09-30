@@ -63,14 +63,21 @@ namespace ScreenPortal.Infrastructure.Protocol
                         var mon = m.Monitors[i];
                         monitors[i] = Fb.MonitorInfo.CreateMonitorInfo(b, mon.Id, mon.Width, mon.Height, b.CreateString(mon.Name), mon.IsPrimary);
                     }
+                    var leases = new Offset<Fb.ScreenLease>[m.Leases.Count];
+                    for (int i = 0; i < leases.Length; i++)
+                    {
+                        var l = m.Leases[i];
+                        leases[i] = Fb.ScreenLease.CreateScreenLease(b, l.ScreenKey, (Fb.ScreenKind)(byte)l.Kind, l.Width, l.Height);
+                    }
                     var host = b.CreateString(m.HostName);
-                    var vector = Fb.Welcome.CreateMonitorsVector(b, monitors);
-                    body = Fb.Welcome.CreateWelcome(b, host, vector).Value;
+                    var monitorVector = Fb.Welcome.CreateMonitorsVector(b, monitors);
+                    var leaseVector = Fb.Welcome.CreateLeasesVector(b, leases);
+                    body = Fb.Welcome.CreateWelcome(b, host, monitorVector, leaseVector).Value;
                     type = Fb.Message.Welcome;
                     break;
                 }
                 case StartStreamMessage m:
-                    body = Fb.StartStream.CreateStartStream(b, m.MonitorId, m.UdpPort, m.StreamId).Value;
+                    body = Fb.StartStream.CreateStartStream(b, 0, m.UdpPort, m.StreamId, m.ScreenKey).Value;
                     type = Fb.Message.StartStream;
                     break;
                 case StreamStartedMessage m:
@@ -93,6 +100,22 @@ namespace ScreenPortal.Infrastructure.Protocol
                     body = Fb.Bye.CreateBye(b, (Fb.ByeReason)(byte)m.Reason).Value;
                     type = Fb.Message.Bye;
                     break;
+                case AcquireScreenMessage m:
+                    body = Fb.AcquireScreen.CreateAcquireScreen(b, m.ScreenKey, (Fb.ScreenKind)(byte)m.ScreenKind, m.Width, m.Height, m.PhysicalMonitorId).Value;
+                    type = Fb.Message.AcquireScreen;
+                    break;
+                case ScreenReadyMessage m:
+                    body = Fb.ScreenReady.CreateScreenReady(b, m.ScreenKey, m.Width, m.Height).Value;
+                    type = Fb.Message.ScreenReady;
+                    break;
+                case ScreenFailedMessage m:
+                    body = Fb.ScreenFailed.CreateScreenFailed(b, m.ScreenKey, b.CreateString(m.Reason)).Value;
+                    type = Fb.Message.ScreenFailed;
+                    break;
+                case ReleaseScreenMessage m:
+                    body = Fb.ReleaseScreen.CreateReleaseScreen(b, m.ScreenKey, m.GraceMs).Value;
+                    type = Fb.Message.ReleaseScreen;
+                    break;
                 default:
                     throw new ArgumentException("Mensagem sem codec: " + message.GetType().Name, nameof(message));
             }
@@ -108,7 +131,7 @@ namespace ScreenPortal.Infrastructure.Protocol
             try
             {
                 var bb = new ByteBuffer(payload);
-                if (!Fb.Envelope.VerifyEnvelope(bb)) return new DecodeResult(DecodeStatus.Invalid, 0, null);
+                if (!new Verifier(bb).VerifyBuffer("SPCT", false, VerifyEnvelopeShell)) return new DecodeResult(DecodeStatus.Invalid, 0, null);
                 var envelope = Fb.Envelope.GetRootAsEnvelope(bb);
                 ushort version = envelope.ProtocolVersion;
                 if (version == 0) return new DecodeResult(DecodeStatus.Invalid, 0, null); // campo ausente = lixo
@@ -123,6 +146,20 @@ namespace ScreenPortal.Infrastructure.Protocol
             {
                 return new DecodeResult(DecodeStatus.Invalid, 0, null);
             }
+        }
+
+        /// <summary>
+        /// Verifica o Envelope sem o verificador de union gerado: no C# 25.2.10 o VerifyUnion passa ao
+        /// MessageVerify o tamanho da tabela (12 no Envelope) em vez do tipo do corpo. Com 10 membros isso caía no
+        /// default (true); com o membro 12 (ScreenReady) passou a verificar o corpo errado e rejeitar mensagens
+        /// válidas. Corpos malformados são pegos pelo try/catch de Decode.
+        /// </summary>
+        private static bool VerifyEnvelopeShell(Verifier verifier, uint tablePos)
+        {
+            return verifier.VerifyTableStart(tablePos)
+                && verifier.VerifyField(tablePos, 4 /*ProtocolVersion*/, 2, 2, false)
+                && verifier.VerifyField(tablePos, 6 /*BodyType*/, 1, 1, false)
+                && verifier.VerifyTableEnd(tablePos);
         }
 
         private static ControlMessage Read(Fb.Envelope e)
@@ -150,12 +187,18 @@ namespace ScreenPortal.Infrastructure.Protocol
                         var m = w.Monitors(i).Value;
                         monitors[i] = new MonitorDescriptor(m.Id, m.Width, m.Height, m.Name, m.IsPrimary);
                     }
-                    return new WelcomeMessage(w.HostName, monitors);
+                    var leases = new ScreenLeaseInfo[w.LeasesLength];
+                    for (int i = 0; i < leases.Length; i++)
+                    {
+                        var l = w.Leases(i).Value;
+                        leases[i] = new ScreenLeaseInfo(l.ScreenKey, (ScreenKind)(byte)l.Kind, l.Width, l.Height);
+                    }
+                    return new WelcomeMessage(w.HostName, monitors, leases);
                 }
                 case Fb.Message.StartStream:
                 {
                     var s = e.BodyAsStartStream();
-                    return new StartStreamMessage(s.MonitorId, s.UdpPort, s.StreamId);
+                    return new StartStreamMessage(s.ScreenKey, s.UdpPort, s.StreamId);
                 }
                 case Fb.Message.StreamStarted:
                 {
@@ -173,6 +216,26 @@ namespace ScreenPortal.Infrastructure.Protocol
                     return new PongMessage(e.BodyAsPong().SentUs);
                 case Fb.Message.Bye:
                     return new ByeMessage((ByeReason)(byte)e.BodyAsBye().Reason);
+                case Fb.Message.AcquireScreen:
+                {
+                    var a = e.BodyAsAcquireScreen();
+                    return new AcquireScreenMessage(a.ScreenKey, (ScreenKind)(byte)a.Kind, a.Width, a.Height, a.PhysicalMonitorId);
+                }
+                case Fb.Message.ScreenReady:
+                {
+                    var r = e.BodyAsScreenReady();
+                    return new ScreenReadyMessage(r.ScreenKey, r.Width, r.Height);
+                }
+                case Fb.Message.ScreenFailed:
+                {
+                    var f = e.BodyAsScreenFailed();
+                    return new ScreenFailedMessage(f.ScreenKey, f.Reason);
+                }
+                case Fb.Message.ReleaseScreen:
+                {
+                    var r = e.BodyAsReleaseScreen();
+                    return new ReleaseScreenMessage(r.ScreenKey, r.GraceMs);
+                }
                 default:
                     return null;
             }

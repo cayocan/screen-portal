@@ -74,7 +74,7 @@ public sealed class HeadsetSession(
     private void OnStartStream(StartStreamMessage start)
     {
         if (!_welcomed || _deviceId == null) return;
-        var monitor = monitors.GetMonitors().FirstOrDefault(m => m.Id == start.MonitorId);
+        var monitor = monitors.GetMonitors().FirstOrDefault(m => m.Id == start.ScreenKey);
         if (monitor == null)
         {
             connection.Send(new StreamStoppedMessage(start.StreamId, "monitor desconhecido"));

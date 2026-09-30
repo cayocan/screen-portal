@@ -1,22 +1,30 @@
-// Canal de controle PC <-> headset, v1. Ver protocol/control-v1.md.
+// Canal de controle PC <-> headset, v2. Ver protocol/control-v2.md.
 // Regra (brief §8.9): campos novos sempre no FIM das tabelas e opcionais. Nunca reordenar nem remover.
 namespace ScreenPortal.Protocol.Fb;
 
 enum ByeReason : ubyte { Shutdown = 0, IncompatibleVersion = 1, PairingRejected = 2, Replaced = 3 }
+enum ScreenKind : ubyte { Virtual = 0, Mirror = 1 }
 
 table Hello { device_id:string; device_name:string; pairing_token:string; }
 table PairingRequired { code:string; }
 table PairingResult { accepted:bool; pairing_token:string; }
 table MonitorInfo { id:uint; width:uint; height:uint; name:string; is_primary:bool; }
-table Welcome { host_name:string; monitors:[MonitorInfo]; }
-table StartStream { monitor_id:uint; udp_port:ushort; stream_id:ushort; }
+table ScreenLease { screen_key:uint; kind:ScreenKind; width:uint; height:uint; }
+table Welcome { host_name:string; monitors:[MonitorInfo]; leases:[ScreenLease]; }
+// v2: monitor_id não é mais usado (0); a tela é screen_key.
+table StartStream { monitor_id:uint; udp_port:ushort; stream_id:ushort; screen_key:uint; }
 table StreamStarted { stream_id:ushort; width:uint; height:uint; }
 table StreamStopped { stream_id:ushort; reason:string; }
 table Ping { sent_us:ulong; }
 table Pong { sent_us:ulong; }
 table Bye { reason:ByeReason; }
+table AcquireScreen { screen_key:uint; kind:ScreenKind; width:uint; height:uint; physical_monitor_id:uint; }
+table ScreenReady { screen_key:uint; width:uint; height:uint; }
+table ScreenFailed { screen_key:uint; reason:string; }
+table ReleaseScreen { screen_key:uint; grace_ms:uint; }
 
-union Message { Hello, PairingRequired, PairingResult, Welcome, StartStream, StreamStarted, StreamStopped, Ping, Pong, Bye }
+union Message { Hello, PairingRequired, PairingResult, Welcome, StartStream, StreamStarted, StreamStopped, Ping, Pong, Bye,
+                AcquireScreen, ScreenReady, ScreenFailed, ReleaseScreen }
 
 table Envelope { protocol_version:ushort; body:Message; }
 
