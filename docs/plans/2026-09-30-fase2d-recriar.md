@@ -18,7 +18,7 @@
 - Item apagado: sem PC (`IHostCatalog.IsConnected == false`), sem tela em foco, ou tela em foco que não é `ScreenSourceKind.Virtual` (espelho e tela de teste não recriam).
 - O aviso "Mais de 4 telas" **não** se aplica ao recriar (a contagem não muda).
 - Host: `AcquireScreen` da mesma chave, virtual → virtual, com outro tamanho = recriar: **cria o novo → move as janelas → para o stream do antigo → remove o antigo → aluguel aponta para o novo**. Falha ao criar: antigo intacto, resposta de falha.
-- Janelas: todas as de nível superior **visíveis** (e não "cloaked") no monitor antigo; posição por `WindowRelocation.Map`; maximizada: restaura → move → maximiza; minimizada: move só a posição de restauração (`SetWindowPlacement`), continua minimizada.
+- Janelas: todas as de nível superior **visíveis** (e não "cloaked" nem travadas) no monitor antigo; posição por `WindowRelocation.Map`; maximizada: restaura → move → maximiza; minimizada: move só a posição de restauração (`SetWindowPlacement`), continua minimizada.
 - Testes: `dotnet test tests-dotnet/UnityPureCode.Tests` (base 215) e `dotnet test host/Host.Tests` (base 71) verdes ao fim de cada tarefa. Host.App só compila (`dotnet build host/Host.App`); não rodar o host nesta parte.
 - Comentários e docs em português, no estilo curto do código ao redor. Commits pequenos, um propósito cada, sem linhas de atribuição.
 - `WristMenu.cs`, `MenuItemId` e `WristMenuTests` também mudam na 2E ("Curvatura ▸"): mudanças localizadas, sem refatorar o resto do menu.
@@ -876,7 +876,9 @@ public sealed class Win32WindowMover(Action<string> log) : IWindowMover<VirtualM
         var result = new List<IntPtr>();
         EnumWindows((hwnd, _) =>
         {
-            if (IsWindowVisible(hwnd) && !IsCloaked(hwnd) && MonitorFromWindow(hwnd, MonitorDefaultToNull) == hmonitor) result.Add(hwnd);
+            // Janela travada fica: SetWindowPos esperaria por ela com o lock do ScreenHost preso.
+            if (IsWindowVisible(hwnd) && !IsCloaked(hwnd) && !IsHungAppWindow(hwnd)
+                && MonitorFromWindow(hwnd, MonitorDefaultToNull) == hmonitor) result.Add(hwnd);
             return true;
         }, IntPtr.Zero);
         return result;
@@ -913,6 +915,7 @@ public sealed class Win32WindowMover(Action<string> log) : IWindowMover<VirtualM
 
     [DllImport("user32.dll")] private static extern bool EnumWindows(EnumWindowsProc proc, IntPtr data);
     [DllImport("user32.dll")] private static extern bool IsWindowVisible(IntPtr hwnd);
+    [DllImport("user32.dll")] private static extern bool IsHungAppWindow(IntPtr hwnd);
     [DllImport("user32.dll")] private static extern bool IsIconic(IntPtr hwnd);
     [DllImport("user32.dll")] private static extern bool IsZoomed(IntPtr hwnd);
     [DllImport("user32.dll")] private static extern IntPtr MonitorFromWindow(IntPtr hwnd, uint flags);

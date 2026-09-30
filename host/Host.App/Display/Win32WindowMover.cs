@@ -64,7 +64,9 @@ public sealed class Win32WindowMover(Action<string> log) : IWindowMover<VirtualM
         var result = new List<IntPtr>();
         EnumWindows((hwnd, _) =>
         {
-            if (IsWindowVisible(hwnd) && !IsCloaked(hwnd) && MonitorFromWindow(hwnd, MonitorDefaultToNull) == hmonitor) result.Add(hwnd);
+            // Janela travada fica: SetWindowPos esperaria por ela com o lock do ScreenHost preso.
+            if (IsWindowVisible(hwnd) && !IsCloaked(hwnd) && !IsHungAppWindow(hwnd)
+                && MonitorFromWindow(hwnd, MonitorDefaultToNull) == hmonitor) result.Add(hwnd);
             return true;
         }, IntPtr.Zero);
         return result;
@@ -101,6 +103,7 @@ public sealed class Win32WindowMover(Action<string> log) : IWindowMover<VirtualM
 
     [DllImport("user32.dll")] private static extern bool EnumWindows(EnumWindowsProc proc, IntPtr data);
     [DllImport("user32.dll")] private static extern bool IsWindowVisible(IntPtr hwnd);
+    [DllImport("user32.dll")] private static extern bool IsHungAppWindow(IntPtr hwnd);
     [DllImport("user32.dll")] private static extern bool IsIconic(IntPtr hwnd);
     [DllImport("user32.dll")] private static extern bool IsZoomed(IntPtr hwnd);
     [DllImport("user32.dll")] private static extern IntPtr MonitorFromWindow(IntPtr hwnd, uint flags);
