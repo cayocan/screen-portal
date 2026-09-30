@@ -31,6 +31,11 @@ namespace ScreenPortal.Presentation.Menu
         private readonly MeshRenderer[] _buttons = new MeshRenderer[WristMenu.MaxItems];
         private readonly Transform[] _frames = new Transform[WristMenu.MaxItems];
         private readonly Transform[] _frameInner = new Transform[WristMenu.MaxItems];
+        // Último valor aplicado: TextMesh.text refaz a malha a cada set, então só atribui quando muda. O WristMenu
+        // devolve strings em cache, por isso a comparação por referência basta.
+        private readonly string[] _shownLabels = new string[WristMenu.MaxItems];
+        private readonly Material[] _shownMaterials = new Material[WristMenu.MaxItems];
+        private string _shownStatus;
         private Material _normal;
         private Material _hover;
         private Material _disabled;
@@ -68,10 +73,25 @@ namespace ScreenPortal.Presentation.Menu
             if (menu.Page != _layoutPage || count != _layoutCount || menu.Orientation != _layoutOrientation) Layout(menu, count);
             for (int i = 0; i < count; i++)
             {
-                _labels[i].text = menu.Label(i);
-                _buttons[i].sharedMaterial = !menu.IsEnabled(i) ? _disabled : i == hoverIndex ? _hover : _normal;
+                string label = menu.Label(i);
+                if (!ReferenceEquals(label, _shownLabels[i]))
+                {
+                    _shownLabels[i] = label;
+                    _labels[i].text = label;
+                }
+                var material = !menu.IsEnabled(i) ? _disabled : i == hoverIndex ? _hover : _normal;
+                if (!ReferenceEquals(material, _shownMaterials[i]))
+                {
+                    _shownMaterials[i] = material;
+                    _buttons[i].sharedMaterial = material;
+                }
             }
-            _status.text = menu.StatusLine;
+            string status = menu.StatusLine;
+            if (!ReferenceEquals(status, _shownStatus))
+            {
+                _shownStatus = status;
+                _status.text = status;
+            }
         }
 
         private void Layout(WristMenu menu, int count)
