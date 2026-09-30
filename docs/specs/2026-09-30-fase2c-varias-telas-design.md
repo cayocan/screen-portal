@@ -36,7 +36,10 @@ mesmo PC.
   fala com o host: o `HostSync` reage à workspace.
 - **Largura inicial:** mesma densidade para todas as resoluções — 2560 px ≈ 1,0 m (a 1,3 m), limitada por
   `ScreenLimits`. É só zoom; as alças ajustam depois.
-- **Posição inicial:** regra da 2B (primeiro espaço livre à direita da última tela).
+- **Posição inicial (revisada no Quest, 30/09):** a tela criada pelo menu nasce **à frente da visão**: no ponto da
+  superfície para onde a cabeça olha, na distância padrão (1,3 m). Se o ponto estiver ocupado, vai para o espaço livre
+  mais perto, à esquerda ou à direita, na mesma elevação (`SurfaceSlots.NearestFree`). O espelho automático da primeira
+  conexão mantém a regra da 2B (posição padrão, primeiro espaço livre à direita).
 
 **Menu de pulso:** "+ Tela de teste" sai do menu principal (fica em build de desenvolvimento) e entram
 **"+ Monitor virtual"** e **"+ Espelhar monitor"**.
@@ -98,9 +101,9 @@ mesmo PC.
 - **Estados visuais** (quad no eye buffer enquanto não há vídeo; a layer fica escondida até o primeiro quadro):
   "Criando monitor…" (`Pedido`) · "Conectando vídeo…" (`Pronto`) · vídeo (`Transmitindo`) · "Falha: <motivo>" ·
   "PC desconectado" (última imagem escurecida).
-- **Moldura e alças:** a layer é desenhada por cima do eye buffer. A moldura (faixa externa de 3 cm) não é coberta; as
-  alças dos cantos ficam metade escondidas — aceito na 2C, conferido no Quest; se incomodar, as alças vão para fora do
-  canto.
+- **Interface por cima das telas (revisado no Quest, 30/09, ADR 0010):** a layer é **Underlay**. Um furo no eye
+  buffer (alpha 0 + profundidade, shader `ScreenPortal/ScreenHole`) a revela. Moldura, alças, laser e menu são
+  desenhados na frente e ficam por cima da tela.
 - **`IScreenVideo` (Infrastructure):** no Quest, `NativeVideo.start/stop` do `.aar` (uma sessão por tela); no Editor
   e no Simulator, no-op. `takeStats` por sessão, 1×/s fora do caminho quente: marca o primeiro quadro (→
   `Transmitindo`) e alimenta o log.
