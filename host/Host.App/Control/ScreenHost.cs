@@ -186,9 +186,18 @@ public sealed class ScreenHost : IScreenHost, IDisposable
             {
                 if (pipeline != null) pipeline.Dispose(); else capture?.Dispose(); // o pipeline descarta a captura
                 _log($"vídeo: falha ao iniciar a tela {screenKey} ({e.GetType().Name}: {e.Message})");
+                LogDeviceState();
                 return false;
             }
         }
+    }
+
+    /// <summary>Diagnóstico de falha de pipeline: motivo de remoção do dispositivo D3D e memória livre do sistema.</summary>
+    private void LogDeviceState()
+    {
+        var reason = _gpu.Device.DeviceRemovedReason;
+        var memory = GC.GetGCMemoryInfo();
+        _log($"vídeo: GPU DeviceRemovedReason=0x{reason.Code:X8} ({reason.Description}); memória: carga {memory.MemoryLoadBytes / (1 << 20)} MiB de {memory.TotalAvailableMemoryBytes / (1 << 20)} MiB");
     }
 
     /// <summary>Logo após criar um monitor, o WGC rejeita o HMONITOR por ~1 s (ADR 0007): resolve e tenta de novo.</summary>
