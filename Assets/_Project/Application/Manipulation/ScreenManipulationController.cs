@@ -14,15 +14,20 @@ namespace ScreenPortal.App.Manipulation
         Hover,
         Moving,
         Resizing,
+        /// <summary>Arrastando a alça de curvatura (spec 2E §3).</summary>
+        Curving,
     }
 
     /// <summary>
-    /// State Machine da manipulação (brief §10.10, spec 2B §4): Idle → Hover(moldura/alça) → Moving | Resizing →
-    /// Commit | Cancel. Pré-visualização pura a cada quadro; **um** Command ao soltar. Um ponteiro por vez:
+    /// State Machine da manipulação (brief §10.10, spec 2B §4, 2E §3): Idle → Hover(moldura/alças) → Moving | Resizing |
+    /// Curving → Commit | Cancel. Pré-visualização pura a cada quadro; **um** Command ao soltar. Um ponteiro por vez:
     /// o outro só modifica (sem encaixe, solto) ou cancela. Ponteiro 0 = direita, 1 = esquerda. Sem alocação por quadro.
     /// </summary>
     public sealed class ScreenManipulationController
     {
+        /// <summary>30 cm ao longo da normal da tela = 100 % (spec 2E §3): para longe curva, para perto achata.</summary>
+        public const float CurvatureDragM = 0.3f;
+
         private readonly WorkspaceStore _store;
         private readonly ICommandBus _bus;
         private readonly List<AngularRect> _others = new List<AngularRect>();
@@ -42,13 +47,17 @@ namespace ScreenPortal.App.Manipulation
         private bool _loose;
         private float _looseDistance;
         private Vec3 _looseOffset;
+        private float _startCurvature;
+        private float _startCurveRadius;
+        private Vec3 _curveOrigin;
+        private Vec3 _curveNormal;
 
         public ManipulationState State { get; private set; }
         public ScreenHit HoverHit { get; private set; }
         public int HoverPointer { get; private set; } = -1;
         public int ActivePointer { get; private set; } = -1;
         public ManipulationPreview Preview { get; } = new ManipulationPreview();
-        public bool IsDragging => State == ManipulationState.Moving || State == ManipulationState.Resizing;
+        public bool IsDragging => State == ManipulationState.Moving || State == ManipulationState.Resizing || State == ManipulationState.Curving;
 
         public ScreenManipulationController(WorkspaceStore store, ICommandBus bus)
         {
@@ -86,7 +95,7 @@ namespace ScreenPortal.App.Manipulation
         {
             if (!input.HasRay) return false;
             var hit = ScreenHitTest.Pick(ws, input.Origin, input.Direction);
-            if (hit.Region != HitRegion.Frame && hit.Region != HitRegion.Handle) return false;
+            if (hit.Region != HitRegion.Frame && hit.Region != HitRegion.Handle && hit.Region != HitRegion.CurvatureHandle) return false;
             if (HoverPointer < 0)
             {
                 HoverHit = hit;
@@ -110,13 +119,23 @@ namespace ScreenPortal.App.Manipulation
             _startWidth = screen.WidthMeters;
             _aspect = screen.Resolution.AspectRatio;
             _startPose = surface.ToPose(screen.Placement);
-            Preview.Begin(screen.Id, _startPose, screen.Placement, screen.WidthMeters, screen.HeightMeters);
+            _startCurvature = screen.Curvature;
+            _startCurveRadius = CurvedGeometry.Of(screen, surface).RadiusM;
+            Preview.Begin(screen.Id, _startPose, screen.Placement, screen.WidthMeters, screen.HeightMeters, screen.Curvature);
             if (ws.FocusedScreenId != screen.Id) _bus.Send(new SetFocus(screen.Id));
 
             if (hit.Region == HitRegion.Handle)
             {
                 State = ManipulationState.Resizing;
-                _resizeStartDistance = Math.Max(0.01f, (hit.Point - _startPose.Position).Length);
+                // coordenadas locais do hit: comprimento do arco na tela curva (na plana é a distância ao centro)
+                _resizeStartDistance = Math.Max(0.01f, (float)Math.Sqrt(hit.LocalX * hit.LocalX + hit.LocalY * hit.LocalY));
+                return;
+            }
+            if (hit.Region == HitRegion.CurvatureHandle)
+            {
+                State = ManipulationState.Curving;
+                _curveOrigin = input.Origin;
+                _curveNormal = _startPose.Rotation * Vec3.Forward;
                 return;
             }
 
@@ -143,6 +162,11 @@ namespace ScreenPortal.App.Manipulation
             if (State == ManipulationState.Resizing)
             {
                 UpdateResize(in active);
+                return;
+            }
+            if (State == ManipulationState.Curving)
+            {
+                UpdateCurving(in active);
                 return;
             }
 
@@ -228,21 +252,36 @@ namespace ScreenPortal.App.Manipulation
 
         private void UpdateResize(in ManipulationInput input)
         {
-            if (!ScreenHitTest.RaycastPlane(input.Origin, input.Direction, _startPose, out _, out float lx, out float ly)) return;
+            if (!ScreenHitTest.RaycastScreen(input.Origin, input.Direction, _startPose, _startCurveRadius, out _, out float lx, out float ly)) return;
             float distance = (float)Math.Sqrt(lx * lx + ly * ly);
             float width = ScreenLimits.ClampWidth(_startWidth * distance / _resizeStartDistance);
             Preview.SetSize(width, width / _aspect);
+        }
+
+        /// <summary>Quanto o ponteiro andou ao longo da normal da tela desde o gatilho (spec 2E §3). Só prévia.</summary>
+        private void UpdateCurving(in ManipulationInput input)
+        {
+            float pushed = Vec3.Dot(input.Origin - _curveOrigin, _curveNormal);
+            Preview.SetCurvature(ScreenLimits.Clamp01(_startCurvature + pushed / CurvatureDragM));
         }
 
         private void Commit()
         {
             var id = _screen;
             bool resizing = State == ManipulationState.Resizing;
+            bool curving = State == ManipulationState.Curving;
             bool loose = Preview.IsLoose;
             var placement = Preview.Placement;
             var pose = Preview.Pose;
             float width = Preview.WidthM;
+            float curvature = Preview.Curvature;
             Reset();
+
+            if (curving)
+            {
+                if (Math.Abs(curvature - _startCurvature) > 1e-4f) _bus.Send(new SetScreenCurvature(id, curvature));
+                return;
+            }
 
             if (resizing)
             {
