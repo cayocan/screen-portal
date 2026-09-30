@@ -12,7 +12,7 @@ namespace ScreenPortal.Presentation.Screens
     public sealed class TestPatternScreenView : IScreenView
     {
         private readonly GameObject _root;
-        private readonly Transform _quad;
+        private readonly CurvedQuadMesh _shape; // plana ou arco (spec 2E §4); sem layer, a prévia pode curvar livremente
         private readonly TextMesh _label;
         private readonly Material _material;
         private readonly Material _labelMaterial;
@@ -28,17 +28,10 @@ namespace ScreenPortal.Presentation.Screens
             _root = new GameObject(screen.Label);
             _root.transform.SetParent(parent, false);
 
-            var quad = GameObject.CreatePrimitive(PrimitiveType.Quad);
-            quad.name = "Pattern";
-            quad.GetComponent<Collider>().enabled = false; // acerto do raio é puro (ScreenHitTest)
-            quad.transform.SetParent(_root.transform, false);
-            _quad = quad.transform;
             _texture = TestPatternTexture.Create(screen.Id.Value);
-            if (unlit != null)
-            {
-                _material = new Material(unlit) { mainTexture = _texture };
-                quad.GetComponent<MeshRenderer>().sharedMaterial = _material;
-            }
+            if (unlit != null) _material = new Material(unlit) { mainTexture = _texture };
+            _shape = new CurvedQuadMesh("Pattern " + screen.Id.Value);
+            ScreenMeshes.MeshObject("Pattern", _root.transform, _shape.Mesh, _material); // sem collider: acerto do raio é puro (ScreenHitTest)
 
             var labelGo = new GameObject("Label");
             labelGo.transform.SetParent(_root.transform, false);
@@ -59,7 +52,7 @@ namespace ScreenPortal.Presentation.Screens
         public void ApplyTransform(Pose pose, float widthMeters, float heightMeters, float radiusM)
         {
             _root.transform.SetLocalPositionAndRotation(pose.Position.ToUnity(), pose.Rotation.ToUnity());
-            _quad.localScale = new Vector3(widthMeters, heightMeters, 1f);
+            _shape.Set(widthMeters, heightMeters, radiusM);
             _label.characterSize = 0.01f * widthMeters;
         }
 
@@ -67,6 +60,7 @@ namespace ScreenPortal.Presentation.Screens
         {
             _onDisposed?.Invoke(this);
             Destroy(_root);
+            _shape.Dispose();
             Destroy(_material);
             Destroy(_labelMaterial);
             Destroy(_texture);
