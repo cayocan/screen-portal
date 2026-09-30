@@ -60,7 +60,9 @@ for ($run = 1; $run -le $Runs; $run++) {
     $runPass = $true
     $seen = 0
     foreach ($g in $rows | Group-Object stream | Sort-Object { [int]$_.Name }) {
-        $steady = $g.Group | Select-Object -Skip 5
+        # Descarta aquecimento (5 s) e as 2 últimas amostras: o host encerra no meio da janela de 1 s e a última
+        # amostra sai com fps parcial (falso "soluço" medido na 2A).
+        $steady = $g.Group | Select-Object -Skip 5 | Select-Object -SkipLast 2
         if (-not $steady) { continue }
         $seen++
         $lat = ($steady | ForEach-Object { [double]$_.lat_avg_ms } | Measure-Object -Average).Average
