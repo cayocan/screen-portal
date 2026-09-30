@@ -7,7 +7,7 @@ using ScreenPortal.Host.Transport;
 
 // Screen Portal host.
 //
-//   ScreenPortalHost [serve] [--bitrate 20000]   (padrão) controle tcp/9200 + mDNS + pareamento + vídeo por headset
+//   ScreenPortalHost [serve] [--bitrate 20000] [--grace-minutes 5]   (padrão) controle tcp/9200 + mDNS + pareamento + monitores/vídeo por tela
 //
 // Ferramentas da Fase 0 (docs/phase0-runbook.md):
 //   Host.App stream  --target <ip> [--port 9000] [--streams 1] [--fps 60] [--bitrate 20000]
@@ -56,18 +56,18 @@ static int RunServe(Args o, CancellationToken ct)
 
     using var gpu = new GpuDevice();
     using var clock = new ClockSyncServer();
-    using var streams = new ScreenPortal.Host.App.Control.StreamRegistry(gpu, o.Int("bitrate", 20_000), Log);
-    var monitors = new ScreenPortal.Host.App.Control.WindowsMonitorProvider();
+    using var screens = new ScreenPortal.Host.App.Control.ScreenHost(gpu, o.Int("bitrate", 20_000),
+        TimeSpan.FromMinutes(o.Int("grace-minutes", 5)), Log);
     var approver = new ScreenPortal.Host.App.Control.MessageBoxPairingApprover();
     string hostName = Environment.MachineName;
 
     using var server = new ScreenPortal.Host.Transport.Control.ControlServer(
         ScreenPortal.Infrastructure.Protocol.ControlProtocol.Port,
-        connection => new ScreenPortal.Host.Transport.Control.HeadsetSession(connection, pairing, SavePairing, approver, monitors, streams,
-            hostName, () => ScreenPortal.Host.Domain.Pairing.PairingStore.NewPairingCode(System.Security.Cryptography.RandomNumberGenerator.GetInt32), Log),
+        connection => new ScreenPortal.Host.Transport.Control.HeadsetSession(connection, pairing, SavePairing, approver,
+            screens.PhysicalMonitors, screens, hostName, () => ScreenPortal.Host.Domain.Pairing.PairingStore.NewPairingCode(System.Security.Cryptography.RandomNumberGenerator.GetInt32), Log),
         Log);
     server.Start();
-    using var keyframes = new KeyframeRequestListener(KeyframeRequestListener.DefaultPort, streams.RequestKeyframe);
+    using var keyframes = new KeyframeRequestListener(KeyframeRequestListener.DefaultPort, screens.RequestKeyframe);
 
     using var mdns = new ScreenPortal.Host.App.Control.MdnsAdvertiser(Log);
     mdns.Start(hostName, ScreenPortal.Infrastructure.Protocol.ControlProtocol.Port, "1");
@@ -78,7 +78,7 @@ static int RunServe(Args o, CancellationToken ct)
     {
         double s = sw.Elapsed.TotalSeconds;
         sw.Restart();
-        if (server.ConnectionCount > 0) Log(streams.TakeStats(s));
+        if (server.ConnectionCount > 0) Log(screens.TakeStats(s));
     }
     return 0;
 }
