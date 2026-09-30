@@ -36,6 +36,7 @@ public sealed class ScreenHost : IScreenHost, IDisposable
     private readonly TimeSpan _disconnectGrace;
     private readonly Action<string> _log;
     private readonly ScreenLeaseTable _leases = new();
+    private readonly DeviceOwnership _owners = new(); // lock próprio: Claim não espera _lock (criar monitor leva ~3 s)
     private readonly Dictionary<(string, uint), Live> _live = new();
     private readonly object _lock = new();
     private readonly Timer _sweeper;
@@ -65,11 +66,32 @@ public sealed class ScreenHost : IScreenHost, IDisposable
                 .ToList();
     }
 
-    public ScreenAcquireResult Acquire(string deviceId, AcquireScreenMessage request)
+    public long Claim(string deviceId, Action onReplaced)
+    {
+        long generation = _owners.Claim(deviceId, onReplaced, out var replaced);
+        if (replaced != null)
+        {
+            _log($"telas: {deviceId} reconectou; sessão anterior substituída");
+            try { replaced(); }
+            catch (Exception e) { _log($"telas: falha ao encerrar a sessão anterior de {deviceId}: {e.Message}"); }
+        }
+        return generation;
+    }
+
+    /// <summary>Trabalho de uma sessão que já não é a dona do device (chamar com _lock).</summary>
+    private bool Stale(string deviceId, long generation, string what)
+    {
+        if (_owners.IsCurrent(deviceId, generation)) return false;
+        _log($"telas: {what} de {deviceId} ignorado (sessão antiga)");
+        return true;
+    }
+
+    public ScreenAcquireResult Acquire(string deviceId, long generation, AcquireScreenMessage request)
     {
         lock (_lock)
         {
             if (_disposed) return new ScreenAcquireResult(false, 0, 0, "Host encerrando.");
+            if (Stale(deviceId, generation, "AcquireScreen")) return new ScreenAcquireResult(false, 0, 0, "Sessão substituída.");
             if (_leases.TryGet(deviceId, request.ScreenKey, out var lease))
             {
                 bool same = request.ScreenKind == ScreenKind.Mirror
@@ -123,12 +145,12 @@ public sealed class ScreenHost : IScreenHost, IDisposable
         return new ScreenAcquireResult(true, fit.Width, fit.Height, "");
     }
 
-    public bool StartStream(string deviceId, uint screenKey, string address, ushort udpPort, ushort streamId, out int width, out int height)
+    public bool StartStream(string deviceId, long generation, uint screenKey, string address, ushort udpPort, ushort streamId, out int width, out int height)
     {
         width = height = 0;
         lock (_lock)
         {
-            if (_disposed || !_live.TryGetValue((deviceId, screenKey), out var live)) return false;
+            if (_disposed || Stale(deviceId, generation, "StartStream") || !_live.TryGetValue((deviceId, screenKey), out var live)) return false;
             if (live.Pipeline != null && live.Address == address && live.Port == udpPort && live.StreamId == streamId)
             {
                 live.Pipeline.RequestKeyframe();
@@ -184,19 +206,22 @@ public sealed class ScreenHost : IScreenHost, IDisposable
         }
     }
 
-    public void Release(string deviceId, uint screenKey, TimeSpan grace)
+    public void Release(string deviceId, long generation, uint screenKey, TimeSpan grace)
     {
         lock (_lock)
         {
+            if (Stale(deviceId, generation, "ReleaseScreen")) return;
             StopStream(deviceId, screenKey);
             _leases.Expire(deviceId, screenKey, DateTimeOffset.Now + grace);
         }
     }
 
-    public void Disconnected(string deviceId)
+    public void Disconnected(string deviceId, long generation)
     {
         lock (_lock)
         {
+            // Depois de uma reconexão, o fechamento do socket antigo não pode parar os streams da sessão nova.
+            if (Stale(deviceId, generation, "Disconnected")) return;
             foreach (var lease in _leases.ForDevice(deviceId)) StopStream(deviceId, lease.ScreenKey);
             _leases.ExpireAll(deviceId, DateTimeOffset.Now + _disconnectGrace);
             _log($"telas: {deviceId} desconectou; monitores mantidos por {_disconnectGrace.TotalMinutes:0.#} min");

@@ -1,5 +1,6 @@
 using ScreenPortal.App.Connection;
 using ScreenPortal.Host.Domain.Pairing;
+using ScreenPortal.Host.Domain.Screens;
 using ScreenPortal.Host.Transport.Control;
 
 namespace ScreenPortal.Host.Tests.Control;
@@ -30,40 +31,50 @@ public class HeadsetSessionTests
     internal sealed class FakeScreens : IScreenHost
     {
         public readonly List<string> Calls = new();
+        public readonly DeviceOwnership Owners = new();
         public bool FailAcquire;
         public string? LastAddress;
         public ManualResetEventSlim? BlockAcquire;
         public ManualResetEventSlim? BlockRelease;
         public List<ScreenLeaseInfo> LeasesToReport = new();
+        /// <summary>Geração recebida em cada chamada de tela (na ordem de <see cref="Calls"/>, sem os claims).</summary>
+        public readonly List<long> Generations = new();
 
         public IReadOnlyList<ScreenLeaseInfo> Leases(string deviceId) => LeasesToReport;
 
-        public ScreenAcquireResult Acquire(string deviceId, AcquireScreenMessage request)
+        public long Claim(string deviceId, Action onReplaced)
+        {
+            long generation = Owners.Claim(deviceId, onReplaced, out var replaced);
+            replaced?.Invoke();
+            return generation;
+        }
+
+        public ScreenAcquireResult Acquire(string deviceId, long generation, AcquireScreenMessage request)
         {
             BlockAcquire?.Wait(5000);
-            lock (Calls) Calls.Add($"acquire {request.ScreenKey}");
+            lock (Calls) { Calls.Add($"acquire {request.ScreenKey}"); Generations.Add(generation); }
             return FailAcquire ? new ScreenAcquireResult(false, 0, 0, "sem driver")
                                : new ScreenAcquireResult(true, (int)request.Width, (int)request.Height, "");
         }
 
-        public bool StartStream(string deviceId, uint screenKey, string address, ushort udpPort, ushort streamId, out int width, out int height)
+        public bool StartStream(string deviceId, long generation, uint screenKey, string address, ushort udpPort, ushort streamId, out int width, out int height)
         {
-            lock (Calls) Calls.Add($"start {screenKey}:{udpPort}");
+            lock (Calls) { Calls.Add($"start {screenKey}:{udpPort}"); Generations.Add(generation); }
             LastAddress = address;
             width = 2560;
             height = 1440;
             return true;
         }
 
-        public void Release(string deviceId, uint screenKey, TimeSpan grace)
+        public void Release(string deviceId, long generation, uint screenKey, TimeSpan grace)
         {
             BlockRelease?.Wait(5000);
-            lock (Calls) Calls.Add($"release {screenKey} {grace.TotalMilliseconds}");
+            lock (Calls) { Calls.Add($"release {screenKey} {grace.TotalMilliseconds}"); Generations.Add(generation); }
         }
 
-        public void Disconnected(string deviceId)
+        public void Disconnected(string deviceId, long generation)
         {
-            lock (Calls) Calls.Add($"disconnected {deviceId}");
+            lock (Calls) { Calls.Add($"disconnected {deviceId}"); Generations.Add(generation); }
         }
     }
 
@@ -186,6 +197,64 @@ public class HeadsetSessionTests
         session.OnClosed();
         await session.Idle.WaitAsync(TimeSpan.FromSeconds(5));
         Assert.Empty(screens.Calls);
+    }
+
+    [Fact]
+    public async Task WelcomedSession_ClaimsTheDevice_AndPassesItsGenerationToEveryScreenCall()
+    {
+        var session = Welcomed(out _, out var screens);
+        session.OnMessage(new AcquireScreenMessage(1, ScreenKind.Virtual, 2560, 1440, 0));
+        session.OnMessage(new StartStreamMessage(1, 9000, 0));
+        session.OnMessage(new ReleaseScreenMessage(1, 0));
+        session.OnClosed();
+        await session.Idle.WaitAsync(TimeSpan.FromSeconds(5));
+
+        Assert.Equal(4, screens.Generations.Count);
+        long generation = screens.Generations[0];
+        Assert.True(screens.Owners.IsCurrent("dev-1", generation));
+        Assert.All(screens.Generations, g => Assert.Equal(generation, g));
+    }
+
+    [Fact]
+    public async Task Reconnect_NewSessionReplacesTheOld_OldCloseCarriesTheStaleGeneration()
+    {
+        var pairing = new PairingStore();
+        string token = pairing.Pair("dev-1", "Quest 3", DateTimeOffset.UnixEpoch);
+        var screens = new FakeScreens();
+        HeadsetSession NewSession(FakeConnection c) => new(c, pairing, () => { }, new FakeApprover(false), new FakeMonitors(),
+            screens, "CAYO-PC", () => "482913", _ => { });
+        var oldConn = new FakeConnection();
+        var newConn = new FakeConnection();
+        var oldSession = NewSession(oldConn);
+        var newSession = NewSession(newConn);
+
+        oldSession.OnMessage(new HelloMessage("dev-1", "Quest 3", token));
+        newSession.OnMessage(new HelloMessage("dev-1", "Quest 3", token)); // Wi-Fi caiu e o headset reconectou
+        newSession.OnMessage(new StartStreamMessage(1, 9000, 0));
+        await newSession.Idle.WaitAsync(TimeSpan.FromSeconds(5));
+
+        Assert.Equal(ByeReason.Replaced, oldConn.Last<ByeMessage>()!.Reason);
+        Assert.True(oldConn.Closed);
+        Assert.False(newConn.Closed);
+
+        oldSession.OnClosed(); // o fechamento do socket antigo chega depois
+        await oldSession.Idle.WaitAsync(TimeSpan.FromSeconds(5));
+        long newGeneration = screens.Generations[0];
+        long oldCloseGeneration = screens.Generations[^1];
+        Assert.Equal("disconnected dev-1", screens.Calls[^1]);
+        Assert.True(screens.Owners.IsCurrent("dev-1", newGeneration));
+        Assert.False(screens.Owners.IsCurrent("dev-1", oldCloseGeneration)); // o ScreenHost ignora esse Disconnected
+    }
+
+    [Fact]
+    public void SecondHello_OnAWelcomedSession_IsIgnored()
+    {
+        var session = Welcomed(out var conn, out _);
+        int sent;
+        lock (conn.Sent) sent = conn.Sent.Count;
+        session.OnMessage(new HelloMessage("other-dev", "Quest 3", ""));
+        lock (conn.Sent) Assert.Equal(sent, conn.Sent.Count);
+        Assert.False(conn.Closed);
     }
 
     private sealed class PendingApprover : IPairingApprover
