@@ -45,6 +45,7 @@ namespace ScreenPortal.Composition
             // 2B: manipulação por controle/mãos + menu de pulso (spec 2026-09-29-fase2b-manipulacao-design.md)
             builder.RegisterInstance(env.Head ?? new FixedHeadPose(Pose.At(LayoutSurface.DefaultCenter))).As<IHeadPoseSource>();
             builder.Register<ScreenManipulationController>(Lifetime.Singleton);
+            builder.Register<StartupRecenter>(Lifetime.Singleton);
             builder.Register(r => new WristMenu(r.Resolve<WorkspaceStore>(), r.Resolve<ICommandBus>(), r.Resolve<IHeadPoseSource>(),
                 r.Resolve<IHostCatalog>(), env.ShowTestScreens), Lifetime.Singleton);
             builder.Register(r => new InteractionRouter(env.RightPointer, env.LeftPointer,

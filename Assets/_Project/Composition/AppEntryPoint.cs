@@ -22,11 +22,12 @@ namespace ScreenPortal.Composition
         private readonly WristMenu _menu;
         private readonly HostSync _hostSync;
         private readonly OverlayScreenViewFactory _views;
+        private readonly StartupRecenter _startupRecenter;
 
         public AppEntryPoint(ScreenViewSynchronizer synchronizer, ConnectionStateMachine connection,
             IControlChannel channel, IHostDiscovery discovery, AppEnvironment env,
             InteractionRouter router, ManipulationPresenter presenter, WristMenu menu,
-            HostSync hostSync, OverlayScreenViewFactory views)
+            HostSync hostSync, OverlayScreenViewFactory views, StartupRecenter startupRecenter)
         {
             _synchronizer = synchronizer;
             _connection = connection;
@@ -38,6 +39,7 @@ namespace ScreenPortal.Composition
             _menu = menu;
             _hostSync = hostSync;
             _views = views;
+            _startupRecenter = startupRecenter;
         }
 
         public void Start()
@@ -52,6 +54,7 @@ namespace ScreenPortal.Composition
 
         public void Tick()
         {
+            _startupRecenter.Tick();
             _connection.Tick();
             _hostSync.Tick();
             _router.Tick();
