@@ -33,6 +33,7 @@ public class HeadsetSessionTests
         public bool FailAcquire;
         public string? LastAddress;
         public ManualResetEventSlim? BlockAcquire;
+        public ManualResetEventSlim? BlockRelease;
         public List<ScreenLeaseInfo> LeasesToReport = new();
 
         public IReadOnlyList<ScreenLeaseInfo> Leases(string deviceId) => LeasesToReport;
@@ -56,6 +57,7 @@ public class HeadsetSessionTests
 
         public void Release(string deviceId, uint screenKey, TimeSpan grace)
         {
+            BlockRelease?.Wait(5000);
             lock (Calls) Calls.Add($"release {screenKey} {grace.TotalMilliseconds}");
         }
 
@@ -110,9 +112,8 @@ public class HeadsetSessionTests
         Assert.True(conn.Closed);
     }
 
-
     [Fact]
-    public void KnownDevice_IsWelcomedWithLeases_ThenAcquiresStreamsReleasesAndDisconnects()
+    public async Task KnownDevice_IsWelcomedWithLeases_ThenAcquiresStreamsReleasesAndDisconnects()
     {
         var (session, conn, pairing, screens, _) = Create(approve: false);
         screens.LeasesToReport.Add(new ScreenLeaseInfo(7, ScreenKind.Virtual, 3840, 2160));
@@ -123,7 +124,7 @@ public class HeadsetSessionTests
         session.OnMessage(new AcquireScreenMessage(7, ScreenKind.Virtual, 3840, 2160, 0));
         session.OnMessage(new StartStreamMessage(7, 9000, 0));
         session.OnMessage(new ReleaseScreenMessage(7, 10000));
-        session.Idle.Wait();
+        await session.Idle.WaitAsync(TimeSpan.FromSeconds(5));
         Assert.Equal(2160u, conn.Last<ScreenReadyMessage>()!.Height);
         Assert.Equal(1440u, conn.Last<StreamStartedMessage>()!.Height);
         Assert.Equal("192.168.0.171", screens.LastAddress);
@@ -133,54 +134,60 @@ public class HeadsetSessionTests
         Assert.Equal(9UL, conn.Last<PongMessage>()!.SentUs);
 
         session.OnClosed();
-        session.Idle.Wait();
+        await session.Idle.WaitAsync(TimeSpan.FromSeconds(5));
         Assert.Equal("disconnected dev-1", screens.Calls[^1]);
     }
 
     [Fact]
-    public void AcquireFailure_ReportsScreenFailedWithTheReason()
+    public async Task AcquireFailure_ReportsScreenFailedWithTheReason()
     {
         var session = Welcomed(out var conn, out var screens);
         screens.FailAcquire = true;
         session.OnMessage(new AcquireScreenMessage(3, ScreenKind.Virtual, 2560, 1440, 0));
-        session.Idle.Wait();
+        await session.Idle.WaitAsync(TimeSpan.FromSeconds(5));
         var failed = conn.Last<ScreenFailedMessage>()!;
         Assert.Equal(3u, failed.ScreenKey);
         Assert.Equal("sem driver", failed.Reason);
     }
 
     [Fact]
-    public void ScreenMessages_BeforeWelcome_AreIgnored()
+    public async Task ScreenMessages_BeforeWelcome_AreIgnored()
     {
         var (session, conn, _, screens, _) = Create(approve: false);
         session.OnMessage(new AcquireScreenMessage(1, ScreenKind.Virtual, 2560, 1440, 0));
         session.OnMessage(new StartStreamMessage(1, 9000, 0));
-        session.Idle.Wait();
+        await session.Idle.WaitAsync(TimeSpan.FromSeconds(5));
         Assert.Empty(screens.Calls);
         Assert.Null(conn.Last<ScreenReadyMessage>());
     }
 
     [Fact]
-    public void SlowAcquire_DoesNotBlockPingOnTheReadThread()
+    public async Task SlowAcquire_DoesNotBlockPingOnTheReadThread()
     {
         var session = Welcomed(out var conn, out var screens);
-        screens.BlockAcquire = new ManualResetEventSlim(false);
+        using var gate = new ManualResetEventSlim(false);
+        screens.BlockAcquire = gate;
         session.OnMessage(new AcquireScreenMessage(1, ScreenKind.Virtual, 2560, 1440, 0)); // volta na hora
         session.OnMessage(new PingMessage(5));
         Assert.Equal(5UL, conn.Last<PongMessage>()!.SentUs);
         Assert.Null(conn.Last<ScreenReadyMessage>());
-        screens.BlockAcquire.Set();
-        session.Idle.Wait();
+        gate.Set();
+        await session.Idle.WaitAsync(TimeSpan.FromSeconds(5));
         Assert.NotNull(conn.Last<ScreenReadyMessage>());
     }
 
     [Fact]
-    public void ReleaseIsFullyHandled_BeforeALaterStartStream()
+    public async Task ReleaseIsFullyHandled_BeforeALaterStartStream()
     {
         var session = Welcomed(out _, out var screens);
+        using var gate = new ManualResetEventSlim(false);
+        screens.BlockRelease = gate;
         session.OnMessage(new ReleaseScreenMessage(1, 0));
         session.OnMessage(new StartStreamMessage(2, 9000, 0));
-        session.Idle.Wait();
+        await Task.Delay(200);
+        lock (screens.Calls) Assert.DoesNotContain(screens.Calls, c => c.StartsWith("start 2"));
+        gate.Set();
+        await session.Idle.WaitAsync(TimeSpan.FromSeconds(5));
         Assert.Equal(new[] { "release 1 0", "start 2:9000" }, screens.Calls);
     }
 }
