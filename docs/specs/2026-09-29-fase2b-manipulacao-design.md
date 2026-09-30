@@ -91,3 +91,14 @@ a sensação do gesto.
 
 **Risco:** a troca de `Pose` por `Placement` em `VirtualScreen` atinge arquivos compartilhados com o host
 (`Host.Shared`) e os testes da 1A: migrar junto e rodar as duas suítes a cada passo.
+
+## 7. Desvios na implementação
+1. **Acerto do raio puro** (raio × retângulo em `ScreenHitTest`), sem colliders do Interaction SDK: o ISDK só forneceria
+   raio + selecionar, que já vêm de `OVRHand.PointerPose`/pinça e `OVRInput`. Ganho: moldura, alças e menu testáveis
+   sem Unity.
+2. **Sem `CompositeCommand`:** `MoveScreenOnSurface(id, az, el, distância)` carrega a distância, então mover + afastar
+   já é **um** comando (um passo de undo), que era o objetivo.
+3. **"Voltar à superfície"** fica no menu de pulso (age na tela em foco), não num botão na moldura.
+4. **Menu acionado pelo raio** da mão/controle direito (sem poke direto).
+5. **Texto 3D com shader próprio** (`ScreenPortal/StereoText`, HLSL da URP): o `GUI/Text Shader` da fonte saía num olho
+   só em Single Pass Instanced/multiview (achado na verificação no Simulator).

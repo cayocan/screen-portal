@@ -1,4 +1,4 @@
-# Fase 2B — verificação (Simulator concluído; falta conferência visual do Cayo e o Quest)
+# Fase 2B — verificação (concluída: Simulator + Quest)
 
 **Branch:** `phase2b/manipulation` · **Plano:** [docs/plans/2026-09-29-fase2b-manipulacao.md](../plans/2026-09-29-fase2b-manipulacao.md)
 
@@ -80,3 +80,14 @@ candidata com a direção da cabeça em três poses da mão sintética: `(0,−1
 
 ### Testes depois das correções
 Unity Test Runner (EditMode): **169**, 0 falhas.
+
+## 4. Quest (30/09/2026)
+APK `Builds/Phase0.apk` com a cena `Main` (commit `001087c`), instalado por Wi-Fi. Sem PC host (telas de teste).
+Substitui a conferência visual no Simulator (Task 13 Step 4): no óculos, estéreo e texto são conclusivos.
+O Cayo repetiu o roteiro manualmente, em 25 itens: controles (texto nos dois olhos, menu por ≡, 3 telas de teste,
+moldura/alças, mover, X/Y, subir reto, analógico, encaixe e sem encaixe, redimensionar, soltar e voltar à superfície,
+Cilindro → Esfera, recentrar, cancelar com B, remover) e mãos (troca automática ao largar os controles, menu pela
+palma, pinça no menu, mover, empurrar/puxar, redimensionar pela alça, soltar com a outra mão fechada, sem encaixe com
+a outra mão, volta ao controle ao pegá-lo).
+
+**Resultado: todos passaram.** Nenhum problema de conforto, tremor ou precisão da pinça foi relatado.
