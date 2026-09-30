@@ -1,7 +1,7 @@
 {
     "name": "ScreenPortal.Infrastructure",
     "rootNamespace": "ScreenPortal.Infrastructure",
-    "references": ["ScreenPortal.Domain", "ScreenPortal.Application", "ScreenPortal.Infrastructure.Shared"],
+    "references": ["ScreenPortal.Domain", "ScreenPortal.Application", "ScreenPortal.Infrastructure.Shared", "Oculus.VR"],
     "includePlatforms": [],
     "excludePlatforms": [],
     "allowUnsafeCode": false,
