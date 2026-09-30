@@ -67,7 +67,10 @@ Comandos (ver cabeçalho de cada script):
 - Host: `ScreenPortalHost serve` (padrão: controle tcp/9200 + mDNS + pareamento + vídeo) · protocolo: `tools/gen-protocol.ps1`
   (regenera o C# de `protocol/control.fbs`) · testes do host: `dotnet test host/Host.Tests`
 - Fase 0: `tools/host-loopback-test.ps1` · `.aar`: `tools/build-native.ps1` · vídeo no Quest: `tools/phase0-streams-test.ps1`
-- Quest pelo Wi-Fi (reserva quando o USB cai): `adb tcpip 5555` + `adb connect 192.168.0.171:5555`
+- **Quest: Wi-Fi é o padrão** (o óculos pode ficar no carregador). `tools/quest.ps1` escolhe USB se estiver no cabo,
+  senão conecta por Wi-Fi (192.168.0.171:5555; outro IP via `SP_QUEST_IP`); os scripts de medição usam o helper.
+  Instalar/abrir: `tools/quest.ps1 -Install Builds/Phase0.apk -Launch`. Depois de reiniciar o Quest o adb por Wi-Fi
+  desliga: cabo uma vez + `tools/quest.ps1 -EnableWifi`. Em repouso (tela apagada) ele não responde: acordar o óculos.
 - Namespace da camada Application é `ScreenPortal.App` (ADR 0004). Em Presentation, `Resolution` precisa de alias
   (`UnityEngine.Resolution` também existe).
 

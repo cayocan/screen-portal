@@ -37,9 +37,12 @@ configuração + named pipe; SudoVDA: IOCTL) é levantada no início da implemen
 **Correções antes de medir:**
 1. `stream_session.cpp`: esperar até **16 ms** por input buffer; se faltar, descartar, enviar `RequestKeyframe` e esperar
    só esse IDR (não o periódico).
-2. Protocolo: mensagem nova `RequestKeyframe { stream_id: ushort }` (headset → host), **no fim da union** (compatível
-   com v1). Host força IDR imediato; IDR periódico passa de 1 s para **5 s** (rede de segurança).
-   Canal: pelo controle TCP da 1B (o decoder nativo sinaliza a necessidade; a máquina de estados envia).
+2. Protocolo: pacote `KFRQ { stream_id: u16 }` (headset → host), **UDP 9101**, enviado direto pelo decoder nativo
+   (padrão PLI do WebRTC; ver `protocol/video-packet-v1.md`). Host força IDR imediato; IDR periódico passa de 1 s
+   para **5 s** (rede de segurança).
+   *Revisão no plano (28/09):* a primeira versão previa o controle TCP da 1B; trocado por UDP nativo porque o decoder
+   detecta a perda na thread nativa (sem atravessar o C#, CLAUDE.md), funciona também na cena de spike sem canal de
+   controle, e o pedido é idempotente (perda de um pacote é coberta pelo reenvio a cada 100 ms).
 3. Host: `stream --mix "60x1,15x3"` roda pipelines simultâneos por taxa, portas consecutivas, stream ids distintos.
 
 **Condições controladas:** conteúdo fixo (`tools/text-test.html`), headset com bateria ≥ 80 % e no cabo,

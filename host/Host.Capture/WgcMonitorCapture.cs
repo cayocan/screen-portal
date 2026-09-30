@@ -26,6 +26,8 @@ public sealed unsafe class WgcMonitorCapture : ICaptureSource
     private GraphicsCaptureSession? _session;
     private ICaptureFrameSink? _sink;
     private Windows.Graphics.SizeInt32 _poolSize;
+    private readonly object _frameLock = new();
+    private bool _disposed;
 
     public string Name => $"WGC monitor ({_item.DisplayName})";
     public int Width => _item.Size.Width;
@@ -38,27 +40,36 @@ public sealed unsafe class WgcMonitorCapture : ICaptureSource
         _captureCursor = captureCursor;
     }
 
-    public static WgcMonitorCapture ForPrimaryMonitor(GpuDevice gpu, bool captureCursor)
+    public static WgcMonitorCapture ForPrimaryMonitor(GpuDevice gpu, bool captureCursor) =>
+        ForMonitor(gpu, MonitorFromPoint(default, MONITOR_DEFAULTTOPRIMARY), captureCursor);
+
+    public static WgcMonitorCapture ForMonitor(GpuDevice gpu, IntPtr hmonitor, bool captureCursor) =>
+        new(gpu, CreateItem(hmonitor, forWindow: false), captureCursor);
+
+    /// <summary>Captura só a janela (monitor-palco com recorte, brief §10.5).</summary>
+    public static WgcMonitorCapture ForWindow(GpuDevice gpu, IntPtr hwnd, bool captureCursor) =>
+        new(gpu, CreateItem(hwnd, forWindow: true), captureCursor);
+
+    private static GraphicsCaptureItem CreateItem(IntPtr handle, bool forWindow)
     {
         if (!GraphicsCaptureSession.IsSupported())
             throw new PlatformNotSupportedException("Windows Graphics Capture não é suportado neste sistema.");
 
-        IntPtr monitor = MonitorFromPoint(default, MONITOR_DEFAULTTOPRIMARY);
         var factory = ActivationFactory.Get("Windows.Graphics.Capture.GraphicsCaptureItem");
 
-        // IGraphicsCaptureItemInterop::CreateForMonitor (vtable slot 4) — chamada direta, sem RCW.
+        // IGraphicsCaptureItemInterop: slot 3 = CreateForWindow, slot 4 = CreateForMonitor — chamada direta, sem RCW.
         var iidInterop = IID_IGraphicsCaptureItemInterop;
         Marshal.ThrowExceptionForHR(Marshal.QueryInterface(factory.ThisPtr, in iidInterop, out IntPtr interop));
         IntPtr itemPtr;
         try
         {
             var iidItem = IID_IGraphicsCaptureItem;
-            var createForMonitor = (delegate* unmanaged[Stdcall]<IntPtr, IntPtr, Guid*, IntPtr*, int>)(*(*(void***)interop + 4));
-            Marshal.ThrowExceptionForHR(createForMonitor(interop, monitor, &iidItem, &itemPtr));
+            var create = (delegate* unmanaged[Stdcall]<IntPtr, IntPtr, Guid*, IntPtr*, int>)(*(*(void***)interop + (forWindow ? 3 : 4)));
+            Marshal.ThrowExceptionForHR(create(interop, handle, &iidItem, &itemPtr));
         }
         finally { Marshal.Release(interop); }
 
-        try { return new WgcMonitorCapture(gpu, GraphicsCaptureItem.FromAbi(itemPtr), captureCursor); }
+        try { return GraphicsCaptureItem.FromAbi(itemPtr); }
         finally { Marshal.Release(itemPtr); }
     }
 
@@ -82,13 +93,25 @@ public sealed unsafe class WgcMonitorCapture : ICaptureSource
 
     private void OnFrameArrived(Direct3D11CaptureFramePool pool, object _)
     {
+        // O pool é free-threaded: sem o lock, Dispose pode liberar pool/sessão no meio deste callback (0xC0000005).
+        lock (_frameLock)
+        {
+            if (_disposed) return;
+            HandleFrame(pool);
+        }
+    }
+
+    private void HandleFrame(Direct3D11CaptureFramePool pool)
+    {
         using var frame = pool.TryGetNextFrame();
         if (frame is null) return;
 
         var size = frame.ContentSize;
         if (size.Width != _poolSize.Width || size.Height != _poolSize.Height)
         {
-            // Resolução do monitor mudou: recria o pool. (Nunca acontece por ação do app — brief §10.1.)
+            // Tamanho mudou (janela redimensionada, ou monitor recém-criado cujo item.Size ainda era o antigo):
+            // recria o pool. O frame precisa ser liberado ANTES do Recreate — liberar depois é 0xC0000005.
+            frame.Dispose();
             _poolSize = size;
             pool.Recreate(_gpu.WinRtDevice, DirectXPixelFormat.B8G8R8A8UIntNormalized, 2, size);
             return;
@@ -121,12 +144,14 @@ public sealed unsafe class WgcMonitorCapture : ICaptureSource
 
     public void Dispose()
     {
-        _session?.Dispose();
-        if (_pool is not null)
+        lock (_frameLock)
         {
-            _pool.FrameArrived -= OnFrameArrived;
-            _pool.Dispose();
+            if (_disposed) return;
+            _disposed = true;
         }
+        if (_pool is not null) _pool.FrameArrived -= OnFrameArrived;
+        _session?.Dispose();
+        _pool?.Dispose();
     }
 
     private const uint MONITOR_DEFAULTTOPRIMARY = 1;

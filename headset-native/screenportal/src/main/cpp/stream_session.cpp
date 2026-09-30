@@ -20,8 +20,11 @@
 namespace sp {
 
 namespace {
-constexpr int64_t kInputTimeoutUs = 2000;    // não segura a thread de rede
+// Até 1 frame: com 2 ms, picos curtos do decoder viravam descarte + espera de IDR em cascata (Fase 0, fase0.md §3).
+// Os pacotes seguintes esperam no buffer do socket (4 MiB), não se perdem.
+constexpr int64_t kInputTimeoutUs = 16000;
 constexpr int64_t kOutputTimeoutUs = 10000;
+constexpr uint64_t kKeyframeRequestIntervalUs = 100000;  // no máximo 1 KFRQ a cada 100 ms
 }  // namespace
 
 StreamSession::StreamSession(const SessionConfig& config, ANativeWindow* window)
@@ -52,6 +55,8 @@ bool StreamSession::configureCodec() {
     // Low-latency: chave padrão (API 30+) + extensão da Qualcomm (XR2 Gen 2 do Quest 3).
     AMediaFormat_setInt32(format, "low-latency", 1);
     AMediaFormat_setInt32(format, "vendor.qti-ext-dec-low-latency.enable", 1);
+    // Libera cada quadro na ordem de decodificação, sem esperar o seguinte (não há B-frames no stream).
+    AMediaFormat_setInt32(format, "vendor.qti-ext-dec-picture-order.enable", 1);
     AMediaFormat_setInt32(format, "priority", 0);  // realtime
     AMediaFormat_setInt32(format, "operating-rate", 120);
 
@@ -122,6 +127,11 @@ void StreamSession::receiveLoop() {
         ssize_t n = recvfrom(fd_, packet, sizeof(packet), 0, reinterpret_cast<sockaddr*>(&from), &fromLen);
         if (n <= 0) continue;
         clock_.startIfNeeded(from);  // o host é quem manda o vídeo: sem configuração manual de IP
+        if (!hasHost_) {
+            hostAddr_ = from;
+            hostAddr_.sin_port = htons(kKeyframeRequestPort);
+            hasHost_ = true;
+        }
 
         {
             std::lock_guard<std::mutex> lock(statsMutex_);
@@ -129,7 +139,14 @@ void StreamSession::receiveLoop() {
             stats_.bytes += static_cast<uint64_t>(n);
         }
 
-        if (!reassembler_.push(packet, static_cast<size_t>(n))) continue;
+        bool complete = reassembler_.push(packet, static_cast<size_t>(n));
+        if (reassembler_.framesDropped() != lastDroppedSeen_) {
+            // Fragmento perdido: o próximo delta não teria referência → espera IDR e pede um já.
+            lastDroppedSeen_ = reassembler_.framesDropped();
+            waitingForKeyframe_ = true;
+            requestKeyframe();
+        }
+        if (!complete) continue;
         const PacketHeader& h = reassembler_.frameHeader();
         submitFrame(reassembler_.frameData(), reassembler_.frameSize(), h.captureTimeUs, h.isKeyframe());
     }
@@ -140,13 +157,17 @@ void StreamSession::submitFrame(const uint8_t* data, size_t size, uint64_t captu
         std::lock_guard<std::mutex> lock(statsMutex_);
         stats_.framesReceived++;
     }
-    if (waitingForKeyframe_ && !keyframe) return;
+    if (waitingForKeyframe_ && !keyframe) {
+        requestKeyframe();  // limitado a 1 a cada 100 ms; cobre a perda do próprio pedido
+        return;
+    }
 
     ssize_t idx = AMediaCodec_dequeueInputBuffer(codec_, kInputTimeoutUs);
     if (idx < 0) {
         // Decoder saturado: descartar é melhor que acumular latência. Delta seguinte não teria
-        // referência, então espera o próximo IDR (o host força um a cada 1 s na Fase 0).
+        // referência, então espera um IDR — pedido agora, em vez de esperar o periódico (5 s).
         waitingForKeyframe_ = true;
+        requestKeyframe();
         std::lock_guard<std::mutex> lock(statsMutex_);
         stats_.framesDroppedDecoder++;
         return;
@@ -157,6 +178,7 @@ void StreamSession::submitFrame(const uint8_t* data, size_t size, uint64_t captu
     if (!buf || capacity < size) {
         AMediaCodec_queueInputBuffer(codec_, static_cast<size_t>(idx), 0, 0, 0, 0);
         waitingForKeyframe_ = true;
+        requestKeyframe();
         LOGW("stream %d: input buffer pequeno (%zu < %zu)", config_.streamId, capacity, size);
         return;
     }
@@ -193,6 +215,16 @@ void StreamSession::outputLoop() {
             if (latency < stats_.latencyMinUs) stats_.latencyMinUs = latency;
         }
     }
+}
+
+void StreamSession::requestKeyframe() {
+    if (!hasHost_) return;
+    uint64_t now = monotonicUs();
+    if (now - lastKeyframeRequestUs_ < kKeyframeRequestIntervalUs) return;
+    lastKeyframeRequestUs_ = now;
+    uint8_t packet[kKeyframeRequestSize];
+    writeKeyframeRequest(packet, static_cast<uint16_t>(config_.streamId));
+    sendto(fd_, packet, sizeof(packet), 0, reinterpret_cast<const sockaddr*>(&hostAddr_), sizeof(hostAddr_));
 }
 
 std::string StreamSession::takeStatsLine() {

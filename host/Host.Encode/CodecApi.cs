@@ -13,6 +13,7 @@ internal sealed unsafe class CodecApi : IDisposable
     public static readonly Guid AVEncMPVGOPSize = new("95f31b26-95a4-41aa-9303-246a7fc6eef1");
     public static readonly Guid AVEncMPVDefaultBPictureCount = new("8d390aac-dc5c-4200-b57f-814d04babab2");
     public static readonly Guid AVEncVideoForceKeyFrame = new("398c1b98-8353-475a-9ef2-8f265d260345");
+    public static readonly Guid AVEncVideoMaxNumRefFrame = new("964829ed-94f9-43b4-b74d-ef40944b69a0");
 
     public const uint RateControlCbr = 0;
     public const uint RateControlLowDelayVbr = 4;

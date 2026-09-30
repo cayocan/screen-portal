@@ -4,6 +4,7 @@
 
 #include <android/native_window.h>
 #include <media/NdkMediaCodec.h>
+#include <netinet/in.h>
 
 #include <atomic>
 #include <cstdint>
@@ -54,6 +55,8 @@ private:
     void outputLoop();
     bool configureCodec();
     void submitFrame(const uint8_t* data, size_t size, uint64_t captureTimeUs, bool keyframe);
+    // Pede IDR ao host (KFRQ, UDP 9101), no máximo 1 a cada 100 ms. Só na thread de recepção.
+    void requestKeyframe();
 
     SessionConfig config_;
     ANativeWindow* window_ = nullptr;
@@ -65,6 +68,10 @@ private:
     FrameReassembler reassembler_;
     ClockSync clock_;
     bool waitingForKeyframe_ = true;
+    sockaddr_in hostAddr_{};  // aprendido do primeiro pacote de vídeo, porta trocada para 9101
+    bool hasHost_ = false;
+    uint64_t lastKeyframeRequestUs_ = 0;
+    uint64_t lastDroppedSeen_ = 0;
 
     std::mutex statsMutex_;
     SessionStats stats_;

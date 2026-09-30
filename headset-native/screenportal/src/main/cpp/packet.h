@@ -56,4 +56,17 @@ constexpr uint32_t kClockMagic = 0x434B4C43;  // "CLKC"
 constexpr size_t kClockMessageSize = 24;
 constexpr uint16_t kClockPort = 9100;
 
+// --- Pedido de keyframe (headset → host, UDP 9101). Espelho de host/Host.Domain/Video/KeyframeRequest.cs ---
+constexpr uint32_t kKeyframeRequestMagic = 0x5152464B;  // "KFRQ"
+constexpr size_t kKeyframeRequestSize = 8;
+constexpr uint16_t kKeyframeRequestPort = 9101;
+
+inline void writeKeyframeRequest(uint8_t* dst, uint16_t streamId) {
+    uint32_t magic = kKeyframeRequestMagic;
+    uint16_t reserved = 0;
+    std::memcpy(dst, &magic, 4);
+    std::memcpy(dst + 4, &streamId, 2);
+    std::memcpy(dst + 6, &reserved, 2);
+}
+
 }  // namespace sp
