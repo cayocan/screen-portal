@@ -1,6 +1,7 @@
 using NUnit.Framework;
 using ScreenPortal.App;
 using ScreenPortal.App.Connection;
+using ScreenPortal.App.Manipulation;
 using ScreenPortal.Composition;
 using ScreenPortal.Infrastructure.Net;
 using UnityEngine;
@@ -31,6 +32,8 @@ namespace ScreenPortal.Tests
                 Assert.That(container.Resolve<AppEntryPoint>(), Is.Not.Null);
                 Assert.That(container.Resolve<ICommandBus>(), Is.Not.Null);
                 Assert.That(container.Resolve<ConnectionStateMachine>(), Is.Not.Null);
+                Assert.That(container.Resolve<ScreenManipulationController>(), Is.Not.Null);
+                Assert.That(container.Resolve<InteractionRouter>(), Is.Not.Null);
             }
         }
     }

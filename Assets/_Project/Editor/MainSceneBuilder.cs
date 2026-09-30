@@ -10,6 +10,7 @@ namespace ScreenPortal.Editor
     {
         public const string ScenePath = "Assets/_Project/Scenes/Main.unity";
         private const string CameraRigPrefab = "Packages/com.meta.xr.sdk.core/Prefabs/OVRCameraRig.prefab";
+        private const string UnlitMaterialPath = "Assets/_Project/Presentation/Materials/Unlit.mat";
 
         [MenuItem("Screen Portal/Main/Build Main Scene")]
         public static void Build()
@@ -23,6 +24,20 @@ namespace ScreenPortal.Editor
             var cam = rigGo.GetComponent<OVRCameraRig>().centerEyeAnchor.GetComponent<Camera>();
             cam.clearFlags = CameraClearFlags.SolidColor;
             cam.backgroundColor = Color.black;
+
+            var rig = rigGo.GetComponent<OVRCameraRig>();
+            var leftHand = AddHand(rig.leftHandAnchor, "LeftOVRHand", 0);   // OVRHand.Hand.HandLeft
+            var rightHand = AddHand(rig.rightHandAnchor, "RightOVRHand", 1); // OVRHand.Hand.HandRight
+            var unlit = LoadOrCreateUnlitMaterial();
+
+            var menuGo = new GameObject("WristMenu");
+            var menu = menuGo.AddComponent<ScreenPortal.Presentation.Menu.WristMenuPanel>();
+            var menuSo = new SerializedObject(menu);
+            menuSo.FindProperty("anchor").objectReferenceValue = rig.leftHandAnchor;
+            menuSo.FindProperty("head").objectReferenceValue = rig.centerEyeAnchor;
+            menuSo.FindProperty("leftHand").objectReferenceValue = leftHand;
+            menuSo.FindProperty("unlit").objectReferenceValue = unlit;
+            menuSo.ApplyModifiedPropertiesWithoutUndo();
 
             var screensRoot = new GameObject("Screens");
 
@@ -46,10 +61,41 @@ namespace ScreenPortal.Editor
             var so = new SerializedObject(scope);
             so.FindProperty("screensRoot").objectReferenceValue = screensRoot.transform;
             so.FindProperty("statusView").objectReferenceValue = statusView;
+            so.FindProperty("headAnchor").objectReferenceValue = rig.centerEyeAnchor;
+            so.FindProperty("trackingSpace").objectReferenceValue = rig.trackingSpace;
+            so.FindProperty("leftHand").objectReferenceValue = leftHand;
+            so.FindProperty("rightHand").objectReferenceValue = rightHand;
+            so.FindProperty("menuPanel").objectReferenceValue = menu;
+            so.FindProperty("unlitMaterial").objectReferenceValue = unlit;
             so.ApplyModifiedPropertiesWithoutUndo();
 
             EditorSceneManager.SaveScene(scene, ScenePath);
             Debug.Log("[ScreenPortal] Cena Main gerada: " + ScenePath);
+        }
+
+        /// <summary>OVRHand sem malha: só raio (PointerPose) e pinça. HandType é serializado e internal no SDK.</summary>
+        private static OVRHand AddHand(Transform anchor, string name, int handType)
+        {
+            var go = new GameObject(name);
+            go.transform.SetParent(anchor, false);
+            var hand = go.AddComponent<OVRHand>();
+            var so = new SerializedObject(hand);
+            so.FindProperty("HandType").intValue = handType;
+            so.ApplyModifiedPropertiesWithoutUndo();
+            return hand;
+        }
+
+        /// <summary>Material URP/Unlit como asset: garante o shader no build (Shader.Find em runtime não garante).</summary>
+        private static Material LoadOrCreateUnlitMaterial()
+        {
+            var existing = AssetDatabase.LoadAssetAtPath<Material>(UnlitMaterialPath);
+            if (existing != null) return existing;
+            if (!AssetDatabase.IsValidFolder("Assets/_Project/Presentation/Materials"))
+                AssetDatabase.CreateFolder("Assets/_Project/Presentation", "Materials");
+            var material = new Material(Shader.Find("Universal Render Pipeline/Unlit")) { name = "Unlit" };
+            AssetDatabase.CreateAsset(material, UnlitMaterialPath);
+            AssetDatabase.SaveAssets();
+            return material;
         }
 
         [MenuItem("Screen Portal/Main/Boot scene: Main")]
