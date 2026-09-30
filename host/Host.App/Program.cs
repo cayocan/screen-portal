@@ -56,8 +56,14 @@ static int RunServe(Args o, CancellationToken ct)
 
     using var gpu = new GpuDevice();
     using var clock = new ClockSyncServer();
+    int graceMinutes = o.Int("grace-minutes", 5);
+    if (graceMinutes < 1)
+    {
+        Log($"--grace-minutes {graceMinutes} inválido; usando 1.");
+        graceMinutes = 1;
+    }
     using var screens = new ScreenPortal.Host.App.Control.ScreenHost(gpu, o.Int("bitrate", 20_000),
-        TimeSpan.FromMinutes(o.Int("grace-minutes", 5)), Log);
+        TimeSpan.FromMinutes(graceMinutes), Log);
     var approver = new ScreenPortal.Host.App.Control.MessageBoxPairingApprover();
     string hostName = Environment.MachineName;
 

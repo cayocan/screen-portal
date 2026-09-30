@@ -40,6 +40,9 @@ public sealed class ScreenHost : IScreenHost, IDisposable
     private readonly object _lock = new();
     private readonly Timer _sweeper;
     private SudoVdaDriver? _driver;
+    private bool _disposed;
+    // Cópia imutável (copy-on-write sob _lock) lida sem lock: o IDR não espera a criação/remoção de monitores.
+    private volatile (string Address, ushort StreamId, StreamPipeline Pipeline)[] _keyframeTargets = [];
 
     public IMonitorProvider PhysicalMonitors { get; }
 
@@ -66,6 +69,7 @@ public sealed class ScreenHost : IScreenHost, IDisposable
     {
         lock (_lock)
         {
+            if (_disposed) return new ScreenAcquireResult(false, 0, 0, "Host encerrando.");
             if (_leases.TryGet(deviceId, request.ScreenKey, out var lease))
             {
                 bool same = request.ScreenKind == ScreenKind.Mirror
@@ -124,7 +128,7 @@ public sealed class ScreenHost : IScreenHost, IDisposable
         width = height = 0;
         lock (_lock)
         {
-            if (!_live.TryGetValue((deviceId, screenKey), out var live)) return false;
+            if (_disposed || !_live.TryGetValue((deviceId, screenKey), out var live)) return false;
             if (live.Pipeline != null && live.Address == address && live.Port == udpPort && live.StreamId == streamId)
             {
                 live.Pipeline.RequestKeyframe();
@@ -134,12 +138,15 @@ public sealed class ScreenHost : IScreenHost, IDisposable
             }
             live.Pipeline?.Dispose();
             live.Pipeline = null;
+            RebuildKeyframeTargets();
+            WgcMonitorCapture? capture = null;
+            StreamPipeline? pipeline = null;
             try
             {
-                var capture = CaptureWithRetry(live.DisplayName);
+                capture = CaptureWithRetry(live.DisplayName);
                 var fit = ResolutionFit.FromCapture(capture.Width, capture.Height);
                 var settings = new EncoderSettings(fit.Width, fit.Height, 60, _bitrateKbps);
-                var pipeline = new StreamPipeline(_gpu, capture, settings, new IPEndPoint(IPAddress.Parse(address), udpPort), 1, null, streamId);
+                pipeline = new StreamPipeline(_gpu, capture, settings, new IPEndPoint(IPAddress.Parse(address), udpPort), 1, null, streamId);
                 pipeline.Start();
                 live.Pipeline = pipeline;
                 live.Address = address;
@@ -147,11 +154,13 @@ public sealed class ScreenHost : IScreenHost, IDisposable
                 live.StreamId = streamId;
                 live.Width = width = fit.Width;
                 live.Height = height = fit.Height;
+                RebuildKeyframeTargets();
                 _log($"vídeo: {pipeline.Description} → {address}:{udpPort} (tela {screenKey})");
                 return true;
             }
             catch (Exception e)
             {
+                if (pipeline != null) pipeline.Dispose(); else capture?.Dispose(); // o pipeline descarta a captura
                 _log($"vídeo: falha ao iniciar a tela {screenKey} ({e.GetType().Name}: {e.Message})");
                 return false;
             }
@@ -199,12 +208,14 @@ public sealed class ScreenHost : IScreenHost, IDisposable
         if (!_live.TryGetValue((deviceId, screenKey), out var live) || live.Pipeline == null) return;
         live.Pipeline.Dispose(); // descarta também a captura
         live.Pipeline = null;
+        RebuildKeyframeTargets();
     }
 
     private void Sweep()
     {
         lock (_lock)
         {
+            if (_disposed) return;
             foreach (var lease in _leases.TakeExpired(DateTimeOffset.Now))
             {
                 DisposeLive(lease.DeviceId, lease.ScreenKey);
@@ -223,22 +234,26 @@ public sealed class ScreenHost : IScreenHost, IDisposable
     {
         if (!_live.Remove((deviceId, screenKey), out var live)) return;
         live.Pipeline?.Dispose();
+        live.Pipeline = null;
+        RebuildKeyframeTargets();
         if (live.Monitor == null || _driver == null) return; // espelho: nada a remover no Windows
         try { _driver.Remove(live.Monitor); }
         catch (Exception e) { _log($"telas: falha ao remover {live.DisplayName}: {e.Message}"); }
     }
 
-    /// <summary>Pedido de keyframe (KFRQ, UDP 9101) de um headset: força IDR no stream dele.</summary>
+    private void RebuildKeyframeTargets() // chamar com _lock
+    {
+        _keyframeTargets = _live.Values.Where(l => l.Pipeline != null)
+            .Select(l => (l.Address, l.StreamId, l.Pipeline!)).ToArray();
+    }
+
+    /// <summary>Pedido de keyframe (KFRQ, UDP 9101) de um headset: força IDR no stream dele. Sem lock (só seta um flag).</summary>
     public void RequestKeyframe(IPAddress address, ushort streamId)
     {
-        lock (_lock)
+        foreach (var t in _keyframeTargets)
         {
-            foreach (var live in _live.Values)
-            {
-                if (live.Pipeline != null && live.StreamId == streamId && IPAddress.TryParse(live.Address, out var ip)
-                    && ip.MapToIPv4().Equals(address))
-                    live.Pipeline.RequestKeyframe();
-            }
+            if (t.StreamId == streamId && IPAddress.TryParse(t.Address, out var ip) && ip.MapToIPv4().Equals(address))
+                t.Pipeline.RequestKeyframe();
         }
     }
 
@@ -263,6 +278,7 @@ public sealed class ScreenHost : IScreenHost, IDisposable
         _sweeper.Dispose();
         lock (_lock)
         {
+            _disposed = true;
             foreach (var key in _live.Keys.ToList()) DisposeLive(key.Item1, key.Item2);
             _driver?.Dispose();
             _driver = null;
