@@ -6,7 +6,7 @@ namespace ScreenPortal.Spikes.Phase0
     /// <summary>
     /// Chamadas JNI para com.screenportal.video.NativeVideo (headset-native/.aar).
     /// Só passa a Surface da compositor layer e um handle: o vídeo nunca atravessa o C#.
-    /// Na Fase 1 isto vira o adapter <c>NativeVideoBridge : IVideoStreamSink</c> em Infrastructure/.
+    /// Na Fase 2C isto virou o adapter <c>NativeScreenVideo : IScreenVideo</c>.
     /// </summary>
     public static class NativeVideoBridge
     {

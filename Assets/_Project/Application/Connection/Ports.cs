@@ -39,11 +39,15 @@ namespace ScreenPortal.App.Connection
         void SaveLastHost(HostEndpoint host);
     }
 
-    /// <summary>Decoder de vídeo de uma tela. TryStart devolve false enquanto a Surface da layer não existe.</summary>
-    public interface IVideoStreamSink
+    /// <summary>
+    /// Decoder de vídeo de uma tela (nativo no Quest; no-op no Editor). TryOpen devolve false enquanto a Surface da
+    /// layer não existe. HasFirstFrame é consultado ~1×/s pelo HostSync até o primeiro quadro decodificado.
+    /// </summary>
+    public interface IScreenVideo
     {
-        bool TryStart(ScreenId screen, ushort streamId, int udpPort, Resolution resolution);
-        void Stop(ushort streamId);
+        bool TryOpen(ScreenId screen, ushort streamId, int udpPort, Resolution resolution);
+        void Close(ScreenId screen);
+        bool HasFirstFrame(ScreenId screen);
     }
 
     /// <summary>Implementado pela Presentation: a Surface (jobject) da compositor layer de uma tela.</summary>

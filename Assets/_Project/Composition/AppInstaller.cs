@@ -36,7 +36,6 @@ namespace ScreenPortal.Composition
             builder.RegisterInstance(new TcpControlChannel(2000)).As<IControlChannel>();
             builder.RegisterInstance(env.Discovery).As<IHostDiscovery>();
             builder.RegisterInstance(env.Pairing).As<IPairingStore>();
-            builder.Register<NativeVideoSink>(Lifetime.Singleton).As<IVideoStreamSink>();
             builder.Register<ConnectionStateMachine>(Lifetime.Singleton);
 
             // 2B: manipulação por controle/mãos + menu de pulso (spec 2026-09-29-fase2b-manipulacao-design.md)
