@@ -11,17 +11,22 @@ namespace ScreenPortal.Presentation.Screens
     /// resolução exata, brief §6.3) + estados (spec 2C §5). Antes do primeiro quadro a layer fica escondida (hidden só
     /// pula a submissão: a Surface existe e o decoder já pode abrir) e um quad no eye buffer mostra o estado. Depois de ter
     /// tido vídeo, perder a conexão só escurece a layer.
+    /// A layer é Underlay (ADR 0010): um furo no eye buffer (alpha 0 + profundidade) a revela, e a interface desenhada
+    /// na frente (moldura, alças, laser, menu) fica por cima da tela.
     /// </summary>
     public sealed class VideoScreenView : IScreenView
     {
         private static readonly Vector4 Dimmed = new Vector4(0.35f, 0.35f, 0.35f, 1f);
         private static readonly Vector4 Normal = Vector4.one;
+        private const string HoleShaderName = "ScreenPortal/ScreenHole"; // Resources/ScreenHole.shader
 
         private readonly GameObject _root;       // pose (sem escala)
         private readonly Transform _statusQuad;  // escala = largura × altura
         private readonly TextMesh _statusText;
         private readonly Material _statusMaterial;
         private readonly Material _textMaterial;
+        private readonly GameObject _hole;
+        private readonly Material _holeMaterial;
         private readonly System.Action<VideoScreenView> _onDisposed;
         private Resolution _resolution;
         private bool _everLive;
@@ -50,6 +55,23 @@ namespace ScreenPortal.Presentation.Screens
                 _statusMaterial = new Material(unlit) { color = new Color(0.08f, 0.09f, 0.11f) };
                 quad.GetComponent<MeshRenderer>().sharedMaterial = _statusMaterial;
             }
+
+            var hole = GameObject.CreatePrimitive(PrimitiveType.Quad);
+            hole.name = "Hole";
+            hole.GetComponent<Collider>().enabled = false;
+            hole.transform.SetParent(_root.transform, false);
+            _hole = hole;
+            var holeShader = Shader.Find(HoleShaderName);
+            if (holeShader != null)
+            {
+                _holeMaterial = new Material(holeShader) { name = "ScreenHole" };
+                hole.GetComponent<MeshRenderer>().sharedMaterial = _holeMaterial;
+            }
+            else
+            {
+                Debug.LogError($"[VideoScreenView] shader {HoleShaderName} não encontrado: a tela não aparece sob o eye buffer.");
+            }
+            hole.SetActive(false);
 
             var textGo = new GameObject("StatusText");
             textGo.transform.SetParent(_root.transform, false);
@@ -87,6 +109,7 @@ namespace ScreenPortal.Presentation.Screens
             _size = size;
             _layer.localScale = size;
             _statusQuad.localScale = size;
+            _hole.transform.localScale = size;
             _statusText.characterSize = 0.006f * widthMeters;
         }
 
@@ -109,6 +132,7 @@ namespace ScreenPortal.Presentation.Screens
             _statusQuad.gameObject.SetActive(showText);
             _statusText.gameObject.SetActive(showText);
             if (showText) _statusText.text = text;
+            _hole.SetActive(!showText && Overlay != null);
             if (Overlay == null) return;
             Overlay.hidden = showText;
             Overlay.SetPerLayerColorScaleAndOffset(state == ScreenLinkState.Live ? Normal : Dimmed, Vector4.zero);
@@ -126,7 +150,7 @@ namespace ScreenPortal.Presentation.Screens
             if (old != null) Object.Destroy(old.gameObject); // adiada: o decoder fecha antes da Surface antiga morrer
             go.SetActive(false); // configurar antes do OnEnable criar a layer
             var overlay = go.AddComponent<OVROverlay>();
-            overlay.currentOverlayType = OVROverlay.OverlayType.Overlay;
+            overlay.currentOverlayType = OVROverlay.OverlayType.Underlay;
             overlay.currentOverlayShape = OVROverlay.OverlayShape.Quad;
             overlay.isExternalSurface = true;
             overlay.externalSurfaceWidth = resolution.Width;
@@ -144,6 +168,7 @@ namespace ScreenPortal.Presentation.Screens
             if (_root != null) Object.Destroy(_root);
             if (_statusMaterial != null) Object.Destroy(_statusMaterial);
             if (_textMaterial != null) Object.Destroy(_textMaterial);
+            if (_holeMaterial != null) Object.Destroy(_holeMaterial);
         }
     }
 }
