@@ -39,8 +39,12 @@ if ($MyInvocation.InvocationName -ne '.') {
         & $QuestAdb -s $QuestUsbSerial tcpip 5555
         Start-Sleep -Seconds 2
         & $QuestAdb connect "${QuestIp}:5555"
-        "Pode desligar o cabo."
-        exit 0
+        $state = & $QuestAdb devices | Select-String "^${QuestIp}:5555\s+(\S+)" | ForEach-Object { $_.Matches[0].Groups[1].Value }
+        if ($state -eq "device") { "Wi-Fi ok. Pode desligar o cabo."; exit 0 }
+        if ($state -eq "unauthorized") {
+            throw "Quest não autorizou este PC: coloque o óculos, aceite 'Permitir depuração USB' (marque 'Sempre permitir') e rode de novo."
+        }
+        throw "Wi-Fi não conectou (estado: '$state'). Mantenha o cabo e rode de novo."
     }
     $serial = Get-QuestSerial
     $battery = & $QuestAdb -s $serial shell dumpsys battery | Select-String "level: (\d+)" | ForEach-Object { $_.Matches[0].Groups[1].Value }
