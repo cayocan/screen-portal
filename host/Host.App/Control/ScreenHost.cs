@@ -29,6 +29,7 @@ public sealed class ScreenHost : IScreenHost, IDisposable
         public ushort StreamId;
         public int Width;
         public int Height;
+        public DisplayInfo? Captured;     // diagnóstico (bug 2): o display como estava ao criar a captura
     }
 
     private readonly GpuDevice _gpu;
@@ -167,7 +168,8 @@ public sealed class ScreenHost : IScreenHost, IDisposable
             StreamPipeline? pipeline = null;
             try
             {
-                capture = CaptureWithRetry(live.DisplayName);
+                capture = CaptureWithRetry(live.DisplayName, out var captured);
+                live.Captured = captured;
                 string display = live.DisplayName;
                 capture.Diagnostic += message => _log($"vídeo: tela {screenKey} ({display}): {message}");
                 _log($"vídeo: tela {screenKey} captura {capture.Width}×{capture.Height} de {display}");
@@ -204,14 +206,15 @@ public sealed class ScreenHost : IScreenHost, IDisposable
     }
 
     /// <summary>Logo após criar um monitor, o WGC rejeita o HMONITOR por ~1 s (ADR 0007): resolve e tenta de novo.</summary>
-    private WgcMonitorCapture CaptureWithRetry(string displayName)
+    private WgcMonitorCapture CaptureWithRetry(string displayName, out DisplayInfo display)
     {
         var sw = Stopwatch.StartNew();
         while (true)
         {
             try
             {
-                return WgcMonitorCapture.ForMonitor(_gpu, Win32Displays.Current(displayName).HMonitor, captureCursor: true);
+                display = Win32Displays.Current(displayName);
+                return WgcMonitorCapture.ForMonitor(_gpu, display.HMonitor, captureCursor: true);
             }
             catch (Exception e) when ((e is ArgumentException || e is InvalidOperationException) && sw.Elapsed < CaptureSettle)
             {
@@ -260,6 +263,28 @@ public sealed class ScreenHost : IScreenHost, IDisposable
                 DisposeLive(lease.DeviceId, lease.ScreenKey);
                 _log($"telas: {lease.DeviceId}/{lease.ScreenKey} expirou ({lease.DisplayName} {(lease.Kind == ScreenLeaseKind.Virtual ? "removido" : "stream encerrado")})");
             }
+            LogDisplayChanges();
+        }
+    }
+
+    /// <summary>
+    /// Diagnóstico (bug 2: tela preta depois de reorganizar os monitores no Windows): registra quando o display de uma
+    /// tela com stream muda de HMONITOR, posição ou tamanho em relação ao que estava ao criar a captura.
+    /// </summary>
+    private void LogDisplayChanges() // chamar com _lock
+    {
+        if (!_live.Values.Any(l => l.Pipeline != null && l.Captured != null)) return;
+        var now = Win32Displays.Snapshot();
+        foreach (var (key, live) in _live)
+        {
+            if (live.Pipeline == null || live.Captured is not { } before) continue;
+            var after = now.FirstOrDefault(d => d.DeviceName.Equals(live.DisplayName, StringComparison.OrdinalIgnoreCase));
+            if (after == before) continue;
+            _log(after == null
+                ? $"diag: tela {key.Item2} ({live.DisplayName}) sumiu do desktop"
+                : $"diag: tela {key.Item2} ({live.DisplayName}) mudou: HMONITOR 0x{before.HMonitor:X} → 0x{after.HMonitor:X}, " +
+                  $"posição {before.Bounds.X},{before.Bounds.Y} {before.Bounds.Width}×{before.Bounds.Height} → {after.Bounds.X},{after.Bounds.Y} {after.Bounds.Width}×{after.Bounds.Height}");
+            live.Captured = after;
         }
     }
 
