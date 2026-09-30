@@ -12,8 +12,9 @@ using Pose = ScreenPortal.Domain.Spatial.Pose;
 namespace ScreenPortal.Presentation.Manipulation
 {
     /// <summary>
-    /// Desenha o que o controlador decide (nunca muda estado): raios, moldura + alças no hover/arraste, guias do
-    /// encaixe e a pré-visualização da tela. Ao terminar sem Command (cancelar), devolve a view ao estado confirmado.
+    /// Desenha o que o controlador decide (nunca muda estado): raios, moldura + alças no hover/arraste (seguindo a curva
+    /// da tela, spec 2E §4), alça e rótulo de curvatura, guias do encaixe e a pré-visualização da tela. Ao terminar sem
+    /// Command (cancelar), devolve a view ao estado confirmado.
     /// Sem alocação por quadro (arrays e materiais criados no construtor).
     /// </summary>
     public sealed class ManipulationPresenter : IDisposable
@@ -23,6 +24,9 @@ namespace ScreenPortal.Presentation.Manipulation
         private const float HandleSizeM = 0.04f;
         private const float RayLengthM = 3f;
         private const int GuideArcPoints = 12;
+        private const int FrameEdgePoints = 25;            // pontos por borda horizontal (a moldura acompanha o arco)
+        private const float CurveHandleHeightM = 0.012f;
+        private const float CurveLabelAboveM = 0.05f;
         private static readonly Color HoverColor = new Color(1f, 1f, 1f);
         private static readonly Color DragColor = new Color(0.25f, 0.8f, 1f);
         private static readonly Color GuideColor = new Color(1f, 0.8f, 0.2f);
@@ -39,7 +43,12 @@ namespace ScreenPortal.Presentation.Manipulation
         private readonly LineRenderer _rayRight;
         private readonly LineRenderer _rayLeft;
         private readonly Transform[] _handles = new Transform[4];
-        private readonly Vector3[] _corners = new Vector3[4];
+        private readonly Transform _curveHandle;
+        private readonly TextMesh _curveLabel;
+        private readonly Vector3[] _frameLine = new Vector3[2 * FrameEdgePoints];
+        private int _labelPercent = -1;
+        private int _labelRadius = -1;
+        private bool _labelLimited;
         private readonly Vector3[] _two = new Vector3[2];
         private readonly Vector3[] _arc = new Vector3[GuideArcPoints];
         private ScreenId _previewing;
@@ -53,7 +62,7 @@ namespace ScreenPortal.Presentation.Manipulation
             _router = router;
             _root = new GameObject("Manipulation");
             _root.transform.SetParent(parent, false);
-            _frame = Line("Frame", unlit, 4, true, DragColor);
+            _frame = Line("Frame", unlit, 2 * FrameEdgePoints, true, DragColor);
             _guideAzimuth = Line("GuideAzimuth", unlit, 2, false, GuideColor);
             _guideElevation = Line("GuideElevation", unlit, GuideArcPoints, false, GuideColor);
             _rayRight = Line("RayRight", unlit, 2, false, RayColor);
@@ -69,6 +78,26 @@ namespace ScreenPortal.Presentation.Manipulation
                 handle.SetActive(false);
                 _handles[i] = handle.transform;
             }
+
+            var curveHandle = GameObject.CreatePrimitive(PrimitiveType.Quad);
+            curveHandle.name = "CurvatureHandle";
+            curveHandle.GetComponent<Collider>().enabled = false;
+            if (handleMaterial != null) curveHandle.GetComponent<MeshRenderer>().sharedMaterial = handleMaterial;
+            curveHandle.transform.SetParent(_root.transform, false);
+            curveHandle.SetActive(false);
+            _curveHandle = curveHandle.transform;
+
+            var labelGo = new GameObject("CurvatureLabel");
+            labelGo.transform.SetParent(_root.transform, false);
+            _curveLabel = labelGo.AddComponent<TextMesh>();
+            _curveLabel.font = Resources.GetBuiltinResource<Font>("LegacyRuntime.ttf");
+            labelGo.GetComponent<MeshRenderer>().sharedMaterial = StereoText.MaterialFor(_curveLabel.font);
+            _curveLabel.fontSize = 96;
+            _curveLabel.characterSize = 0.0025f;
+            _curveLabel.anchor = TextAnchor.LowerCenter;
+            _curveLabel.alignment = TextAlignment.Center;
+            _curveLabel.color = Color.white;
+            labelGo.SetActive(false);
         }
 
         public void Tick()
@@ -83,7 +112,11 @@ namespace ScreenPortal.Presentation.Manipulation
                 var curve = CurvedGeometry.Of(preview.Curvature, preview.Placement, preview.WidthM, ws.Surface);
                 if (_views.TryGetView(preview.Screen, out var view)) view.ApplyTransform(preview.Pose, preview.WidthM, preview.HeightM, curve.RadiusM);
                 _previewing = preview.Screen;
-                DrawFrame(preview.Pose, preview.WidthM, preview.HeightM, DragColor, _controller.State == ManipulationState.Resizing);
+                bool curving = _controller.State == ManipulationState.Curving;
+                DrawFrame(preview.Pose, preview.WidthM, preview.HeightM, curve.RadiusM, DragColor,
+                    _controller.State == ManipulationState.Resizing, curving);
+                if (curving) ShowCurveLabel(preview.Pose, curve.RadiusM, preview.HeightM, curve);
+                else _curveLabel.gameObject.SetActive(false);
                 DrawGuides(preview, ws.Surface);
                 return;
             }
@@ -98,9 +131,18 @@ namespace ScreenPortal.Presentation.Manipulation
 
             var hover = _controller.HoverHit;
             if (_controller.State == ManipulationState.Hover && ws.TryGetScreen(hover.Screen, out var screen))
-                DrawFrame(ws.Surface.ToPose(screen.Placement), screen.WidthMeters, screen.HeightMeters, HoverColor, hover.Region == HitRegion.Handle);
+            {
+                var pose = ws.Surface.ToPose(screen.Placement);
+                var curve = CurvedGeometry.Of(screen, ws.Surface);
+                bool onCurveHandle = hover.Region == HitRegion.CurvatureHandle;
+                DrawFrame(pose, screen.WidthMeters, screen.HeightMeters, curve.RadiusM, HoverColor, hover.Region == HitRegion.Handle, onCurveHandle);
+                if (onCurveHandle) ShowCurveLabel(pose, curve.RadiusM, screen.HeightMeters, curve);
+                else _curveLabel.gameObject.SetActive(false);
+            }
             else
+            {
                 HideFrame();
+            }
         }
 
         private void RestoreConfirmed(Workspace ws, ScreenId id)
@@ -124,35 +166,62 @@ namespace ScreenPortal.Presentation.Manipulation
             line.enabled = true;
         }
 
-        private void DrawFrame(Pose pose, float width, float height, Color color, bool emphasizeHandles)
+        private void DrawFrame(Pose pose, float width, float height, float radius, Color color, bool emphasizeHandles, bool emphasizeCurveHandle)
         {
-            var position = pose.Position.ToUnity();
-            var rotation = pose.Rotation.ToUnity();
             float x = width * 0.5f + FrameOutsetM;
             float y = height * 0.5f + FrameOutsetM;
-            _corners[0] = position + rotation * new Vector3(-x, -y, 0f);
-            _corners[1] = position + rotation * new Vector3(-x, y, 0f);
-            _corners[2] = position + rotation * new Vector3(x, y, 0f);
-            _corners[3] = position + rotation * new Vector3(x, -y, 0f);
-            _frame.SetPositions(_corners);
+            // loop: borda de cima da esquerda para a direita, borda de baixo da direita para a esquerda
+            for (int i = 0; i < FrameEdgePoints; i++)
+            {
+                float lx = -x + 2f * x * i / (FrameEdgePoints - 1);
+                _frameLine[i] = CurvedGeometry.SurfacePoint(pose, radius, lx, y).ToUnity();
+                _frameLine[2 * FrameEdgePoints - 1 - i] = CurvedGeometry.SurfacePoint(pose, radius, lx, -y).ToUnity();
+            }
+            _frame.SetPositions(_frameLine);
             if (_frame.sharedMaterial != null) _frame.sharedMaterial.color = color;
             _frame.enabled = true;
 
             float size = HandleSizeM * (emphasizeHandles ? 1.5f : 1f);
             for (int i = 0; i < 4; i++)
             {
-                float sx = i < 2 ? -1f : 1f;
-                float sy = i == 1 || i == 2 ? 1f : -1f;
-                _handles[i].SetPositionAndRotation(position + rotation * new Vector3(sx * width * 0.5f, sy * height * 0.5f, -0.002f), rotation);
-                _handles[i].localScale = new Vector3(size, size, 1f);
-                _handles[i].gameObject.SetActive(true);
+                float lx = (i < 2 ? -1f : 1f) * width * 0.5f;
+                float ly = (i == 1 || i == 2 ? 1f : -1f) * height * 0.5f;
+                PlaceOnSurface(_handles[i], pose, radius, lx, ly, size, size);
             }
+
+            float scale = emphasizeCurveHandle ? 1.5f : 1f;
+            PlaceOnSurface(_curveHandle, pose, radius, 0f, y, ScreenHitTest.CurvatureHandleWidthM * scale, CurveHandleHeightM * scale);
+        }
+
+        /// <summary>Quad tangente à tela no ponto local (lx, ly), 2 mm para o lado do usuário.</summary>
+        private static void PlaceOnSurface(Transform t, Pose pose, float radius, float lx, float ly, float sx, float sy)
+        {
+            float yaw = radius > 0f ? lx / radius * Mathf.Rad2Deg : 0f;
+            var rotation = pose.Rotation.ToUnity() * Quaternion.Euler(0f, yaw, 0f);
+            var position = CurvedGeometry.SurfacePoint(pose, radius, lx, ly).ToUnity() + rotation * new Vector3(0f, 0f, -0.002f);
+            t.SetPositionAndRotation(position, rotation);
+            t.localScale = new Vector3(sx, sy, 1f);
+            t.gameObject.SetActive(true);
+        }
+
+        private void ShowCurveLabel(Pose pose, float radius, float height, CurvedGeometry curve)
+        {
+            if (curve.Percent != _labelPercent || curve.RoundedRadiusMm != _labelRadius || curve.ArcLimited != _labelLimited)
+            {
+                _labelPercent = curve.Percent;
+                _labelRadius = curve.RoundedRadiusMm;
+                _labelLimited = curve.ArcLimited;
+                _curveLabel.text = curve.Label(); // aloca só quando o valor muda
+            }
+            PlaceOnSurface(_curveLabel.transform, pose, radius, 0f, height * 0.5f + CurveLabelAboveM, 1f, 1f);
         }
 
         private void HideFrame()
         {
             _frame.enabled = false;
             for (int i = 0; i < 4; i++) _handles[i].gameObject.SetActive(false);
+            _curveHandle.gameObject.SetActive(false);
+            _curveLabel.gameObject.SetActive(false);
         }
 
         private void DrawGuides(ManipulationPreview preview, LayoutSurface surface)
