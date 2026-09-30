@@ -26,6 +26,7 @@ namespace ScreenPortal.Presentation.Menu
         private Material _normal;
         private Material _hover;
         private Material _disabled;
+        private Material _text;
 
         public bool Visible { get; private set; }
 
@@ -109,7 +110,8 @@ namespace ScreenPortal.Presentation.Menu
             go.transform.localPosition = localPosition;
             var text = go.AddComponent<TextMesh>();
             text.font = Resources.GetBuiltinResource<Font>("LegacyRuntime.ttf");
-            go.GetComponent<MeshRenderer>().sharedMaterial = text.font.material;
+            if (_text == null) _text = StereoText.MaterialFor(text.font);
+            go.GetComponent<MeshRenderer>().sharedMaterial = _text;
             text.fontSize = 48;
             text.characterSize = 0.0012f;
             text.anchor = TextAnchor.MiddleCenter;

@@ -9,6 +9,8 @@ namespace ScreenPortal.Presentation.Connection
         [SerializeField] private TextMesh label;
         private float _hideAt = -1f;
 
+        private void Awake() => label.GetComponent<MeshRenderer>().sharedMaterial = StereoText.MaterialFor(label.font);
+
         public void Bind(ConnectionStateMachine machine)
         {
             machine.StatusChanged += Show;

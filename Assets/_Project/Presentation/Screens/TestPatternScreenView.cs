@@ -15,6 +15,7 @@ namespace ScreenPortal.Presentation.Screens
         private readonly Transform _quad;
         private readonly TextMesh _label;
         private readonly Material _material;
+        private readonly Material _labelMaterial;
         private readonly Texture2D _texture;
         private readonly System.Action<TestPatternScreenView> _onDisposed;
 
@@ -44,7 +45,8 @@ namespace ScreenPortal.Presentation.Screens
             labelGo.transform.localPosition = new Vector3(0f, 0f, -0.003f);
             _label = labelGo.AddComponent<TextMesh>();
             _label.font = Resources.GetBuiltinResource<Font>("LegacyRuntime.ttf");
-            labelGo.GetComponent<MeshRenderer>().sharedMaterial = _label.font.material;
+            _labelMaterial = StereoText.MaterialFor(_label.font);
+            labelGo.GetComponent<MeshRenderer>().sharedMaterial = _labelMaterial;
             _label.fontSize = 96;
             _label.anchor = TextAnchor.MiddleCenter;
             _label.alignment = TextAlignment.Center;
@@ -66,6 +68,7 @@ namespace ScreenPortal.Presentation.Screens
             _onDisposed?.Invoke(this);
             Destroy(_root);
             Destroy(_material);
+            Destroy(_labelMaterial);
             Destroy(_texture);
         }
 
