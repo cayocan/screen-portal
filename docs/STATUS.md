@@ -29,6 +29,7 @@ ADRs: [0000](adr/0000-unity-project-at-repo-root.md) Unity na raiz · [0001](adr
 
 ## Pendências levadas para frente
 - **Fase 3:** arranjo do Windows segue a disposição das telas no Quest (pedido do Cayo, 30/09; era o plano B da Fase 3) — resolve também o arranjo perdido ao reiniciar o PC.
+- **Fase 3 (junto do arranjo):** a escala de cada monitor virtual (Windows: "Alterar o tamanho do texto, dos aplicativos e de outros itens") é guardada por tela e reaplicada quando o monitor é recriado (reabrir o app, reiniciar o PC, recriar). Pedido do Cayo, 01/10. Obs.: a escala por monitor só tem API não documentada (`DisplayConfigGetDeviceInfo`/`SetDeviceInfo` com o tipo de DPI) — medir antes.
 - **Host:** se o SudoVDA cair no meio da sessão, o host reinicia o dispositivo ao criar o próximo monitor, mas os monitores que já existiam não se recriam sozinhos.
 - **Host:** recuperar de `DXGI_ERROR_DEVICE_REMOVED` (driver/TDR) sem reiniciar: recriar o `GpuDevice` e os pipelines.
 - **Telas sobrepostas** com layers Underlay: ordenar a `compositionDepth` pela distância se incomodar (ADR 0010).
