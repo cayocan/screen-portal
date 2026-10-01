@@ -6,7 +6,9 @@ namespace ScreenPortal.App.Menu
     /// <summary>
     /// Na abertura, centraliza a superfície na cabeça assim que o tracking vale. Sem isso a superfície nasce no centro
     /// padrão do tracking space (1,2 m do chão, frente do Guardian), longe de onde o usuário está e olha. Até os
-    /// perfis (Fase 3b) a workspace não é salva, então toda abertura começa assim. Não entra no undo.
+    /// perfis (Fase 3b) não há âncora no mundo: mesmo com a última sessão restaurada (ADR 0014), o tracking space é novo a
+    /// cada abertura, então a superfície recentra e as telas voltam na mesma disposição em volta do usuário. Não entra no
+    /// undo.
     /// </summary>
     public sealed class StartupRecenter
     {
@@ -23,9 +25,6 @@ namespace ScreenPortal.App.Menu
         }
 
         public bool Done { get; private set; }
-
-        /// <summary>Sessão restaurada: a superfície já está onde o usuário deixou.</summary>
-        public void Skip() => Done = true;
 
         public void Tick()
         {

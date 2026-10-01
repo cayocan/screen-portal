@@ -31,7 +31,8 @@ namespace ScreenPortal.Composition
             builder.RegisterInstance(new WorkspaceStore(restored ? lastSession : null));
             builder.RegisterInstance(session).As<ISessionStore>();
             builder.Register<SessionAutosave>(Lifetime.Singleton);
-            if (restored) builder.RegisterBuildCallback(c => c.Resolve<StartupRecenter>().Skip());
+            // Sessão restaurada também recentra: cada abertura do app tem um tracking space novo (origem e frente onde o
+            // óculos estava), então só as posições relativas à superfície valem — o layout volta igual em volta do usuário.
             builder.RegisterInstance(new CommandJournal()).As<ICommandObserver>().AsSelf();
             builder.Register<CommandBus>(Lifetime.Singleton).As<ICommandBus>();
 

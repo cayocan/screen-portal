@@ -13,11 +13,13 @@ host ainda alugava (expiravam em 10 s). O Cayo perdeu uma tela assim e esperava 
    Arquivo: `persistentDataPath/last-session.txt`, texto versionado (`SessionCodec`), gravado num temporário e trocado.
 2. Na abertura, a sessão salva vira o estado inicial do `WorkspaceStore`, sem histórico de undo. O `HostSync` reata os
    monitores que o host ainda aluga (até 5 min) com as janelas no lugar; depois disso, recria vazios na mesma resolução.
-3. Com sessão restaurada, o recentrar automático da abertura não roda: a superfície fica onde o usuário deixou.
+3. Com sessão restaurada, o recentrar automático da abertura **também roda**. Verificado no Quest: cada abertura do app
+   tem um tracking space novo (origem e frente onde o óculos estava), então o centro salvo da superfície cai em outro
+   lugar. As posições das telas são relativas à superfície, então o layout volta igual em volta do usuário.
 4. Arquivo ilegível ou de outra versão → abre vazio, como antes.
 
 ## Consequências
 - Não são perfis: um só "estado atual", sem nomes, sem âncoras na mesa (continua na Fase 3b, que vai reaproveitar o
   `SessionCodec`).
-- Se o usuário levantar e mudar de lugar entre sessões, as telas voltam no lugar antigo do tracking space; o menu
-  "Recentrar" resolve (ou o recentrar do sistema, que já recentra a superfície).
+- As telas voltam na mesma disposição em volta da cabeça, não no mesmo ponto do quarto (isso exige spatial anchors,
+  Fase 3b).
