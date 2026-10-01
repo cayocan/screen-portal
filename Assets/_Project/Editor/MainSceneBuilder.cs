@@ -43,16 +43,9 @@ namespace ScreenPortal.Editor
 
             var screensRoot = new GameObject("Screens");
 
-            var statusGo = new GameObject("ConnectionStatus");
+            var text = ScreenPortal.Presentation.UiText.Create("ConnectionStatus", null, 0.768f, TMPro.TextAlignmentOptions.Center, Color.white);
+            var statusGo = text.gameObject;
             statusGo.transform.position = new Vector3(0f, 1.25f, 1.2f);
-            var text = statusGo.AddComponent<TextMesh>();
-            text.font = Resources.GetBuiltinResource<Font>("LegacyRuntime.ttf");
-            statusGo.GetComponent<MeshRenderer>().sharedMaterial = text.font.material;
-            text.fontSize = 64;
-            text.characterSize = 0.012f;
-            text.anchor = TextAnchor.MiddleCenter;
-            text.alignment = TextAlignment.Center;
-            text.color = Color.white;
             var statusView = statusGo.AddComponent<ScreenPortal.Presentation.Connection.ConnectionStatusView>();
             var statusSo = new SerializedObject(statusView);
             statusSo.FindProperty("label").objectReferenceValue = text;

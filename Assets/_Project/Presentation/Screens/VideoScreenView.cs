@@ -23,9 +23,8 @@ namespace ScreenPortal.Presentation.Screens
         private readonly GameObject _root;       // pose (sem escala)
         private readonly CurvedQuadMesh _shape;   // furo e quad de estado: plana ou arco (spec 2E §4)
         private readonly GameObject _statusQuad;
-        private readonly TextMesh _statusText;
+        private readonly TMPro.TextMeshPro _statusText;
         private readonly Material _statusMaterial;
-        private readonly Material _textMaterial;
         private readonly GameObject _hole;
         private readonly Material _holeMaterial;
         private readonly System.Action<VideoScreenView> _onDisposed;
@@ -59,17 +58,8 @@ namespace ScreenPortal.Presentation.Screens
             _hole = ScreenMeshes.MeshObject("Hole", _root.transform, _shape.Mesh, _holeMaterial);
             _hole.SetActive(false);
 
-            var textGo = new GameObject("StatusText");
-            textGo.transform.SetParent(_root.transform, false);
-            textGo.transform.localPosition = new Vector3(0f, 0f, -0.003f);
-            _statusText = textGo.AddComponent<TextMesh>();
-            _statusText.font = Resources.GetBuiltinResource<Font>("LegacyRuntime.ttf");
-            _textMaterial = StereoText.MaterialFor(_statusText.font);
-            textGo.GetComponent<MeshRenderer>().sharedMaterial = _textMaterial;
-            _statusText.fontSize = 96;
-            _statusText.anchor = TextAnchor.MiddleCenter;
-            _statusText.alignment = TextAlignment.Center;
-            _statusText.color = Color.white;
+            _statusText = UiText.Create("StatusText", _root.transform, 0.576f, TMPro.TextAlignmentOptions.Center, Color.white);
+            _statusText.transform.localPosition = new Vector3(0f, 0f, -0.003f);
 
             BuildOverlay(screen.Resolution);
             SetLink(ScreenLinkState.Offline, string.Empty);
@@ -103,7 +93,7 @@ namespace ScreenPortal.Presentation.Screens
             PlaceLayer();
             // furo e estado seguem a forma que a layer mostra (senão o furo recorta fora da imagem)
             _shape.Set(widthMeters, heightMeters, _cylinder ? _layerRadius : 0f);
-            _statusText.characterSize = 0.006f * widthMeters; // texto plano no centro, 3 mm à frente
+            _statusText.fontSize = 0.576f * widthMeters; // texto plano no centro, 3 mm à frente
         }
 
         /// <summary>Cilindro: centro R atrás da tela (do lado do usuário), escala = (arco, altura, raio), como no spike 2E.</summary>
@@ -176,7 +166,6 @@ namespace ScreenPortal.Presentation.Screens
             if (_root != null) Object.Destroy(_root);
             _shape.Dispose();
             if (_statusMaterial != null) Object.Destroy(_statusMaterial);
-            if (_textMaterial != null) Object.Destroy(_textMaterial);
             if (_holeMaterial != null) Object.Destroy(_holeMaterial);
         }
     }

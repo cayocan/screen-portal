@@ -26,8 +26,8 @@ namespace ScreenPortal.Presentation.Menu
 
         private GameObject _content;
         private Transform _background;
-        private TextMesh _status;
-        private readonly TextMesh[] _labels = new TextMesh[WristMenu.MaxItems];
+        private TMPro.TextMeshPro _status;
+        private readonly TMPro.TextMeshPro[] _labels = new TMPro.TextMeshPro[WristMenu.MaxItems];
         private readonly MeshRenderer[] _buttons = new MeshRenderer[WristMenu.MaxItems];
         private readonly Transform[] _frames = new Transform[WristMenu.MaxItems];
         private readonly Transform[] _frameInner = new Transform[WristMenu.MaxItems];
@@ -39,7 +39,6 @@ namespace ScreenPortal.Presentation.Menu
         private Material _normal;
         private Material _hover;
         private Material _disabled;
-        private Material _text;
         private MenuPage _layoutPage = (MenuPage)(-1);
         private int _layoutCount = -1;
         private Orientation _layoutOrientation;
@@ -170,20 +169,10 @@ namespace ScreenPortal.Presentation.Menu
             return quad.transform;
         }
 
-        private TextMesh Text(string name, Vector3 localPosition)
+        private TMPro.TextMeshPro Text(string name, Vector3 localPosition)
         {
-            var go = new GameObject(name);
-            go.transform.SetParent(_content.transform, false);
-            go.transform.localPosition = localPosition;
-            var text = go.AddComponent<TextMesh>();
-            text.font = Resources.GetBuiltinResource<Font>("LegacyRuntime.ttf");
-            if (_text == null) _text = StereoText.MaterialFor(text.font);
-            go.GetComponent<MeshRenderer>().sharedMaterial = _text;
-            text.fontSize = 48;
-            text.characterSize = 0.0012f;
-            text.anchor = TextAnchor.MiddleCenter;
-            text.alignment = TextAlignment.Center;
-            text.color = Color.white;
+            var text = UiText.Create(name, _content.transform, 0.0576f, TMPro.TextAlignmentOptions.Center, Color.white);
+            text.transform.localPosition = localPosition;
             return text;
         }
     }

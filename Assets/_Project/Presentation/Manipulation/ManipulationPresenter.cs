@@ -44,7 +44,7 @@ namespace ScreenPortal.Presentation.Manipulation
         private readonly LineRenderer _rayLeft;
         private readonly Transform[] _handles = new Transform[4];
         private readonly Transform _curveHandle;
-        private readonly TextMesh _curveLabel;
+        private readonly TMPro.TextMeshPro _curveLabel;
         private readonly Vector3[] _frameLine = new Vector3[2 * FrameEdgePoints];
         private int _labelPercent = -1;
         private int _labelRadius = -1;
@@ -87,17 +87,8 @@ namespace ScreenPortal.Presentation.Manipulation
             curveHandle.SetActive(false);
             _curveHandle = curveHandle.transform;
 
-            var labelGo = new GameObject("CurvatureLabel");
-            labelGo.transform.SetParent(_root.transform, false);
-            _curveLabel = labelGo.AddComponent<TextMesh>();
-            _curveLabel.font = Resources.GetBuiltinResource<Font>("LegacyRuntime.ttf");
-            labelGo.GetComponent<MeshRenderer>().sharedMaterial = StereoText.MaterialFor(_curveLabel.font);
-            _curveLabel.fontSize = 96;
-            _curveLabel.characterSize = 0.0025f;
-            _curveLabel.anchor = TextAnchor.LowerCenter;
-            _curveLabel.alignment = TextAlignment.Center;
-            _curveLabel.color = Color.white;
-            labelGo.SetActive(false);
+            _curveLabel = UiText.Create("CurvatureLabel", _root.transform, 0.24f, TMPro.TextAlignmentOptions.Bottom, Color.white);
+            _curveLabel.gameObject.SetActive(false);
         }
 
         public void Tick()

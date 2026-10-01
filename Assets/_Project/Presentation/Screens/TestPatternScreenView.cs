@@ -13,9 +13,8 @@ namespace ScreenPortal.Presentation.Screens
     {
         private readonly GameObject _root;
         private readonly CurvedQuadMesh _shape; // plana ou arco (spec 2E §4); sem layer, a prévia pode curvar livremente
-        private readonly TextMesh _label;
+        private readonly TMPro.TextMeshPro _label;
         private readonly Material _material;
-        private readonly Material _labelMaterial;
         private readonly Texture2D _texture;
         private readonly System.Action<TestPatternScreenView> _onDisposed;
 
@@ -33,17 +32,8 @@ namespace ScreenPortal.Presentation.Screens
             _shape = new CurvedQuadMesh("Pattern " + screen.Id.Value);
             ScreenMeshes.MeshObject("Pattern", _root.transform, _shape.Mesh, _material); // sem collider: acerto do raio é puro (ScreenHitTest)
 
-            var labelGo = new GameObject("Label");
-            labelGo.transform.SetParent(_root.transform, false);
-            labelGo.transform.localPosition = new Vector3(0f, 0f, -0.003f);
-            _label = labelGo.AddComponent<TextMesh>();
-            _label.font = Resources.GetBuiltinResource<Font>("LegacyRuntime.ttf");
-            _labelMaterial = StereoText.MaterialFor(_label.font);
-            labelGo.GetComponent<MeshRenderer>().sharedMaterial = _labelMaterial;
-            _label.fontSize = 96;
-            _label.anchor = TextAnchor.MiddleCenter;
-            _label.alignment = TextAlignment.Center;
-            _label.color = Color.black;
+            _label = UiText.Create("Label", _root.transform, 0.96f, TMPro.TextAlignmentOptions.Center, Color.black);
+            _label.transform.localPosition = new Vector3(0f, 0f, -0.003f);
             _label.text = screen.Label + "\n" + screen.Resolution.Width + "×" + screen.Resolution.Height;
         }
 
@@ -53,7 +43,7 @@ namespace ScreenPortal.Presentation.Screens
         {
             _root.transform.SetLocalPositionAndRotation(pose.Position.ToUnity(), pose.Rotation.ToUnity());
             _shape.Set(widthMeters, heightMeters, radiusM);
-            _label.characterSize = 0.01f * widthMeters;
+            _label.fontSize = 0.96f * widthMeters;
         }
 
         public void Dispose()
@@ -62,7 +52,6 @@ namespace ScreenPortal.Presentation.Screens
             Destroy(_root);
             _shape.Dispose();
             Destroy(_material);
-            Destroy(_labelMaterial);
             Destroy(_texture);
         }
 

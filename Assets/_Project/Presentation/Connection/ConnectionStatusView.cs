@@ -6,10 +6,8 @@ namespace ScreenPortal.Presentation.Connection
     /// <summary>Painel de texto com o status da conexão (acaba a tela preta). "Conectado" some após 2 s.</summary>
     public sealed class ConnectionStatusView : MonoBehaviour
     {
-        [SerializeField] private TextMesh label;
+        [SerializeField] private TMPro.TextMeshPro label;
         private float _hideAt = -1f;
-
-        private void Awake() => label.GetComponent<MeshRenderer>().sharedMaterial = StereoText.MaterialFor(label.font);
 
         public void Bind(ConnectionStateMachine machine)
         {
