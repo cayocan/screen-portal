@@ -19,7 +19,8 @@ public sealed class HeadsetSession(
     Func<string> newCode,
     Action<string> log,
     IAudioHost? audio = null,
-    HotkeyRouter? hotkeys = null)
+    HotkeyRouter? hotkeys = null,
+    ICursorHost? cursor = null)
 {
     private string? _deviceId;
     private long _generation; // publicado pela escrita volátil de _welcomed
@@ -60,6 +61,9 @@ public sealed class HeadsetSession(
                 break;
             case StartAudioMessage startAudio when _welcomed && audio != null:
                 Enqueue(() => OnStartAudio(startAudio));
+                break;
+            case StartCursorMessage startCursor when _welcomed && cursor != null && _deviceId != null:
+                cursor.Start(_deviceId, this, connection.RemoteAddress, startCursor.UdpPort, connection.Send);
                 break;
             case LayoutChangedMessage layout when _welcomed:
                 Enqueue(() =>
@@ -118,6 +122,7 @@ public sealed class HeadsetSession(
     {
         log($"sessão de {_deviceId} ({connection.RemoteAddress}) substituída por uma nova conexão");
         if (_deviceId != null) hotkeys?.Unregister(_deviceId, this);
+        if (_deviceId != null) cursor?.Stop(_deviceId, this);
         connection.Send(new ByeMessage(ByeReason.Replaced));
         connection.Close();
     }
@@ -180,6 +185,7 @@ public sealed class HeadsetSession(
         string? deviceId = _deviceId;
         long generation = _generation;
         if (deviceId != null) hotkeys?.Unregister(deviceId, this);
+        if (deviceId != null) cursor?.Stop(deviceId, this);
         if (deviceId != null) Enqueue(() =>
         {
             screens.Disconnected(deviceId, generation);

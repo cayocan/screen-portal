@@ -328,7 +328,8 @@ public sealed class ScreenHost : IScreenHost, IDisposable
             try
             {
                 display = Win32Displays.Current(displayName);
-                return WgcMonitorCapture.ForMonitor(_gpu, display.HMonitor, captureCursor: true);
+                // 3B: o cursor é desenhado pelo headset (CursorFeed), sem o atraso do vídeo
+                return WgcMonitorCapture.ForMonitor(_gpu, display.HMonitor, captureCursor: false);
             }
             catch (Exception e) when ((e is ArgumentException || e is InvalidOperationException) && sw.Elapsed < CaptureSettle)
             {

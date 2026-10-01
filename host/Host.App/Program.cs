@@ -32,6 +32,7 @@ switch (opts.Command)
     case "receive": return RunReceive(opts, cts.Token);
     case "display-spike": return RunDisplaySpike(opts);
     case "audio-test": return ScreenPortal.Host.App.Audio.AudioSelfTest.Run();
+    case "cursor-probe": return RunCursorProbe(opts, cts.Token);
     default:
         Console.Error.WriteLine("Uso: Host.App [serve] | stream --target <ip> [...] | receive [...]");
         return 2;
@@ -86,12 +87,14 @@ static int RunServe(Args o, CancellationToken ct)
     using var hotkeys = new ScreenPortal.Host.App.Control.HotkeyService(
         Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData), "ScreenPortal", "hotkeys.json"),
         screens.ScreenAt, hotkeyRouter, Log);
+    // 3B: cursor desenhado no headset (posição por UDP, formas pelo controle)
+    using var cursorFeed = new ScreenPortal.Host.App.Control.CursorFeed(screens.ScreenAt, Log);
 
     using var server = new ScreenPortal.Host.Transport.Control.ControlServer(
         ScreenPortal.Infrastructure.Protocol.ControlProtocol.Port,
         connection => new ScreenPortal.Host.Transport.Control.HeadsetSession(connection, pairing, SavePairing, approver,
             screens.PhysicalMonitors, screens, hostName, () => ScreenPortal.Host.Domain.Pairing.PairingStore.NewPairingCode(System.Security.Cryptography.RandomNumberGenerator.GetInt32), Log, audio,
-            hotkeyRouter),
+            hotkeyRouter, cursorFeed),
         Log);
     server.Start();
     using var keyframes = new KeyframeRequestListener(KeyframeRequestListener.DefaultPort, screens.RequestKeyframe);
@@ -112,6 +115,46 @@ static int RunServe(Args o, CancellationToken ct)
             if (audioStats.Length > 0) Log(audioStats);
         }
     }
+    return 0;
+}
+
+// 3B: lista as formas de cursor vistas por N segundos (diagnóstico da extração: tamanho, hotspot, escala, id).
+static int RunCursorProbe(Args o, CancellationToken ct)
+{
+    var capture = new ScreenPortal.Host.App.Display.CursorCapture();
+    var seen = new HashSet<uint>();
+    // Cursores do sistema: seta, I-beam, espera, mão, redimensionar ↔, ↕.
+    foreach (var (name, idc) in new[] { ("seta", 32512), ("I-beam", 32513), ("espera", 32514), ("mão", 32649), ("↔", 32644), ("↕", 32645) })
+    {
+        var s = ScreenPortal.Host.App.Display.CursorCapture.ExtractSystem(idc);
+        if (s == null) { Console.WriteLine($"{name}: não extraído"); continue; }
+        int black = 0, white = 0, visible = 0;
+        for (int i = 0; i < s.Bgra.Length; i += 4)
+        {
+            if (s.Bgra[i + 3] == 0) continue;
+            visible++;
+            if (s.Bgra[i] == 0 && s.Bgra[i + 1] == 0 && s.Bgra[i + 2] == 0) black++;
+            if (s.Bgra[i] == 255 && s.Bgra[i + 1] == 255 && s.Bgra[i + 2] == 255) white++;
+        }
+        Console.WriteLine($"{name}: {s.Width}x{s.Height} x{s.Scale}, hotspot {s.HotX},{s.HotY}, {visible} visíveis ({black} pretos, {white} brancos)");
+        if (o.Flag("colors"))
+            Console.WriteLine("   cores: " + string.Join(" ", Enumerable.Range(0, s.Bgra.Length / 4).Where(i => s.Bgra[i * 4 + 3] > 0)
+                .Select(i => $"{s.Bgra[i * 4 + 2]:X2}{s.Bgra[i * 4 + 1]:X2}{s.Bgra[i * 4]:X2}/{s.Bgra[i * 4 + 3]:X2}").GroupBy(c => c)
+                .OrderByDescending(g => g.Count()).Take(6).Select(g => $"{g.Key}×{g.Count()}")));
+    }
+    var end = DateTime.UtcNow.AddSeconds(o.Int("seconds", 10));
+    while (DateTime.UtcNow < end && !ct.IsCancellationRequested)
+    {
+        if (capture.Read(out int x, out int y, out var shape) && shape != null && seen.Add(shape.Id))
+        {
+            int opaque = 0;
+            for (int i = 3; i < shape.Bgra.Length; i += 4) if (shape.Bgra[i] > 0) opaque++;
+            Console.WriteLine($"forma {shape.Id:X8}: {shape.Width}×{shape.Height} ×{shape.Scale}, hotspot {shape.HotX},{shape.HotY}, " +
+                              $"{opaque} px visíveis, em ({x},{y})");
+        }
+        Thread.Sleep(20);
+    }
+    Console.WriteLine($"{seen.Count} forma(s).");
     return 0;
 }
 
