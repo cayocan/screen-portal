@@ -36,6 +36,7 @@ public sealed class CursorFeed : ICursorHost, IDisposable
 
     private readonly Func<string, (string DeviceId, uint ScreenKey)?> _screenAt;
     private readonly MouseHook _hook;
+    private readonly Action<bool> _onEditMode;
     private readonly Action<string> _log;
     private readonly Dictionary<string, Target> _targets = new(StringComparer.Ordinal);
     private readonly object _lock = new();
@@ -47,10 +48,12 @@ public sealed class CursorFeed : ICursorHost, IDisposable
     private long _monitorsAt;
     private volatile bool _stop;
 
-    public CursorFeed(Func<string, (string, uint)?> screenAt, MouseHook hook, Action<string> log)
+    /// <param name="onEditMode">modo edição ligou/desligou (o Esc global só vale nele).</param>
+    public CursorFeed(Func<string, (string, uint)?> screenAt, MouseHook hook, Action<bool> onEditMode, Action<string> log)
     {
         _screenAt = screenAt;
         _hook = hook;
+        _onEditMode = onEditMode;
         _log = log;
         _thread = new Thread(Run) { IsBackground = true, Name = "CursorFeed", Priority = ThreadPriority.AboveNormal };
         _thread.Start();
@@ -80,7 +83,9 @@ public sealed class CursorFeed : ICursorHost, IDisposable
             _monitorsAt = 0;
             none = _targets.Count == 0;
         }
-        if (none) _hook.SetConnected(false); // sem headset, o mouse volta inteiro ao Windows
+        if (!none) return;
+        _hook.SetConnected(false); // sem headset, o mouse volta inteiro ao Windows
+        _onEditMode(false);
     }
 
     public void Enter(string deviceId, object owner, uint screenKey, int x, int y)
@@ -90,7 +95,9 @@ public sealed class CursorFeed : ICursorHost, IDisposable
 
     public void SetEditMode(string deviceId, object owner, bool on)
     {
-        if (Owns(deviceId, owner)) _hook.SetEditMode(on);
+        if (!Owns(deviceId, owner)) return;
+        _hook.SetEditMode(on);
+        _onEditMode(on);
     }
 
     private bool Owns(string deviceId, object owner)

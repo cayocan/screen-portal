@@ -35,6 +35,7 @@ public static class HotkeyMap
         [HotkeyAction.AlignPosture] = "Ctrl+Alt+T",
         [HotkeyAction.ToggleGrid] = "Ctrl+Alt+G",
         [HotkeyAction.ToggleEditMode] = "Ctrl+Alt+E",
+        [HotkeyAction.FindCursor] = "Ctrl+Alt+Home",
     };
 
     /// <summary>Ações que repetem com a tecla segurada (mover, tamanho, distância, curvatura).</summary>

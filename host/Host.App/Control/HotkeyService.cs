@@ -10,7 +10,7 @@ namespace ScreenPortal.Host.App.Control;
 /// </summary>
 public sealed class HotkeyService : IDisposable
 {
-    private const uint WmHotkey = 0x0312, WmQuit = 0x0012, ModNoRepeat = 0x4000;
+    private const uint WmHotkey = 0x0312, WmQuit = 0x0012, WmApp = 0x8000, ModNoRepeat = 0x4000, VkEscape = 0x1B;
 
     private readonly Func<string, (string DeviceId, uint ScreenKey)?> _screenAt;
     private readonly HotkeyRouter _router;
@@ -57,11 +57,25 @@ public sealed class HotkeyService : IDisposable
         _log($"atalhos: {ok} de {map.Count} registrados ({path})");
         while (GetMessage(out var msg, IntPtr.Zero, 0, 0) > 0)
         {
+            if (msg.message == WmApp)
+            {
+                // 3B: Esc só durante o modo edição (fora dele o Esc é do Windows)
+                if (msg.wParam != IntPtr.Zero) RegisterHotKey(IntPtr.Zero, (int)HotkeyAction.Escape, ModNoRepeat, VkEscape);
+                else UnregisterHotKey(IntPtr.Zero, (int)HotkeyAction.Escape);
+                continue;
+            }
             if (msg.message != WmHotkey) continue;
             try { OnHotkey((HotkeyAction)(int)msg.wParam); }
             catch (Exception e) { _log($"atalhos: {e.GetType().Name}: {e.Message}"); }
         }
         foreach (var action in map.Keys) UnregisterHotKey(IntPtr.Zero, (int)action);
+        UnregisterHotKey(IntPtr.Zero, (int)HotkeyAction.Escape);
+    }
+
+    /// <summary>Liga/desliga o Esc global (modo edição do headset).</summary>
+    public void SetEscapeActive(bool on)
+    {
+        if (_threadId != 0) PostThreadMessage(_threadId, WmApp, on ? (IntPtr)1 : IntPtr.Zero, IntPtr.Zero);
     }
 
     private void OnHotkey(HotkeyAction action)
