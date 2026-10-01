@@ -30,13 +30,15 @@ namespace ScreenPortal.Composition
         public System.Action<bool> SetHandsVisible { get; }
         /// <summary>Última sessão (a workspace volta se o app reiniciar).</summary>
         public ScreenPortal.App.Session.ISessionStore Session { get; }
+        /// <summary>2G: áudio nativo (null = sem áudio, Editor/Simulator).</summary>
+        public ScreenPortal.App.Audio.IAudioLink Audio { get; }
 
         public AppEnvironment(Transform screensRoot, ConnectionStatusView statusView, IHostDiscovery discovery,
             IPairingStore pairing, ConnectionOptions options,
             IManipulationInput rightPointer = null, IManipulationInput leftPointer = null, IHeadPoseSource head = null,
             IRecenterEvents recenter = null, IWristMenuPanel menuPanel = null, Material unlitMaterial = null,
             bool showTestScreens = false, System.Action<bool> setHandsVisible = null,
-            ScreenPortal.App.Session.ISessionStore session = null)
+            ScreenPortal.App.Session.ISessionStore session = null, ScreenPortal.App.Audio.IAudioLink audio = null)
         {
             ScreensRoot = screensRoot;
             StatusView = statusView;
@@ -52,6 +54,7 @@ namespace ScreenPortal.Composition
             ShowTestScreens = showTestScreens;
             SetHandsVisible = setHandsVisible;
             Session = session;
+            Audio = audio;
         }
     }
 }

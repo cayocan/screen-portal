@@ -24,6 +24,7 @@ namespace ScreenPortal.App.Menu
         Curvature,
         Recreate,
         FrameRate,
+        Audio,
     }
 
     public enum MenuPage
@@ -34,6 +35,7 @@ namespace ScreenPortal.App.Menu
         Mirrors,
         Curvature,
         FrameRate,
+        Audio,
     }
 
     /// <summary>
@@ -43,7 +45,11 @@ namespace ScreenPortal.App.Menu
     /// </summary>
     public sealed class WristMenu
     {
-        public const int MaxItems = 14;
+        public const int MaxItems = 15;
+        public const string PlaybackOn = "Som do PC: ligado";
+        public const string PlaybackOff = "Som do PC: desligado";
+        public const string MicOn = "Microfone: ligado";
+        public const string MicOff = "Microfone: mudo";
         public const int ComfortableVideoScreens = 4;
         public const string TooManyNotice = "Mais de 4 telas:\npode haver quedas e travamentos";
         public const string BackLabel = "← Voltar";
@@ -55,14 +61,14 @@ namespace ScreenPortal.App.Menu
         {
             MenuItemId.Undo, MenuItemId.Redo, MenuItemId.ToggleMode, MenuItemId.Recenter, MenuItemId.AlignPosture,
             MenuItemId.ToggleGrid, MenuItemId.AddVirtual, MenuItemId.AddMirror, MenuItemId.ReturnToSurface, MenuItemId.RemoveScreen,
-            MenuItemId.Curvature, MenuItemId.Recreate, MenuItemId.FrameRate,
+            MenuItemId.Curvature, MenuItemId.Recreate, MenuItemId.FrameRate, MenuItemId.Audio,
         };
 
         private static readonly MenuItemId[] MainItemsWithTest =
         {
             MenuItemId.Undo, MenuItemId.Redo, MenuItemId.ToggleMode, MenuItemId.Recenter, MenuItemId.AlignPosture,
             MenuItemId.ToggleGrid, MenuItemId.AddVirtual, MenuItemId.AddMirror, MenuItemId.ReturnToSurface, MenuItemId.RemoveScreen,
-            MenuItemId.Curvature, MenuItemId.Recreate, MenuItemId.FrameRate, MenuItemId.AddTestScreen,
+            MenuItemId.Curvature, MenuItemId.Recreate, MenuItemId.FrameRate, MenuItemId.Audio, MenuItemId.AddTestScreen,
         };
 
         private readonly WorkspaceStore _store;
@@ -73,6 +79,7 @@ namespace ScreenPortal.App.Menu
         private readonly CurvatureMenu _curvature = new CurvatureMenu();
         private readonly FrameRateMenu _frameRate = new FrameRateMenu();
         private readonly ScreenPortal.App.Screens.RateSync _rates;
+        private readonly ScreenPortal.App.Audio.AudioSync _audio;
         private int _testScreens;
         private int _aspect;
         private string _notice = string.Empty;
@@ -97,9 +104,10 @@ namespace ScreenPortal.App.Menu
         public Orientation Orientation { get; private set; } = Orientation.Landscape;
 
         public WristMenu(WorkspaceStore store, ICommandBus bus, IHeadPoseSource head, IHostCatalog host = null, bool showTestScreens = false,
-            ScreenPortal.App.Screens.RateSync rates = null)
+            ScreenPortal.App.Screens.RateSync rates = null, ScreenPortal.App.Audio.AudioSync audio = null)
         {
             _rates = rates;
+            _audio = audio;
             _store = store;
             _bus = bus;
             _head = head;
@@ -118,6 +126,7 @@ namespace ScreenPortal.App.Menu
                     case MenuPage.Mirrors: return MirrorCount + 1;
                     case MenuPage.Curvature: return CurvatureMenu.ItemCount + 1;
                     case MenuPage.FrameRate: return FrameRateMenu.ItemCount + 1;
+                    case MenuPage.Audio: return 3;
                     default: return _main.Length;
                 }
             }
@@ -136,6 +145,7 @@ namespace ScreenPortal.App.Menu
             {
                 if (Page == MenuPage.Curvature) return _curvature.Status(_store.State);
                 if (Page == MenuPage.FrameRate) return _frameRate.Status(_store.State, _rates);
+                if (Page == MenuPage.Audio) return _audio != null ? _audio.Status : string.Empty;
                 if (IsRecreating) return _recreateTitle;
                 var ws = _store.State;
                 bool connected = _host.IsConnected;
@@ -173,6 +183,9 @@ namespace ScreenPortal.App.Menu
                     return CurvatureMenu.Label(index, FocusedCurvature());
                 case MenuPage.FrameRate:
                     return FrameRateMenu.Label(index, IsCurrentFrameRate(index));
+                case MenuPage.Audio:
+                    return index == 0 ? (_audio.Settings.Playback ? PlaybackOn : PlaybackOff)
+                        : _audio.Settings.Mic ? MicOn : MicOff;
                 default:
                     return Label(_main[index]);
             }
@@ -196,6 +209,7 @@ namespace ScreenPortal.App.Menu
                 case MenuItemId.AddTestScreen: return "+ Tela de teste";
                 case MenuItemId.Curvature: return "Curvatura ▸";
                 case MenuItemId.FrameRate: return "Taxa de quadros ▸";
+                case MenuItemId.Audio: return "Áudio ▸";
                 case MenuItemId.Recreate: return RecreateLabel;
                 default: return id.ToString();
             }
@@ -222,6 +236,7 @@ namespace ScreenPortal.App.Menu
                 case MenuPage.Mirrors: return _host.IsConnected;
                 case MenuPage.Curvature: return HasFocusedScreen();
                 case MenuPage.FrameRate: return HasFocusedVideoScreen();
+                case MenuPage.Audio: return _audio != null;
                 default: return IsEnabled(_main[index]);
             }
         }
@@ -240,6 +255,8 @@ namespace ScreenPortal.App.Menu
                     return ws.TryGetScreen(ws.FocusedScreenId, out var focused) && focused.Placement.IsLoose;
                 case MenuItemId.FrameRate:
                     return HasFocusedVideoScreen();
+                case MenuItemId.Audio:
+                    return _audio != null;
                 case MenuItemId.AddVirtual:
                 case MenuItemId.AddMirror:
                     return _host.IsConnected;
@@ -296,6 +313,10 @@ namespace ScreenPortal.App.Menu
                 case MenuPage.FrameRate:
                     _bus.Send(new SetFrameRateMode(_store.State.FocusedScreenId, FrameRateMenu.Mode(index)));
                     return; // fica na página: mostra o fps concedido
+                case MenuPage.Audio:
+                    if (index == 0) _audio.Settings.TogglePlayback();
+                    else _audio.Settings.ToggleMic();
+                    return;
                 default:
                     Invoke(_main[index]);
                     return;
@@ -338,6 +359,9 @@ namespace ScreenPortal.App.Menu
                     break;
                 case MenuItemId.FrameRate:
                     Page = MenuPage.FrameRate;
+                    break;
+                case MenuItemId.Audio:
+                    Page = MenuPage.Audio;
                     break;
                 case MenuItemId.AddTestScreen:
                     _bus.Send(TestScreens.Next(_testScreens++));

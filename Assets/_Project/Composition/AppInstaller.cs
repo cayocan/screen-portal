@@ -49,6 +49,11 @@ namespace ScreenPortal.Composition
             // 2C: telas com vídeo sob comando do headset (spec 2026-09-30-fase2c-varias-telas-design.md)
             builder.Register<NativeScreenVideo>(Lifetime.Singleton).As<IScreenVideo>();
             builder.Register<HostSync>(Lifetime.Singleton).AsSelf().As<IHostCatalog>().As<IScreenLinks>();
+            // 2G: som do PC e microfone (nativo no Quest; no Editor, sem áudio)
+            builder.RegisterInstance(new ScreenPortal.App.Audio.AudioSettings());
+            builder.Register(r => new ScreenPortal.App.Audio.AudioSync(r.Resolve<ConnectionStateMachine>(),
+                env.Audio ?? new ScreenPortal.App.Audio.NullAudioLink(), r.Resolve<ScreenPortal.App.Audio.AudioSettings>()), Lifetime.Singleton);
+            builder.RegisterBuildCallback(c => c.Resolve<ScreenPortal.App.Audio.AudioSync>()); // assina a conexão já na montagem
             // 2F: fps/bitrate por tela (modo → olhar → orçamento) mandados ao host só quando mudam
             builder.Register(r =>
             {
@@ -62,7 +67,7 @@ namespace ScreenPortal.Composition
             builder.Register<ScreenManipulationController>(Lifetime.Singleton);
             builder.Register<StartupRecenter>(Lifetime.Singleton);
             builder.Register(r => new WristMenu(r.Resolve<WorkspaceStore>(), r.Resolve<ICommandBus>(), r.Resolve<IHeadPoseSource>(),
-                r.Resolve<IHostCatalog>(), env.ShowTestScreens, r.Resolve<RateSync>()), Lifetime.Singleton);
+                r.Resolve<IHostCatalog>(), env.ShowTestScreens, r.Resolve<RateSync>(), r.Resolve<ScreenPortal.App.Audio.AudioSync>()), Lifetime.Singleton);
             // Controle parado perde o laser; tchau liga/desliga as mãos (laser, interação e modelo).
             builder.Register<HandsMode>(Lifetime.Singleton);
             builder.RegisterBuildCallback(c =>
