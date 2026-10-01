@@ -44,6 +44,8 @@ public enum Message : byte
   SetStreamRate = 15,
   StartAudio = 16,
   AudioStarted = 17,
+  LayoutChanged = 18,
+  Hotkey = 19,
 };
 
 
@@ -105,6 +107,12 @@ static public class MessageVerify
         break;
       case Message.AudioStarted:
         result = ScreenPortal.Protocol.Fb.AudioStartedVerify.Verify(verifier, tablePos);
+        break;
+      case Message.LayoutChanged:
+        result = ScreenPortal.Protocol.Fb.LayoutChangedVerify.Verify(verifier, tablePos);
+        break;
+      case Message.Hotkey:
+        result = ScreenPortal.Protocol.Fb.HotkeyVerify.Verify(verifier, tablePos);
         break;
       default: result = true;
         break;
@@ -1042,6 +1050,148 @@ static public class AudioStartedVerify
       && verifier.VerifyTableEnd(tablePos);
   }
 }
+public struct ScreenAngles : IFlatbufferObject
+{
+  private Table __p;
+  public ByteBuffer ByteBuffer { get { return __p.bb; } }
+  public static void ValidateVersion() { FlatBufferConstants.FLATBUFFERS_25_2_10(); }
+  public static ScreenAngles GetRootAsScreenAngles(ByteBuffer _bb) { return GetRootAsScreenAngles(_bb, new ScreenAngles()); }
+  public static ScreenAngles GetRootAsScreenAngles(ByteBuffer _bb, ScreenAngles obj) { return (obj.__assign(_bb.GetInt(_bb.Position) + _bb.Position, _bb)); }
+  public void __init(int _i, ByteBuffer _bb) { __p = new Table(_i, _bb); }
+  public ScreenAngles __assign(int _i, ByteBuffer _bb) { __init(_i, _bb); return this; }
+
+  public uint ScreenKey { get { int o = __p.__offset(4); return o != 0 ? __p.bb.GetUint(o + __p.bb_pos) : (uint)0; } }
+  public float AzimuthDeg { get { int o = __p.__offset(6); return o != 0 ? __p.bb.GetFloat(o + __p.bb_pos) : (float)0.0f; } }
+  public float ElevationDeg { get { int o = __p.__offset(8); return o != 0 ? __p.bb.GetFloat(o + __p.bb_pos) : (float)0.0f; } }
+  public float HalfWidthDeg { get { int o = __p.__offset(10); return o != 0 ? __p.bb.GetFloat(o + __p.bb_pos) : (float)0.0f; } }
+  public float HalfHeightDeg { get { int o = __p.__offset(12); return o != 0 ? __p.bb.GetFloat(o + __p.bb_pos) : (float)0.0f; } }
+
+  public static Offset<ScreenPortal.Protocol.Fb.ScreenAngles> CreateScreenAngles(FlatBufferBuilder builder,
+      uint screen_key = 0,
+      float azimuth_deg = 0.0f,
+      float elevation_deg = 0.0f,
+      float half_width_deg = 0.0f,
+      float half_height_deg = 0.0f) {
+    builder.StartTable(5);
+    ScreenAngles.AddHalfHeightDeg(builder, half_height_deg);
+    ScreenAngles.AddHalfWidthDeg(builder, half_width_deg);
+    ScreenAngles.AddElevationDeg(builder, elevation_deg);
+    ScreenAngles.AddAzimuthDeg(builder, azimuth_deg);
+    ScreenAngles.AddScreenKey(builder, screen_key);
+    return ScreenAngles.EndScreenAngles(builder);
+  }
+
+  public static void StartScreenAngles(FlatBufferBuilder builder) { builder.StartTable(5); }
+  public static void AddScreenKey(FlatBufferBuilder builder, uint screenKey) { builder.AddUint(0, screenKey, 0); }
+  public static void AddAzimuthDeg(FlatBufferBuilder builder, float azimuthDeg) { builder.AddFloat(1, azimuthDeg, 0.0f); }
+  public static void AddElevationDeg(FlatBufferBuilder builder, float elevationDeg) { builder.AddFloat(2, elevationDeg, 0.0f); }
+  public static void AddHalfWidthDeg(FlatBufferBuilder builder, float halfWidthDeg) { builder.AddFloat(3, halfWidthDeg, 0.0f); }
+  public static void AddHalfHeightDeg(FlatBufferBuilder builder, float halfHeightDeg) { builder.AddFloat(4, halfHeightDeg, 0.0f); }
+  public static Offset<ScreenPortal.Protocol.Fb.ScreenAngles> EndScreenAngles(FlatBufferBuilder builder) {
+    int o = builder.EndTable();
+    return new Offset<ScreenPortal.Protocol.Fb.ScreenAngles>(o);
+  }
+}
+
+
+static public class ScreenAnglesVerify
+{
+  static public bool Verify(Google.FlatBuffers.Verifier verifier, uint tablePos)
+  {
+    return verifier.VerifyTableStart(tablePos)
+      && verifier.VerifyField(tablePos, 4 /*ScreenKey*/, 4 /*uint*/, 4, false)
+      && verifier.VerifyField(tablePos, 6 /*AzimuthDeg*/, 4 /*float*/, 4, false)
+      && verifier.VerifyField(tablePos, 8 /*ElevationDeg*/, 4 /*float*/, 4, false)
+      && verifier.VerifyField(tablePos, 10 /*HalfWidthDeg*/, 4 /*float*/, 4, false)
+      && verifier.VerifyField(tablePos, 12 /*HalfHeightDeg*/, 4 /*float*/, 4, false)
+      && verifier.VerifyTableEnd(tablePos);
+  }
+}
+public struct LayoutChanged : IFlatbufferObject
+{
+  private Table __p;
+  public ByteBuffer ByteBuffer { get { return __p.bb; } }
+  public static void ValidateVersion() { FlatBufferConstants.FLATBUFFERS_25_2_10(); }
+  public static LayoutChanged GetRootAsLayoutChanged(ByteBuffer _bb) { return GetRootAsLayoutChanged(_bb, new LayoutChanged()); }
+  public static LayoutChanged GetRootAsLayoutChanged(ByteBuffer _bb, LayoutChanged obj) { return (obj.__assign(_bb.GetInt(_bb.Position) + _bb.Position, _bb)); }
+  public void __init(int _i, ByteBuffer _bb) { __p = new Table(_i, _bb); }
+  public LayoutChanged __assign(int _i, ByteBuffer _bb) { __init(_i, _bb); return this; }
+
+  public ScreenPortal.Protocol.Fb.ScreenAngles? Screens(int j) { int o = __p.__offset(4); return o != 0 ? (ScreenPortal.Protocol.Fb.ScreenAngles?)(new ScreenPortal.Protocol.Fb.ScreenAngles()).__assign(__p.__indirect(__p.__vector(o) + j * 4), __p.bb) : null; }
+  public int ScreensLength { get { int o = __p.__offset(4); return o != 0 ? __p.__vector_len(o) : 0; } }
+
+  public static Offset<ScreenPortal.Protocol.Fb.LayoutChanged> CreateLayoutChanged(FlatBufferBuilder builder,
+      VectorOffset screensOffset = default(VectorOffset)) {
+    builder.StartTable(1);
+    LayoutChanged.AddScreens(builder, screensOffset);
+    return LayoutChanged.EndLayoutChanged(builder);
+  }
+
+  public static void StartLayoutChanged(FlatBufferBuilder builder) { builder.StartTable(1); }
+  public static void AddScreens(FlatBufferBuilder builder, VectorOffset screensOffset) { builder.AddOffset(0, screensOffset.Value, 0); }
+  public static VectorOffset CreateScreensVector(FlatBufferBuilder builder, Offset<ScreenPortal.Protocol.Fb.ScreenAngles>[] data) { builder.StartVector(4, data.Length, 4); for (int i = data.Length - 1; i >= 0; i--) builder.AddOffset(data[i].Value); return builder.EndVector(); }
+  public static VectorOffset CreateScreensVectorBlock(FlatBufferBuilder builder, Offset<ScreenPortal.Protocol.Fb.ScreenAngles>[] data) { builder.StartVector(4, data.Length, 4); builder.Add(data); return builder.EndVector(); }
+  public static VectorOffset CreateScreensVectorBlock(FlatBufferBuilder builder, ArraySegment<Offset<ScreenPortal.Protocol.Fb.ScreenAngles>> data) { builder.StartVector(4, data.Count, 4); builder.Add(data); return builder.EndVector(); }
+  public static VectorOffset CreateScreensVectorBlock(FlatBufferBuilder builder, IntPtr dataPtr, int sizeInBytes) { builder.StartVector(1, sizeInBytes, 1); builder.Add<Offset<ScreenPortal.Protocol.Fb.ScreenAngles>>(dataPtr, sizeInBytes); return builder.EndVector(); }
+  public static void StartScreensVector(FlatBufferBuilder builder, int numElems) { builder.StartVector(4, numElems, 4); }
+  public static Offset<ScreenPortal.Protocol.Fb.LayoutChanged> EndLayoutChanged(FlatBufferBuilder builder) {
+    int o = builder.EndTable();
+    return new Offset<ScreenPortal.Protocol.Fb.LayoutChanged>(o);
+  }
+}
+
+
+static public class LayoutChangedVerify
+{
+  static public bool Verify(Google.FlatBuffers.Verifier verifier, uint tablePos)
+  {
+    return verifier.VerifyTableStart(tablePos)
+      && verifier.VerifyVectorOfTables(tablePos, 4 /*Screens*/, ScreenPortal.Protocol.Fb.ScreenAnglesVerify.Verify, false)
+      && verifier.VerifyTableEnd(tablePos);
+  }
+}
+public struct Hotkey : IFlatbufferObject
+{
+  private Table __p;
+  public ByteBuffer ByteBuffer { get { return __p.bb; } }
+  public static void ValidateVersion() { FlatBufferConstants.FLATBUFFERS_25_2_10(); }
+  public static Hotkey GetRootAsHotkey(ByteBuffer _bb) { return GetRootAsHotkey(_bb, new Hotkey()); }
+  public static Hotkey GetRootAsHotkey(ByteBuffer _bb, Hotkey obj) { return (obj.__assign(_bb.GetInt(_bb.Position) + _bb.Position, _bb)); }
+  public void __init(int _i, ByteBuffer _bb) { __p = new Table(_i, _bb); }
+  public Hotkey __assign(int _i, ByteBuffer _bb) { __init(_i, _bb); return this; }
+
+  public byte Action { get { int o = __p.__offset(4); return o != 0 ? __p.bb.Get(o + __p.bb_pos) : (byte)0; } }
+  public uint ScreenKey { get { int o = __p.__offset(6); return o != 0 ? __p.bb.GetUint(o + __p.bb_pos) : (uint)0; } }
+
+  public static Offset<ScreenPortal.Protocol.Fb.Hotkey> CreateHotkey(FlatBufferBuilder builder,
+      byte action = 0,
+      uint screen_key = 0) {
+    builder.StartTable(2);
+    Hotkey.AddScreenKey(builder, screen_key);
+    Hotkey.AddAction(builder, action);
+    return Hotkey.EndHotkey(builder);
+  }
+
+  public static void StartHotkey(FlatBufferBuilder builder) { builder.StartTable(2); }
+  public static void AddAction(FlatBufferBuilder builder, byte action) { builder.AddByte(0, action, 0); }
+  public static void AddScreenKey(FlatBufferBuilder builder, uint screenKey) { builder.AddUint(1, screenKey, 0); }
+  public static Offset<ScreenPortal.Protocol.Fb.Hotkey> EndHotkey(FlatBufferBuilder builder) {
+    int o = builder.EndTable();
+    return new Offset<ScreenPortal.Protocol.Fb.Hotkey>(o);
+  }
+}
+
+
+static public class HotkeyVerify
+{
+  static public bool Verify(Google.FlatBuffers.Verifier verifier, uint tablePos)
+  {
+    return verifier.VerifyTableStart(tablePos)
+      && verifier.VerifyField(tablePos, 4 /*Action*/, 1 /*byte*/, 1, false)
+      && verifier.VerifyField(tablePos, 6 /*ScreenKey*/, 4 /*uint*/, 4, false)
+      && verifier.VerifyTableEnd(tablePos);
+  }
+}
 public struct Envelope : IFlatbufferObject
 {
   private Table __p;
@@ -1074,6 +1224,8 @@ public struct Envelope : IFlatbufferObject
   public ScreenPortal.Protocol.Fb.SetStreamRate BodyAsSetStreamRate() { return Body<ScreenPortal.Protocol.Fb.SetStreamRate>().Value; }
   public ScreenPortal.Protocol.Fb.StartAudio BodyAsStartAudio() { return Body<ScreenPortal.Protocol.Fb.StartAudio>().Value; }
   public ScreenPortal.Protocol.Fb.AudioStarted BodyAsAudioStarted() { return Body<ScreenPortal.Protocol.Fb.AudioStarted>().Value; }
+  public ScreenPortal.Protocol.Fb.LayoutChanged BodyAsLayoutChanged() { return Body<ScreenPortal.Protocol.Fb.LayoutChanged>().Value; }
+  public ScreenPortal.Protocol.Fb.Hotkey BodyAsHotkey() { return Body<ScreenPortal.Protocol.Fb.Hotkey>().Value; }
 
   public static Offset<ScreenPortal.Protocol.Fb.Envelope> CreateEnvelope(FlatBufferBuilder builder,
       ushort protocol_version = 0,

@@ -22,6 +22,8 @@ namespace ScreenPortal.App.Connection
         SetStreamRate,
         StartAudio,
         AudioStarted,
+        LayoutChanged,
+        Hotkey,
     }
 
     public enum ByeReason
@@ -296,6 +298,58 @@ namespace ScreenPortal.App.Connection
             MicPort = micPort;
             Speakers = speakers;
             Mic = mic;
+        }
+    }
+
+    /// <summary>3A: onde uma tela está na superfície (ângulos do centro e meio-tamanho angular).</summary>
+    public readonly struct ScreenAnglesInfo
+    {
+        public readonly uint ScreenKey;
+        public readonly float AzimuthDeg;
+        public readonly float ElevationDeg;
+        public readonly float HalfWidthDeg;
+        public readonly float HalfHeightDeg;
+
+        public ScreenAnglesInfo(uint screenKey, float azimuthDeg, float elevationDeg, float halfWidthDeg, float halfHeightDeg)
+        {
+            ScreenKey = screenKey;
+            AzimuthDeg = azimuthDeg;
+            ElevationDeg = elevationDeg;
+            HalfWidthDeg = halfWidthDeg;
+            HalfHeightDeg = halfHeightDeg;
+        }
+    }
+
+    /// <summary>3A: disposição das telas no Quest (headset → host), para o arranjo do Windows seguir.</summary>
+    public sealed class LayoutChangedMessage : ControlMessage
+    {
+        public override ControlMessageKind Kind => ControlMessageKind.LayoutChanged;
+        public IReadOnlyList<ScreenAnglesInfo> Screens { get; }
+
+        public LayoutChangedMessage(IReadOnlyList<ScreenAnglesInfo> screens) => Screens = screens;
+    }
+
+    /// <summary>3A: ações dos atalhos globais (brief §10.9).</summary>
+    public enum HotkeyAction : byte
+    {
+        None = 0,
+        MoveLeft, MoveRight, MoveUp, MoveDown,
+        Bigger, Smaller, Closer, Farther,
+        CurvatureToggle, CurvatureLess, CurvatureMore,
+        CycleFrameRate, Undo, Redo, Recenter, ToggleLayoutMode, AlignPosture, ToggleGrid,
+    }
+
+    /// <summary>3A: atalho apertado no PC (host → headset). <see cref="ScreenKey"/> = tela sob o cursor (0 = nenhuma).</summary>
+    public sealed class HotkeyMessage : ControlMessage
+    {
+        public override ControlMessageKind Kind => ControlMessageKind.Hotkey;
+        public HotkeyAction Action { get; }
+        public uint ScreenKey { get; }
+
+        public HotkeyMessage(HotkeyAction action, uint screenKey)
+        {
+            Action = action;
+            ScreenKey = screenKey;
         }
     }
 

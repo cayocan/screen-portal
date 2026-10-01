@@ -80,6 +80,18 @@ namespace ScreenPortal.Tests
             Assert.That(release.ScreenKey, Is.EqualTo(5u));
             Assert.That(release.GraceMs, Is.EqualTo(10000u));
 
+            var layout = (LayoutChangedMessage)RoundTrip(new LayoutChangedMessage(new[]
+            {
+                new ScreenAnglesInfo(1, -10.5f, 2f, 20f, 9f), new ScreenAnglesInfo(4, 30f, -5f, 15f, 12f),
+            }));
+            Assert.That(layout.Screens.Count, Is.EqualTo(2));
+            Assert.That(layout.Screens[1].ScreenKey, Is.EqualTo(4u));
+            Assert.That(layout.Screens[0].AzimuthDeg, Is.EqualTo(-10.5f));
+            Assert.That(layout.Screens[1].HalfHeightDeg, Is.EqualTo(12f));
+            var hotkey = (HotkeyMessage)RoundTrip(new HotkeyMessage(HotkeyAction.CurvatureMore, 3));
+            Assert.That(hotkey.Action, Is.EqualTo(HotkeyAction.CurvatureMore));
+            Assert.That(hotkey.ScreenKey, Is.EqualTo(3u));
+
             var audio = (StartAudioMessage)RoundTrip(new StartAudioMessage(9300, true, false));
             Assert.That(audio.UdpPort, Is.EqualTo((ushort)9300));
             Assert.That(audio.Playback, Is.True);
