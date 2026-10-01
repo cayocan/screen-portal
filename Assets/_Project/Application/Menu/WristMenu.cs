@@ -25,6 +25,7 @@ namespace ScreenPortal.App.Menu
         Recreate,
         FrameRate,
         Audio,
+        AutoArrange,
     }
 
     public enum MenuPage
@@ -45,11 +46,13 @@ namespace ScreenPortal.App.Menu
     /// </summary>
     public sealed class WristMenu
     {
-        public const int MaxItems = 15;
+        public const int MaxItems = 16;
         public const string PlaybackOn = "Som do PC: ligado";
         public const string PlaybackOff = "Som do PC: desligado";
         public const string MicOn = "Microfone: ligado";
         public const string MicOff = "Microfone: mudo";
+        public const string AutoArrangeOn = "Arranjo automático: ligado";
+        public const string AutoArrangeOff = "Arranjo automático: desligado";
         public const int ComfortableVideoScreens = 4;
         public const string TooManyNotice = "Mais de 4 telas:\npode haver quedas e travamentos";
         public const string BackLabel = "← Voltar";
@@ -61,14 +64,15 @@ namespace ScreenPortal.App.Menu
         {
             MenuItemId.Undo, MenuItemId.Redo, MenuItemId.ToggleMode, MenuItemId.Recenter, MenuItemId.AlignPosture,
             MenuItemId.ToggleGrid, MenuItemId.AddVirtual, MenuItemId.AddMirror, MenuItemId.ReturnToSurface, MenuItemId.RemoveScreen,
-            MenuItemId.Curvature, MenuItemId.Recreate, MenuItemId.FrameRate, MenuItemId.Audio,
+            MenuItemId.Curvature, MenuItemId.Recreate, MenuItemId.FrameRate, MenuItemId.Audio, MenuItemId.AutoArrange,
         };
 
         private static readonly MenuItemId[] MainItemsWithTest =
         {
             MenuItemId.Undo, MenuItemId.Redo, MenuItemId.ToggleMode, MenuItemId.Recenter, MenuItemId.AlignPosture,
             MenuItemId.ToggleGrid, MenuItemId.AddVirtual, MenuItemId.AddMirror, MenuItemId.ReturnToSurface, MenuItemId.RemoveScreen,
-            MenuItemId.Curvature, MenuItemId.Recreate, MenuItemId.FrameRate, MenuItemId.Audio, MenuItemId.AddTestScreen,
+            MenuItemId.Curvature, MenuItemId.Recreate, MenuItemId.FrameRate, MenuItemId.Audio, MenuItemId.AutoArrange,
+            MenuItemId.AddTestScreen,
         };
 
         private readonly WorkspaceStore _store;
@@ -80,6 +84,7 @@ namespace ScreenPortal.App.Menu
         private readonly FrameRateMenu _frameRate = new FrameRateMenu();
         private readonly ScreenPortal.App.Screens.RateSync _rates;
         private readonly ScreenPortal.App.Audio.AudioSync _audio;
+        private readonly ScreenPortal.App.Screens.LayoutSyncSettings _arrange;
         private int _testScreens;
         private int _aspect;
         private string _notice = string.Empty;
@@ -104,8 +109,10 @@ namespace ScreenPortal.App.Menu
         public Orientation Orientation { get; private set; } = Orientation.Landscape;
 
         public WristMenu(WorkspaceStore store, ICommandBus bus, IHeadPoseSource head, IHostCatalog host = null, bool showTestScreens = false,
-            ScreenPortal.App.Screens.RateSync rates = null, ScreenPortal.App.Audio.AudioSync audio = null)
+            ScreenPortal.App.Screens.RateSync rates = null, ScreenPortal.App.Audio.AudioSync audio = null,
+            ScreenPortal.App.Screens.LayoutSyncSettings arrange = null)
         {
+            _arrange = arrange;
             _rates = rates;
             _audio = audio;
             _store = store;
@@ -210,6 +217,7 @@ namespace ScreenPortal.App.Menu
                 case MenuItemId.Curvature: return "Curvatura ▸";
                 case MenuItemId.FrameRate: return "Taxa de quadros ▸";
                 case MenuItemId.Audio: return "Áudio ▸";
+                case MenuItemId.AutoArrange: return _arrange != null && _arrange.Enabled ? AutoArrangeOn : AutoArrangeOff;
                 case MenuItemId.Recreate: return RecreateLabel;
                 default: return id.ToString();
             }
@@ -257,6 +265,8 @@ namespace ScreenPortal.App.Menu
                     return HasFocusedVideoScreen();
                 case MenuItemId.Audio:
                     return _audio != null;
+                case MenuItemId.AutoArrange:
+                    return _arrange != null;
                 case MenuItemId.AddVirtual:
                 case MenuItemId.AddMirror:
                     return _host.IsConnected;
@@ -362,6 +372,9 @@ namespace ScreenPortal.App.Menu
                     break;
                 case MenuItemId.Audio:
                     Page = MenuPage.Audio;
+                    break;
+                case MenuItemId.AutoArrange:
+                    _arrange.Toggle();
                     break;
                 case MenuItemId.AddTestScreen:
                     _bus.Send(TestScreens.Next(_testScreens++));

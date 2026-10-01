@@ -112,6 +112,23 @@ namespace ScreenPortal.Infrastructure.Protocol
                     body = Fb.ScreenFailed.CreateScreenFailed(b, m.ScreenKey, b.CreateString(m.Reason)).Value;
                     type = Fb.Message.ScreenFailed;
                     break;
+                case LayoutChangedMessage m:
+                {
+                    var screens = new Offset<Fb.ScreenAngles>[m.Screens.Count];
+                    for (int i = 0; i < screens.Length; i++)
+                    {
+                        var s = m.Screens[i];
+                        screens[i] = Fb.ScreenAngles.CreateScreenAngles(b, s.ScreenKey, s.AzimuthDeg, s.ElevationDeg, s.HalfWidthDeg, s.HalfHeightDeg);
+                    }
+                    var vector = Fb.LayoutChanged.CreateScreensVector(b, screens);
+                    body = Fb.LayoutChanged.CreateLayoutChanged(b, vector).Value;
+                    type = Fb.Message.LayoutChanged;
+                    break;
+                }
+                case HotkeyMessage m:
+                    body = Fb.Hotkey.CreateHotkey(b, (byte)m.Action, m.ScreenKey).Value;
+                    type = Fb.Message.Hotkey;
+                    break;
                 case StartAudioMessage m:
                     body = Fb.StartAudio.CreateStartAudio(b, m.UdpPort, m.Playback, m.Mic).Value;
                     type = Fb.Message.StartAudio;
@@ -257,6 +274,22 @@ namespace ScreenPortal.Infrastructure.Protocol
                 {
                     var f = e.BodyAsScreenFailed();
                     return new ScreenFailedMessage(f.ScreenKey, f.Reason);
+                }
+                case Fb.Message.LayoutChanged:
+                {
+                    var l = e.BodyAsLayoutChanged();
+                    var screens = new ScreenAnglesInfo[l.ScreensLength];
+                    for (int i = 0; i < screens.Length; i++)
+                    {
+                        var s = l.Screens(i).Value;
+                        screens[i] = new ScreenAnglesInfo(s.ScreenKey, s.AzimuthDeg, s.ElevationDeg, s.HalfWidthDeg, s.HalfHeightDeg);
+                    }
+                    return new LayoutChangedMessage(screens);
+                }
+                case Fb.Message.Hotkey:
+                {
+                    var h = e.BodyAsHotkey();
+                    return new HotkeyMessage((HotkeyAction)h.Action, h.ScreenKey);
                 }
                 case Fb.Message.StartAudio:
                 {

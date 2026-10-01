@@ -44,6 +44,13 @@ public sealed class ScreenHost : IScreenHost, IDisposable
     private readonly Dictionary<(string, uint), Live> _live = new();
     private readonly object _lock = new();
     private readonly Timer _sweeper;
+    // 3A §4: escala do Windows por headset/tela, lida a cada 3 s e reaplicada ao criar/recriar o monitor.
+    private static readonly TimeSpan ScalePoll = TimeSpan.FromSeconds(3);
+    private const int ScaleRestoreTries = 3;
+    private readonly ScaleMemory _scales;
+    private readonly string? _scalesPath;
+    private readonly Dictionary<(string, uint), (int Percent, int Tries)> _scaleRestores = new(); // sob _lock
+    private readonly Timer _scaleKeeper;
     private SudoVdaDriver? _driver;
     private bool _disposed;
     // Cópia imutável (copy-on-write sob _lock) lida sem lock: o IDR não espera a criação/remoção de monitores.
@@ -51,14 +58,71 @@ public sealed class ScreenHost : IScreenHost, IDisposable
 
     public IMonitorProvider PhysicalMonitors { get; }
 
-    public ScreenHost(GpuDevice gpu, int bitrateKbps, TimeSpan disconnectGrace, Action<string> log)
+    /// <param name="scalesPath">scales.json (escala por tela); null = não guarda.</param>
+    public ScreenHost(GpuDevice gpu, int bitrateKbps, TimeSpan disconnectGrace, Action<string> log, string? scalesPath = null)
     {
         _gpu = gpu;
         _bitrateKbps = bitrateKbps;
         _disconnectGrace = disconnectGrace;
         _log = log;
+        _scalesPath = scalesPath;
+        _scales = ScaleMemory.FromJson(scalesPath != null && File.Exists(scalesPath) ? File.ReadAllText(scalesPath) : null);
         PhysicalMonitors = new WindowsMonitorProvider(IsVirtualDisplay);
         _sweeper = new Timer(_ => Sweep(), null, 1000, 1000);
+        _scaleKeeper = new Timer(_ => KeepScales(), null, ScalePoll, ScalePoll);
+    }
+
+    /// <summary>Monitor (re)criado: volta a escala guardada da tela, se houver (chamar com _lock).</summary>
+    private void RestoreScale(string deviceId, uint screenKey, string displayName)
+    {
+        if (!_scales.TryGet(deviceId, screenKey, out var percent)) return;
+        int err = DisplayScale.Set(displayName, percent);
+        if (err == -2)
+        {
+            _log($"escala: {percent}% não vale para {displayName} na resolução nova; fica a do Windows");
+            return;
+        }
+        // O Windows pode reaplicar a escala padrão enquanto o monitor novo sobe: KeepScales confere e insiste.
+        _scaleRestores[(deviceId, screenKey)] = (percent, 0);
+        if (err == 0) _log($"escala: {displayName} de volta a {percent}%");
+    }
+
+    /// <summary>A cada 3 s: guarda a escala de cada monitor virtual vivo (e termina as restaurações pendentes).</summary>
+    private void KeepScales()
+    {
+        bool changed = false;
+        lock (_lock)
+        {
+            if (_disposed) return;
+            foreach (var ((deviceId, screenKey), live) in _live)
+            {
+                if (live.Monitor == null) continue; // espelho: a escala do monitor físico é do usuário, não da tela
+                int now = DisplayScale.Get(live.DisplayName);
+                if (_scaleRestores.TryGetValue((deviceId, screenKey), out var restore))
+                {
+                    if (now == restore.Percent) _scaleRestores.Remove((deviceId, screenKey));
+                    else if (restore.Tries < ScaleRestoreTries)
+                    {
+                        DisplayScale.Set(live.DisplayName, restore.Percent);
+                        _scaleRestores[(deviceId, screenKey)] = (restore.Percent, restore.Tries + 1);
+                        continue;
+                    }
+                    else
+                    {
+                        _log($"escala: o Windows não manteve {restore.Percent}% em {live.DisplayName}");
+                        _scaleRestores.Remove((deviceId, screenKey));
+                    }
+                }
+                changed |= _scales.Observe(deviceId, screenKey, now);
+            }
+        }
+        if (!changed || _scalesPath == null) return;
+        try
+        {
+            Directory.CreateDirectory(Path.GetDirectoryName(_scalesPath)!);
+            File.WriteAllText(_scalesPath, _scales.ToJson());
+        }
+        catch (Exception e) { _log($"escala: falha ao salvar {_scalesPath}: {e.Message}"); }
     }
 
     public IReadOnlyList<ScreenLeaseInfo> Leases(string deviceId)
@@ -143,6 +207,7 @@ public sealed class ScreenHost : IScreenHost, IDisposable
             _leases.Add(new ScreenLease(deviceId, request.ScreenKey, ScreenLeaseKind.Virtual, (int)request.Width, (int)request.Height, 0, name));
             _live[(deviceId, request.ScreenKey)] = new Live { Monitor = monitor, DisplayName = name };
             _log($"telas: monitor virtual {request.Width}×{request.Height} criado ({name}) para {deviceId}/{request.ScreenKey}");
+            RestoreScale(deviceId, request.ScreenKey, name);
             return new ScreenAcquireResult(true, (int)request.Width, (int)request.Height, "");
         }
         catch (Exception e)
@@ -170,6 +235,7 @@ public sealed class ScreenHost : IScreenHost, IDisposable
         _live[(deviceId, request.ScreenKey)] = new Live { Monitor = result.Monitor, DisplayName = name };
         _log($"telas: {deviceId}/{request.ScreenKey} recriado {lease.Width}×{lease.Height} → {width}×{height} " +
              $"({lease.DisplayName} → {name}, {result.WindowsMoved} janela(s) movida(s))");
+        RestoreScale(deviceId, request.ScreenKey, name);
         return new ScreenAcquireResult(true, width, height, "");
     }
 
@@ -293,6 +359,41 @@ public sealed class ScreenHost : IScreenHost, IDisposable
         }
     }
 
+    /// <summary>
+    /// 3A: o arranjo do Windows segue a disposição das telas no Quest (spec 3A §2): plano puro (DisplayArrangement) e um
+    /// único SetDisplayConfig com os monitores que mudaram. Telas fora da mensagem (soltas) e monitores fora do Quest
+    /// ficam onde estão. Cada monitor movido tem a captura recriada (FollowDisplayChanges).
+    /// </summary>
+    public void Arrange(string deviceId, long generation, IReadOnlyList<ScreenAnglesInfo> angles)
+    {
+        lock (_lock)
+        {
+            if (_disposed || Stale(deviceId, generation, "LayoutChanged")) return;
+            var windows = Win32Displays.Snapshot();
+            var current = windows.ToDictionary(d => d.DeviceName, d => d.Bounds, StringComparer.OrdinalIgnoreCase);
+            var screens = new List<ArrangedScreen>();
+            foreach (var a in angles)
+            {
+                if (!_live.TryGetValue((deviceId, a.ScreenKey), out var live) || !current.TryGetValue(live.DisplayName, out var bounds)) continue;
+                if (screens.Exists(s => s.Monitor.Equals(live.DisplayName, StringComparison.OrdinalIgnoreCase))) continue; // dois espelhos do mesmo monitor
+                screens.Add(new ArrangedScreen(live.DisplayName, bounds.Width, bounds.Height, a.AzimuthDeg, a.ElevationDeg, a.HalfWidthDeg, a.HalfHeightDeg));
+            }
+            if (screens.Count == 0) return;
+            var primary = windows.FirstOrDefault(d => d.IsPrimary)?.DeviceName ?? "";
+            var plan = DisplayArrangement.Plan(screens,
+                windows.Select(d => new WindowsMonitor(d.DeviceName, d.Bounds, d.IsPrimary)).ToList(), primary);
+            var changed = new Dictionary<string, int[]>(StringComparer.OrdinalIgnoreCase);
+            foreach (var (name, rect) in plan)
+                if (!name.Equals(primary, StringComparison.OrdinalIgnoreCase) && current[name] != rect)
+                    changed[name] = [rect.X, rect.Y];
+            if (changed.Count == 0) return;
+            int err = DisplayConfigPosition.SetPositions(changed);
+            _log(err == 0
+                ? $"arranjo: {changed.Count} monitor(es) reposicionado(s) como no Quest ({string.Join(", ", changed.Select(c => $"{c.Key} {c.Value[0]},{c.Value[1]}"))})"
+                : $"arranjo: o Windows recusou o arranjo ({err})");
+        }
+    }
+
     /// <summary>2F: fps e bitrate de uma tela com stream, ao vivo. Loga só quando muda.</summary>
     public void SetRate(string deviceId, long generation, uint screenKey, int fps, int kbps)
     {
@@ -371,6 +472,7 @@ public sealed class ScreenHost : IScreenHost, IDisposable
     private void DisposeLive(string deviceId, uint screenKey)
     {
         if (!_live.Remove((deviceId, screenKey), out var live)) return;
+        _scaleRestores.Remove((deviceId, screenKey));
         live.Pipeline?.Dispose();
         live.Pipeline = null;
         RebuildKeyframeTargets();
@@ -395,6 +497,15 @@ public sealed class ScreenHost : IScreenHost, IDisposable
         }
     }
 
+    /// <summary>3A (atalhos): a tela de headset mostrada neste monitor (virtual ou espelhado), se houver.</summary>
+    public (string DeviceId, uint ScreenKey)? ScreenAt(string deviceName)
+    {
+        lock (_lock)
+            foreach (var (key, live) in _live)
+                if (live.DisplayName.Equals(deviceName, StringComparison.OrdinalIgnoreCase)) return key;
+        return null;
+    }
+
     public bool IsVirtualDisplay(string deviceName)
     {
         lock (_lock)
@@ -414,6 +525,7 @@ public sealed class ScreenHost : IScreenHost, IDisposable
     public void Dispose()
     {
         _sweeper.Dispose();
+        _scaleKeeper.Dispose();
         lock (_lock)
         {
             _disposed = true;

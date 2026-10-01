@@ -27,10 +27,14 @@ table SetStreamRate { screen_key:uint; fps:ubyte; kbps:uint; }
 // 2G: áudio. StartAudio (headset → host) depois do Welcome e quando os botões mudam; AudioStarted (host → headset).
 table StartAudio { udp_port:ushort; playback:bool; mic:bool; }
 table AudioStarted { mic_port:ushort; speakers:bool; mic:bool; }
+// 3A: disposição das telas no Quest (headset → host) para o arranjo do Windows; atalhos globais (host → headset).
+table ScreenAngles { screen_key:uint; azimuth_deg:float; elevation_deg:float; half_width_deg:float; half_height_deg:float; }
+table LayoutChanged { screens:[ScreenAngles]; }
+table Hotkey { action:ubyte; screen_key:uint; }
 
 union Message { Hello, PairingRequired, PairingResult, Welcome, StartStream, StreamStarted, StreamStopped, Ping, Pong, Bye,
                 AcquireScreen, ScreenReady, ScreenFailed, ReleaseScreen, SetStreamRate,
-                StartAudio, AudioStarted }
+                StartAudio, AudioStarted, LayoutChanged, Hotkey }
 
 table Envelope { protocol_version:ushort; body:Message; }
 

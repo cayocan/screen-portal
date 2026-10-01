@@ -55,6 +55,8 @@ public interface IScreenHost
     void Release(string deviceId, long generation, uint screenKey, TimeSpan grace);
     /// <summary>2F: fps e bitrate do stream de uma tela, ao vivo (valores já limitados).</summary>
     void SetRate(string deviceId, long generation, uint screenKey, int fps, int kbps);
+    /// <summary>3A: o arranjo do Windows segue a disposição das telas no Quest.</summary>
+    void Arrange(string deviceId, long generation, IReadOnlyList<ScreenAnglesInfo> screens);
     void Disconnected(string deviceId, long generation);
 }
 
