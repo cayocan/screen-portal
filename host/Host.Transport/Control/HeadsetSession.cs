@@ -60,6 +60,12 @@ public sealed class HeadsetSession(
             case StartAudioMessage startAudio when _welcomed && audio != null:
                 Enqueue(() => OnStartAudio(startAudio));
                 break;
+            case LayoutChangedMessage layout when _welcomed:
+                Enqueue(() =>
+                {
+                    if (_welcomed && _deviceId != null) screens.Arrange(_deviceId, _generation, layout.Screens);
+                });
+                break;
             case SetStreamRateMessage rate when _welcomed:
                 Enqueue(() => OnSetRate(rate));
                 break;

@@ -13,6 +13,16 @@ namespace ScreenPortal.Host.App.Display
         /// <returns>0 se aplicou; senão o código de erro do Win32 (ou -1 se o monitor não foi encontrado).</returns>
         public static int SetPosition(string gdiDeviceName, int x, int y)
         {
+            var one = new System.Collections.Generic.Dictionary<string, int[]>(StringComparer.OrdinalIgnoreCase);
+            one[gdiDeviceName] = new[] { x, y };
+            return SetPositions(one);
+        }
+
+        /// <summary>Vários monitores num único SetDisplayConfig (3A: o arranjo inteiro de uma vez, uma só reconfiguração).</summary>
+        /// <param name="positions">nome GDI → { x, y }.</param>
+        /// <returns>0 se aplicou; senão o erro do Win32 (−1 = algum monitor não foi encontrado).</returns>
+        public static int SetPositions(System.Collections.Generic.IDictionary<string, int[]> positions)
+        {
             uint pathCount, modeCount;
             int err = GetDisplayConfigBufferSizes(QdcOnlyActivePaths, out pathCount, out modeCount);
             if (err != 0) return err;
@@ -21,6 +31,7 @@ namespace ScreenPortal.Host.App.Display
             err = QueryDisplayConfig(QdcOnlyActivePaths, ref pathCount, paths, ref modeCount, modes, IntPtr.Zero);
             if (err != 0) return err;
 
+            int found = 0;
             for (int i = 0; i < pathCount; i++)
             {
                 var source = paths[i].sourceInfo;
@@ -30,16 +41,17 @@ namespace ScreenPortal.Host.App.Display
                 name.header.adapterId = source.adapterId;
                 name.header.id = source.id;
                 if (DisplayConfigGetDeviceInfo(ref name) != 0) continue;
-                if (!string.Equals(name.viewGdiDeviceName, gdiDeviceName, StringComparison.OrdinalIgnoreCase)) continue;
+                int[] position;
+                if (name.viewGdiDeviceName == null || !positions.TryGetValue(name.viewGdiDeviceName, out position)) continue;
 
                 uint modeIndex = source.modeInfoIdx;
                 if (modeIndex >= modeCount || modes[modeIndex].infoType != ModeInfoTypeSource) return -1;
-                modes[modeIndex].sourceMode.position.x = x;
-                modes[modeIndex].sourceMode.position.y = y;
-                return SetDisplayConfig(pathCount, paths, modeCount, modes,
-                    SdcApply | SdcUseSuppliedDisplayConfig | SdcSaveToDatabase);
+                modes[modeIndex].sourceMode.position.x = position[0];
+                modes[modeIndex].sourceMode.position.y = position[1];
+                found++;
             }
-            return -1;
+            if (found < positions.Count) return -1;
+            return SetDisplayConfig(pathCount, paths, modeCount, modes, SdcApply | SdcUseSuppliedDisplayConfig | SdcSaveToDatabase);
         }
 
         private const uint QdcOnlyActivePaths = 0x2;

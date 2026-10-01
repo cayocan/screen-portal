@@ -293,6 +293,41 @@ public sealed class ScreenHost : IScreenHost, IDisposable
         }
     }
 
+    /// <summary>
+    /// 3A: o arranjo do Windows segue a disposição das telas no Quest (spec 3A §2): plano puro (DisplayArrangement) e um
+    /// único SetDisplayConfig com os monitores que mudaram. Telas fora da mensagem (soltas) e monitores fora do Quest
+    /// ficam onde estão. Cada monitor movido tem a captura recriada (FollowDisplayChanges).
+    /// </summary>
+    public void Arrange(string deviceId, long generation, IReadOnlyList<ScreenAnglesInfo> angles)
+    {
+        lock (_lock)
+        {
+            if (_disposed || Stale(deviceId, generation, "LayoutChanged")) return;
+            var windows = Win32Displays.Snapshot();
+            var current = windows.ToDictionary(d => d.DeviceName, d => d.Bounds, StringComparer.OrdinalIgnoreCase);
+            var screens = new List<ArrangedScreen>();
+            foreach (var a in angles)
+            {
+                if (!_live.TryGetValue((deviceId, a.ScreenKey), out var live) || !current.TryGetValue(live.DisplayName, out var bounds)) continue;
+                if (screens.Exists(s => s.Monitor.Equals(live.DisplayName, StringComparison.OrdinalIgnoreCase))) continue; // dois espelhos do mesmo monitor
+                screens.Add(new ArrangedScreen(live.DisplayName, bounds.Width, bounds.Height, a.AzimuthDeg, a.ElevationDeg, a.HalfWidthDeg, a.HalfHeightDeg));
+            }
+            if (screens.Count == 0) return;
+            var primary = windows.FirstOrDefault(d => d.IsPrimary)?.DeviceName ?? "";
+            var plan = DisplayArrangement.Plan(screens,
+                windows.Select(d => new WindowsMonitor(d.DeviceName, d.Bounds, d.IsPrimary)).ToList(), primary);
+            var changed = new Dictionary<string, int[]>(StringComparer.OrdinalIgnoreCase);
+            foreach (var (name, rect) in plan)
+                if (!name.Equals(primary, StringComparison.OrdinalIgnoreCase) && current[name] != rect)
+                    changed[name] = [rect.X, rect.Y];
+            if (changed.Count == 0) return;
+            int err = DisplayConfigPosition.SetPositions(changed);
+            _log(err == 0
+                ? $"arranjo: {changed.Count} monitor(es) reposicionado(s) como no Quest ({string.Join(", ", changed.Select(c => $"{c.Key} {c.Value[0]},{c.Value[1]}"))})"
+                : $"arranjo: o Windows recusou o arranjo ({err})");
+        }
+    }
+
     /// <summary>2F: fps e bitrate de uma tela com stream, ao vivo. Loga só quando muda.</summary>
     public void SetRate(string deviceId, long generation, uint screenKey, int fps, int kbps)
     {
