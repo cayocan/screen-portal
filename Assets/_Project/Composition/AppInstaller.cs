@@ -61,6 +61,14 @@ namespace ScreenPortal.Composition
                 return new RateSync(r.Resolve<WorkspaceStore>(), r.Resolve<IScreenLinks>(), () => machine.IsLinked, machine.Send,
                     r.Resolve<IHeadPoseSource>(), r.Resolve<IClock>());
             }, Lifetime.Singleton);
+            // 3A: o arranjo do Windows segue a disposição das telas no Quest ("Arranjo automático", começa ligado)
+            builder.RegisterInstance(new LayoutSyncSettings());
+            builder.Register(r =>
+            {
+                var machine = r.Resolve<ConnectionStateMachine>();
+                return new LayoutSync(r.Resolve<WorkspaceStore>(), () => machine.IsLinked, machine.Send, r.Resolve<IClock>(),
+                    r.Resolve<LayoutSyncSettings>());
+            }, Lifetime.Singleton);
 
             // 2B: manipulação por controle/mãos + menu de pulso (spec 2026-09-29-fase2b-manipulacao-design.md)
             builder.RegisterInstance(env.Head ?? new FixedHeadPose(Pose.At(LayoutSurface.DefaultCenter))).As<IHeadPoseSource>();
