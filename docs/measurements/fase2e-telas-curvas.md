@@ -24,8 +24,8 @@ layer e desempenho.
 Spike (antes da implementação): 4 layers cilíndricas a 60 fps, 15–17 ms, 0 perdas; troca plana ↔ curva 35–100 ms.
 
 ## Ajustes pedidos no teste (mesma branch)
-- Texto da interface em TextMeshPro (SDF) e eye buffer em escala 1,0 (ADR 0013).
+- Texto da interface em TextMeshPro (SDF) e eye buffer em escala 1,0 (ADR 0013). ✅ confirmado no Quest: mais nítido.
 - Laser do controle some com o controle parado (3 s); tchau liga/desliga as mãos (laser, interação, modelo); modelos
-  de mão e de controle do Meta SDK.
+  de mão e de controle do Meta SDK. ✅ confirmados no Quest.
 - Última sessão salva no headset e restaurada na abertura, recentrada na cabeça (ADR 0014). ✅ verificado: app
   fechado à força duas vezes, as 5 telas voltaram (`reatado` no host, nenhuma expirou) e centralizadas.
