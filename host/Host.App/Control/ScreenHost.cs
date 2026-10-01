@@ -497,6 +497,15 @@ public sealed class ScreenHost : IScreenHost, IDisposable
         }
     }
 
+    /// <summary>3A (atalhos): a tela de headset mostrada neste monitor (virtual ou espelhado), se houver.</summary>
+    public (string DeviceId, uint ScreenKey)? ScreenAt(string deviceName)
+    {
+        lock (_lock)
+            foreach (var (key, live) in _live)
+                if (live.DisplayName.Equals(deviceName, StringComparison.OrdinalIgnoreCase)) return key;
+        return null;
+    }
+
     public bool IsVirtualDisplay(string deviceName)
     {
         lock (_lock)

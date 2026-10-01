@@ -81,11 +81,17 @@ static int RunServe(Args o, CancellationToken ct)
     using var closing = System.Runtime.InteropServices.PosixSignalRegistration.Create(System.Runtime.InteropServices.PosixSignal.SIGHUP, _ => audio.Dispose());
     var approver = new ScreenPortal.Host.App.Control.MessageBoxPairingApprover();
     string hostName = Environment.MachineName;
+    // 3A: atalhos globais → headset dono da tela sob o cursor
+    var hotkeyRouter = new ScreenPortal.Host.Transport.Control.HotkeyRouter();
+    using var hotkeys = new ScreenPortal.Host.App.Control.HotkeyService(
+        Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData), "ScreenPortal", "hotkeys.json"),
+        screens.ScreenAt, hotkeyRouter, Log);
 
     using var server = new ScreenPortal.Host.Transport.Control.ControlServer(
         ScreenPortal.Infrastructure.Protocol.ControlProtocol.Port,
         connection => new ScreenPortal.Host.Transport.Control.HeadsetSession(connection, pairing, SavePairing, approver,
-            screens.PhysicalMonitors, screens, hostName, () => ScreenPortal.Host.Domain.Pairing.PairingStore.NewPairingCode(System.Security.Cryptography.RandomNumberGenerator.GetInt32), Log, audio),
+            screens.PhysicalMonitors, screens, hostName, () => ScreenPortal.Host.Domain.Pairing.PairingStore.NewPairingCode(System.Security.Cryptography.RandomNumberGenerator.GetInt32), Log, audio,
+            hotkeyRouter),
         Log);
     server.Start();
     using var keyframes = new KeyframeRequestListener(KeyframeRequestListener.DefaultPort, screens.RequestKeyframe);

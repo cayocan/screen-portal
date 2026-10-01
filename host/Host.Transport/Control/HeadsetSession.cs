@@ -18,7 +18,8 @@ public sealed class HeadsetSession(
     string hostName,
     Func<string> newCode,
     Action<string> log,
-    IAudioHost? audio = null)
+    IAudioHost? audio = null,
+    HotkeyRouter? hotkeys = null)
 {
     private string? _deviceId;
     private long _generation; // publicado pela escrita volátil de _welcomed
@@ -108,6 +109,7 @@ public sealed class HeadsetSession(
     {
         _generation = screens.Claim(_deviceId!, OnReplaced);
         _welcomed = true;
+        hotkeys?.Register(_deviceId!, this, connection.Send);
         connection.Send(new WelcomeMessage(hostName, monitors.GetMonitors(), screens.Leases(_deviceId!)));
     }
 
@@ -115,6 +117,7 @@ public sealed class HeadsetSession(
     private void OnReplaced()
     {
         log($"sessão de {_deviceId} ({connection.RemoteAddress}) substituída por uma nova conexão");
+        if (_deviceId != null) hotkeys?.Unregister(_deviceId, this);
         connection.Send(new ByeMessage(ByeReason.Replaced));
         connection.Close();
     }
@@ -176,6 +179,7 @@ public sealed class HeadsetSession(
         if (!_welcomed) return; // leitura volátil primeiro: publica _deviceId e _generation
         string? deviceId = _deviceId;
         long generation = _generation;
+        if (deviceId != null) hotkeys?.Unregister(deviceId, this);
         if (deviceId != null) Enqueue(() =>
         {
             screens.Disconnected(deviceId, generation);

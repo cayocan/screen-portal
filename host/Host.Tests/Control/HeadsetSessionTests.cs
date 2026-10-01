@@ -125,6 +125,22 @@ public class HeadsetSessionTests
         Assert.Equal(new[] { "start 192.168.0.171:9300 True True", "stop dev-1" }, audio.Calls);
     }
 
+    [Fact]
+    public void Welcomed_ReceivesHotkeys_UntilClosed()
+    {
+        var conn = new FakeConnection();
+        var pairing = new PairingStore();
+        var router = new HotkeyRouter();
+        var session = new HeadsetSession(conn, pairing, () => { }, new FakeApprover(false), new FakeMonitors(), new FakeScreens(), "CAYO-PC",
+            () => "482913", _ => { }, null, router);
+        Assert.False(router.Send("dev-1", new HotkeyMessage(HotkeyAction.Undo, 0)), "antes do Welcome");
+        session.OnMessage(new HelloMessage("dev-1", "Quest 3", pairing.Pair("dev-1", "Quest 3", DateTimeOffset.UnixEpoch)));
+        Assert.True(router.Send("dev-1", new HotkeyMessage(HotkeyAction.MoveLeft, 7)));
+        Assert.Equal(HotkeyAction.MoveLeft, conn.Last<HotkeyMessage>()!.Action);
+        session.OnClosed();
+        Assert.False(router.Send("dev-1", new HotkeyMessage(HotkeyAction.Undo, 0)));
+    }
+
     private static (HeadsetSession session, FakeConnection conn, PairingStore pairing, FakeScreens screens, FakeApprover approver) Create(bool approve)
     {
         var conn = new FakeConnection();
