@@ -12,12 +12,13 @@ pelo mouse seja igual à do controle e da mão, num **modo edição** geral do a
 ## Decisão
 1. O cursor do Windows é desenhado no headset (posição e forma por UDP/TCP; captura sem cursor).
 2. Fora das telas, o host engole o mouse e o headset move um **cursor 3D no mundo** (graus em volta da cabeça); ao tocar
-   uma tela, o host põe o cursor do Windows no pixel do toque. Substitui o "pular vão"/"parede" do brief. A saída tem
-   resistência de borda (40 px em 300 ms).
+   uma tela, o host põe o cursor do Windows no pixel do toque. Substitui o "pular vão"/"parede" do brief. A saída é
+   imediata (sem resistência de borda, a pedido do Cayo).
 3. Monitores do PC fora do Quest continuam alcançáveis pelo arranjo do Windows.
 4. **Modo edição** global: só nele telas são manipuladas, por mouse (novo `IManipulationInput`), controle ou mão. Fora
    dele, os lasers só servem ao menu. Entra/sai por menu, `Ctrl+Alt+E`, `Esc`, `Ctrl+Alt` segurado (temporário).
 5. O headset é dono da geometria (cursor 3D, toque, edição); o host só decide engolir/passar e posicionar o cursor.
+6. O cursor é uma **compositor layer** própria (no eye buffer ficava borrado, Quest 01/10).
 
 ## Consequências
 - O host precisa de um hook `WH_MOUSE_LL` (callback leve) e de um canal UDP novo; sem headset conectado nada é interceptado.

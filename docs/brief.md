@@ -577,7 +577,7 @@ A resolução é escolhida **uma vez, na criação**. É aí que o usuário deci
 
 > **v1.3.6 (ADR 0016/0017):** o arranjo do Windows segue o Quest por padrão. Fora das telas o cursor **não pula**: vira
 > um **cursor 3D no mundo** (o host engole o mouse, o headset move o cursor) e entra na tela que tocar, no ponto do
-> toque. "Pular vão"/"Parede" (10.7) saem; a resistência de borda e a histerese ficam. Monitores fora do Quest seguem
+> toque. "Pular vão"/"Parede" (10.7) saem; a histerese fica; a resistência de borda sai (pedido do Cayo). Monitores fora do Quest seguem
 > pelo Windows. Spec: `docs/specs/2026-10-01-fase3b-cursor-edicao-design.md`. O texto abaixo é o desenho original.
 
 **O problema:** o Windows só entende monitores como **retângulos num plano 2D, colados borda com borda**. Ele não sabe que uma janela está no canto superior esquerdo, afastada, maior que o desktop ou flutuando acima dele. Se dependermos só do Windows, o mouse vai para onde a configuração de monitores mandar, **não para onde a tela está no 3D**.

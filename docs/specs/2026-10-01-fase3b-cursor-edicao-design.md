@@ -24,7 +24,7 @@ Fora do escopo: clicar no conteúdo das telas com o laser, menu pelo mouse, mold
 | **Fora do Quest** (monitor físico não espelhado) | Windows | invisível |
 
 - Hook `WH_MOUSE_LL` numa thread própria; o callback só lê o evento, decide engolir/passar e grava o estado (sem I/O, sem alocação). Um envio UDP separado lê o estado mais recente.
-- **Saída (Tela → Mundo):** o ponto pedido pelo evento fica fora do monitor atual. Se cair num monitor fora do Quest → passa (Windows). Senão → engole e acumula a **resistência**: 40 px empurrando para fora em até 300 ms (zera se parar ou voltar). Vencida, entra em Mundo com o ponto de saída (tela, x, y); o cursor do Windows fica parado na borda.
+- **Saída (Tela → Mundo):** o ponto pedido pelo evento fica fora do monitor atual. Se cair num monitor fora do Quest → passa (Windows). Senão → engole e entra **na hora** em Mundo com o ponto de saída (tela, x, y); o cursor do Windows fica parado na borda. Sem resistência de borda (o Cayo pediu para tirar, 01/10).
 - **Entrada (Mundo → Tela):** `CursorEnter(tela, x, y)` do headset → `SetCursorPos` no pixel correspondente do monitor da tela (coordenadas do desktop) → estado Tela.
 - **Segurança:** sem sessão de headset, o hook não intercepta nada. Sessão caiu em Mundo/Edição → volta a Tela e devolve o cursor ao ponto de saída.
 - Movimento normal entre duas telas do Quest coladas no Windows também passa pela saída: a entrada imediata no headset (§4) faz a travessia parecer direta e respeita o ponto que o usuário vê.
@@ -45,7 +45,7 @@ Fora do escopo: clicar no conteúdo das telas com o laser, menu pelo mouse, mold
 - **`MousePointer`** (Application): adapter `IManipulationInput` — raio cabeça → cursor 3D; botão esquerdo = `SelectHeld`, direito = `GripHeld`, roda = `DistanceDeltaM` (5 cm por clique), `Shift`+roda = `ResizeScreen` ±10 % na tela sob o cursor, `Esc` = `CancelPressed` (com arraste) ou sai do modo. Só ativo na Edição.
 - **Lasers fora da edição:** `InteractionRouter` só entrega controle/mão à manipulação com a Edição ligada; fora dela, só menu. Tchau continua.
 - **Edição ligada:** molduras e alças visíveis em todas as telas (não só no hover) e selo "Modo edição" na visão.
-- **`CursorView`** (Presentation): quad no eye buffer (acima das telas, ADR 0010), 2 mm à frente da tela, orientada pela normal; posição = pixel → ponto 3D (geometria plana/cilíndrica já usada nas alças); tamanho = pixels da forma × metros por pixel da tela; hotspot alinhado. Texturas por `shape_id` em cache (aloca só em forma nova). No Mundo: mesma forma, tamanho angular igual ao que tinha na última tela, na distância dela, sempre por cima, com halo. Na Edição, sobre alças: ícones de mover/redimensionar do headset. Fora do Quest: escondido.
+- **`CursorView`** (Presentation): **compositor layer** própria (OVROverlay quad, tipo Overlay, supersample) — no eye buffer ficava borrada (Quest, 01/10); 2 mm à frente da tela, orientada pela normal; posição = pixel → ponto 3D (geometria plana/cilíndrica já usada nas alças); tamanho = pixels da forma × metros por pixel da tela; hotspot alinhado. A forma vai para o canto de uma textura fixa de 128² (a layer nunca é recriada; aloca só em forma nova). No Mundo: mesma forma, tamanho angular igual ao que tinha na última tela, na distância dela, sempre por cima, com halo. Na Edição, sobre alças: ícones de mover/redimensionar do headset. Fora do Quest: escondido.
 - **Recepção UDP** (Infrastructure): thread com buffer fixo; o quadro lê só o pacote mais recente (sem alocação). O cursor não é vídeo: passar pelo C# não fere a regra do vídeo.
 - Menu de pulso: item "Modo edição: ligado/desligado" (`MaxItems` → 17).
 
@@ -54,8 +54,8 @@ Fora do escopo: clicar no conteúdo das telas com o laser, menu pelo mouse, mold
 
 ## 6. Ordem e verificação
 1. **3B-1 — cursor da tela:** captura sem cursor, `MouseState` (estado Tela), formas, `CursorView` na tela. **Quest:** atraso do cursor × vídeo, leitura sobre texto, I-beam visível.
-2. **3B-2 — cursor no mundo:** saída com resistência, `WorldCursor`, entrada no ponto certo, monitores fora do Quest pelo Windows, queda da sessão. **Simulator** (host real no PC) + Quest.
+2. **3B-2 — cursor no mundo:** saída imediata, `WorldCursor`, entrada no ponto certo, monitores fora do Quest pelo Windows, queda da sessão. **Simulator** (host real no PC) + Quest.
 3. **3B-3 — modo edição:** `EditMode`, `MousePointer`, lasers só na edição, alças visíveis, atalhos/menu/`Esc`/`Ctrl+Alt`. **Simulator** + Quest.
 
 ## 7. Testes
-Host (xUnit, puro): `MouseRouter` (estados, borda → Quest/fora do Quest/nada, resistência e tempo, `CursorEnter`, queda da sessão, edição engole tudo); conversão de cursor monocromático; codec das mensagens novas. Headset (NUnit, puro): `WorldCursor` (delta → graus, toque → pixel em plana e curva, 80 ms), `MousePointer` → `ManipulationInput`, `EditMode` (lasers só nele, desligar cancela arraste, desligar sobre tela entra nela), pixel → ponto 3D do cursor. Simulator e Quest como em §6.
+Host (xUnit, puro): `MouseRouter` (estados, borda → Quest/fora do Quest/nada, `CursorEnter`, queda da sessão, edição engole tudo); conversão de cursor monocromático; codec das mensagens novas. Headset (NUnit, puro): `WorldCursor` (delta → graus, toque → pixel em plana e curva, 80 ms), `MousePointer` → `ManipulationInput`, `EditMode` (lasers só nele, desligar cancela arraste, desligar sobre tela entra nela), pixel → ponto 3D do cursor. Simulator e Quest como em §6.

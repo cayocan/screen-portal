@@ -14,14 +14,14 @@
 3. **Headset — recepção:** `UdpMouseStateReceiver` (Infrastructure/Shared/Net, thread, buffer fixo, último pacote);
    `CursorSync` (Application): manda `StartCursor` no Welcome, guarda formas (`CursorShape`) e o estado mais recente.
 4. **Headset — desenho:** `CursorPlacement` (Application, puro: pixel → pose 3D na tela plana/curva, tamanho em metros;
-   testes) + `CursorView` (Presentation: quad no eye buffer, texturas por `shape_id`). Composição; Unity; APK; Quest.
+   testes) + `CursorView` (Presentation: compositor layer própria — no eye buffer ficava borrado). Composição; Unity; APK; Quest.
 
 ## 3B-2 — Cursor no mundo
-5. **Host `MouseRouter`** (Host.Domain, puro): estados Tela/Mundo/Edição/Fora do Quest, borda → destino, resistência
-   40 px/300 ms, deltas acumulados, `CursorEnter`, queda da sessão; bateria de testes.
+5. **Host `MouseRouter`** (Host.Domain, puro): estados Tela/Mundo/Edição/Fora do Quest, borda → destino (saída imediata),
+   deltas acumulados, `CursorEnter`, queda da sessão; bateria de testes.
 6. **Host `MouseHook`:** `WH_MOUSE_LL` em thread própria → `MouseRouter`; `SetCursorPos` na entrada; só com headset.
 7. **Headset `WorldCursor`** (Application, puro): direção a partir do ponto de saída, delta → graus pela última tela,
-   toque → `CursorEnter`, 80 ms; testes. `CursorView` no mundo (tamanho angular, halo). Simulator; Quest.
+   toque → `CursorEnter`, 80 ms; testes. `CursorView` no mundo (tamanho angular). Simulator; Quest.
 
 ## 3B-3 — Modo edição
 8. **`EditMode`** (Application) + `SetEditMode` ao host; `InteractionRouter` só manipula com a edição ligada; alças
