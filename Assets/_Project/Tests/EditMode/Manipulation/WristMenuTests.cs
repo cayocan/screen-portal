@@ -227,6 +227,30 @@ namespace ScreenPortal.Tests
         }
 
         [Test]
+        public void AudioPage_TogglesThePlaybackAndTheMic_AndShowsTheStatus()
+        {
+            var c = new ConnectionRig();
+            var audio = new ScreenPortal.App.Audio.AudioSync(c.Machine, new NullAudio(), new ScreenPortal.App.Audio.AudioSettings());
+            var menu = new WristMenu(c.Store, c.Bus, new FixedHeadPose(Head), new FixedHostCatalog(true, Physical), false, null, audio);
+            menu.Invoke(MenuItemId.Audio);
+            Assert.That(menu.Page, Is.EqualTo(MenuPage.Audio));
+            Assert.That(menu.ItemCount, Is.EqualTo(3));
+            Assert.That(menu.Label(0), Is.EqualTo(WristMenu.PlaybackOn));
+            Assert.That(menu.Label(1), Is.EqualTo(WristMenu.MicOn));
+            menu.Invoke(1);
+            Assert.That(menu.Label(1), Is.EqualTo(WristMenu.MicOff));
+            Assert.That(menu.StatusLine, Is.EqualTo("Som do PC: ligado · Microfone: mudo"));
+            menu.Invoke(0);
+            Assert.That(menu.Label(0), Is.EqualTo(WristMenu.PlaybackOff));
+        }
+
+        private sealed class NullAudio : ScreenPortal.App.Audio.IAudioLink
+        {
+            public bool Start(string host, int rxPort, int txPort, bool playback, bool mic) => true;
+            public void Stop() { }
+        }
+
+        [Test]
         public void FrameRateItem_NeedsAFocusedVideoScreen()
         {
             var r = new Rig();

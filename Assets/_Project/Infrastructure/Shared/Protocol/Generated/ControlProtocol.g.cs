@@ -42,6 +42,8 @@ public enum Message : byte
   ScreenFailed = 13,
   ReleaseScreen = 14,
   SetStreamRate = 15,
+  StartAudio = 16,
+  AudioStarted = 17,
 };
 
 
@@ -97,6 +99,12 @@ static public class MessageVerify
         break;
       case Message.SetStreamRate:
         result = ScreenPortal.Protocol.Fb.SetStreamRateVerify.Verify(verifier, tablePos);
+        break;
+      case Message.StartAudio:
+        result = ScreenPortal.Protocol.Fb.StartAudioVerify.Verify(verifier, tablePos);
+        break;
+      case Message.AudioStarted:
+        result = ScreenPortal.Protocol.Fb.AudioStartedVerify.Verify(verifier, tablePos);
         break;
       default: result = true;
         break;
@@ -940,6 +948,100 @@ static public class SetStreamRateVerify
       && verifier.VerifyTableEnd(tablePos);
   }
 }
+public struct StartAudio : IFlatbufferObject
+{
+  private Table __p;
+  public ByteBuffer ByteBuffer { get { return __p.bb; } }
+  public static void ValidateVersion() { FlatBufferConstants.FLATBUFFERS_25_2_10(); }
+  public static StartAudio GetRootAsStartAudio(ByteBuffer _bb) { return GetRootAsStartAudio(_bb, new StartAudio()); }
+  public static StartAudio GetRootAsStartAudio(ByteBuffer _bb, StartAudio obj) { return (obj.__assign(_bb.GetInt(_bb.Position) + _bb.Position, _bb)); }
+  public void __init(int _i, ByteBuffer _bb) { __p = new Table(_i, _bb); }
+  public StartAudio __assign(int _i, ByteBuffer _bb) { __init(_i, _bb); return this; }
+
+  public ushort UdpPort { get { int o = __p.__offset(4); return o != 0 ? __p.bb.GetUshort(o + __p.bb_pos) : (ushort)0; } }
+  public bool Playback { get { int o = __p.__offset(6); return o != 0 ? 0!=__p.bb.Get(o + __p.bb_pos) : (bool)false; } }
+  public bool Mic { get { int o = __p.__offset(8); return o != 0 ? 0!=__p.bb.Get(o + __p.bb_pos) : (bool)false; } }
+
+  public static Offset<ScreenPortal.Protocol.Fb.StartAudio> CreateStartAudio(FlatBufferBuilder builder,
+      ushort udp_port = 0,
+      bool playback = false,
+      bool mic = false) {
+    builder.StartTable(3);
+    StartAudio.AddUdpPort(builder, udp_port);
+    StartAudio.AddMic(builder, mic);
+    StartAudio.AddPlayback(builder, playback);
+    return StartAudio.EndStartAudio(builder);
+  }
+
+  public static void StartStartAudio(FlatBufferBuilder builder) { builder.StartTable(3); }
+  public static void AddUdpPort(FlatBufferBuilder builder, ushort udpPort) { builder.AddUshort(0, udpPort, 0); }
+  public static void AddPlayback(FlatBufferBuilder builder, bool playback) { builder.AddBool(1, playback, false); }
+  public static void AddMic(FlatBufferBuilder builder, bool mic) { builder.AddBool(2, mic, false); }
+  public static Offset<ScreenPortal.Protocol.Fb.StartAudio> EndStartAudio(FlatBufferBuilder builder) {
+    int o = builder.EndTable();
+    return new Offset<ScreenPortal.Protocol.Fb.StartAudio>(o);
+  }
+}
+
+
+static public class StartAudioVerify
+{
+  static public bool Verify(Google.FlatBuffers.Verifier verifier, uint tablePos)
+  {
+    return verifier.VerifyTableStart(tablePos)
+      && verifier.VerifyField(tablePos, 4 /*UdpPort*/, 2 /*ushort*/, 2, false)
+      && verifier.VerifyField(tablePos, 6 /*Playback*/, 1 /*bool*/, 1, false)
+      && verifier.VerifyField(tablePos, 8 /*Mic*/, 1 /*bool*/, 1, false)
+      && verifier.VerifyTableEnd(tablePos);
+  }
+}
+public struct AudioStarted : IFlatbufferObject
+{
+  private Table __p;
+  public ByteBuffer ByteBuffer { get { return __p.bb; } }
+  public static void ValidateVersion() { FlatBufferConstants.FLATBUFFERS_25_2_10(); }
+  public static AudioStarted GetRootAsAudioStarted(ByteBuffer _bb) { return GetRootAsAudioStarted(_bb, new AudioStarted()); }
+  public static AudioStarted GetRootAsAudioStarted(ByteBuffer _bb, AudioStarted obj) { return (obj.__assign(_bb.GetInt(_bb.Position) + _bb.Position, _bb)); }
+  public void __init(int _i, ByteBuffer _bb) { __p = new Table(_i, _bb); }
+  public AudioStarted __assign(int _i, ByteBuffer _bb) { __init(_i, _bb); return this; }
+
+  public ushort MicPort { get { int o = __p.__offset(4); return o != 0 ? __p.bb.GetUshort(o + __p.bb_pos) : (ushort)0; } }
+  public bool Speakers { get { int o = __p.__offset(6); return o != 0 ? 0!=__p.bb.Get(o + __p.bb_pos) : (bool)false; } }
+  public bool Mic { get { int o = __p.__offset(8); return o != 0 ? 0!=__p.bb.Get(o + __p.bb_pos) : (bool)false; } }
+
+  public static Offset<ScreenPortal.Protocol.Fb.AudioStarted> CreateAudioStarted(FlatBufferBuilder builder,
+      ushort mic_port = 0,
+      bool speakers = false,
+      bool mic = false) {
+    builder.StartTable(3);
+    AudioStarted.AddMicPort(builder, mic_port);
+    AudioStarted.AddMic(builder, mic);
+    AudioStarted.AddSpeakers(builder, speakers);
+    return AudioStarted.EndAudioStarted(builder);
+  }
+
+  public static void StartAudioStarted(FlatBufferBuilder builder) { builder.StartTable(3); }
+  public static void AddMicPort(FlatBufferBuilder builder, ushort micPort) { builder.AddUshort(0, micPort, 0); }
+  public static void AddSpeakers(FlatBufferBuilder builder, bool speakers) { builder.AddBool(1, speakers, false); }
+  public static void AddMic(FlatBufferBuilder builder, bool mic) { builder.AddBool(2, mic, false); }
+  public static Offset<ScreenPortal.Protocol.Fb.AudioStarted> EndAudioStarted(FlatBufferBuilder builder) {
+    int o = builder.EndTable();
+    return new Offset<ScreenPortal.Protocol.Fb.AudioStarted>(o);
+  }
+}
+
+
+static public class AudioStartedVerify
+{
+  static public bool Verify(Google.FlatBuffers.Verifier verifier, uint tablePos)
+  {
+    return verifier.VerifyTableStart(tablePos)
+      && verifier.VerifyField(tablePos, 4 /*MicPort*/, 2 /*ushort*/, 2, false)
+      && verifier.VerifyField(tablePos, 6 /*Speakers*/, 1 /*bool*/, 1, false)
+      && verifier.VerifyField(tablePos, 8 /*Mic*/, 1 /*bool*/, 1, false)
+      && verifier.VerifyTableEnd(tablePos);
+  }
+}
 public struct Envelope : IFlatbufferObject
 {
   private Table __p;
@@ -970,6 +1072,8 @@ public struct Envelope : IFlatbufferObject
   public ScreenPortal.Protocol.Fb.ScreenFailed BodyAsScreenFailed() { return Body<ScreenPortal.Protocol.Fb.ScreenFailed>().Value; }
   public ScreenPortal.Protocol.Fb.ReleaseScreen BodyAsReleaseScreen() { return Body<ScreenPortal.Protocol.Fb.ReleaseScreen>().Value; }
   public ScreenPortal.Protocol.Fb.SetStreamRate BodyAsSetStreamRate() { return Body<ScreenPortal.Protocol.Fb.SetStreamRate>().Value; }
+  public ScreenPortal.Protocol.Fb.StartAudio BodyAsStartAudio() { return Body<ScreenPortal.Protocol.Fb.StartAudio>().Value; }
+  public ScreenPortal.Protocol.Fb.AudioStarted BodyAsAudioStarted() { return Body<ScreenPortal.Protocol.Fb.AudioStarted>().Value; }
 
   public static Offset<ScreenPortal.Protocol.Fb.Envelope> CreateEnvelope(FlatBufferBuilder builder,
       ushort protocol_version = 0,

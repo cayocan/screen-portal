@@ -17,7 +17,8 @@ public sealed class HeadsetSession(
     IScreenHost screens,
     string hostName,
     Func<string> newCode,
-    Action<string> log)
+    Action<string> log,
+    IAudioHost? audio = null)
 {
     private string? _deviceId;
     private long _generation; // publicado pela escrita volátil de _welcomed
@@ -55,6 +56,9 @@ public sealed class HeadsetSession(
                 break;
             case ReleaseScreenMessage release when _welcomed:
                 Enqueue(() => OnRelease(release));
+                break;
+            case StartAudioMessage startAudio when _welcomed && audio != null:
+                Enqueue(() => OnStartAudio(startAudio));
                 break;
             case SetStreamRateMessage rate when _welcomed:
                 Enqueue(() => OnSetRate(rate));
@@ -145,6 +149,13 @@ public sealed class HeadsetSession(
         screens.Release(_deviceId, _generation, release.ScreenKey, TimeSpan.FromMilliseconds(release.GraceMs));
     }
 
+    private void OnStartAudio(StartAudioMessage start)
+    {
+        if (!_welcomed || _deviceId == null || audio == null) return;
+        var result = audio.Start(_deviceId, _generation, connection.RemoteAddress, start.UdpPort, start.Playback, start.Mic);
+        connection.Send(new AudioStartedMessage(result.MicPort, result.Speakers, result.Mic));
+    }
+
     private void OnSetRate(SetStreamRateMessage rate)
     {
         if (!_welcomed || _deviceId == null) return;
@@ -159,6 +170,10 @@ public sealed class HeadsetSession(
         if (!_welcomed) return; // leitura volátil primeiro: publica _deviceId e _generation
         string? deviceId = _deviceId;
         long generation = _generation;
-        if (deviceId != null) Enqueue(() => screens.Disconnected(deviceId, generation));
+        if (deviceId != null) Enqueue(() =>
+        {
+            screens.Disconnected(deviceId, generation);
+            audio?.Stop(deviceId, generation);
+        });
     }
 }

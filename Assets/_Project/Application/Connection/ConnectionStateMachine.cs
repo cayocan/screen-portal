@@ -33,6 +33,8 @@ namespace ScreenPortal.App.Connection
         public ConnectionStatus Status { get; private set; } = new ConnectionStatus(ConnectionStatusKind.Idle);
         /// <summary>true entre o Welcome e a queda: dá para falar com o host.</summary>
         public bool IsLinked => _linked;
+        /// <summary>IP do PC conectado (2G: destino do microfone).</summary>
+        public string HostAddress => _host.Address;
 
         public event Action<ConnectionStatus> StatusChanged;
         /// <summary>Welcome recebido (conexão nova ou reconexão). IsLinked já é true.</summary>
@@ -213,6 +215,7 @@ namespace ScreenPortal.App.Connection
                 case ScreenFailedMessage _:
                 case StreamStartedMessage _:
                 case StreamStoppedMessage _:
+                case AudioStartedMessage _:
                     ScreenMessage?.Invoke(message);
                     break;
                 case PingMessage ping:

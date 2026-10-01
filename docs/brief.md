@@ -6,6 +6,7 @@
 > v1.3.2 (28/09/2026) — ADR 0005: **superfície de layout Cilindro/Esfera** (seção 10.12) e o princípio **Liberdade**. Entra nas Fases 2 e 3, sem mudar a ordem do roadmap.
 > v1.3.3 (30/09/2026) — ADR 0011: **toda tela curva é uma layer cilíndrica** (o limite de 1 cilindro não vale no OpenXR do Quest 3; saem `CylinderLayerPolicy`, crossfade e o modo "nitidez reduzida"). ADR 0012: **sem resolução personalizada**, **sem contorno fantasma** (a tela nasce à frente da visão) e **recriar sem confirmação** (com undo).
 > v1.3.4 (30/09/2026) — ADR 0014: **última sessão salva no headset** (a workspace volta quando o app reinicia; antecipa só esse pedaço da Fase 3b — perfis nomeados e âncoras continuam lá). ADR 0013: texto da interface em TextMeshPro (SDF) e eye buffer em escala 1,0.
+> v1.3.5 (01/10/2026) — ADR 0015: **microfone do Quest no PC** entra no MVP; áudio pelos drivers de streaming do Steam até a Fase 5 (som do PC só no Quest).
 >
 > **Princípio de produto — Liberdade:** encaixes, grades e regras de layout **ajudam, nunca prendem**. Tudo que gruda pode ser desgrudado e toda tela pode sair da superfície de layout.
 >

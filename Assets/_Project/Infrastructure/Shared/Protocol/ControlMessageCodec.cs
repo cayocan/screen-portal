@@ -112,6 +112,14 @@ namespace ScreenPortal.Infrastructure.Protocol
                     body = Fb.ScreenFailed.CreateScreenFailed(b, m.ScreenKey, b.CreateString(m.Reason)).Value;
                     type = Fb.Message.ScreenFailed;
                     break;
+                case StartAudioMessage m:
+                    body = Fb.StartAudio.CreateStartAudio(b, m.UdpPort, m.Playback, m.Mic).Value;
+                    type = Fb.Message.StartAudio;
+                    break;
+                case AudioStartedMessage m:
+                    body = Fb.AudioStarted.CreateAudioStarted(b, m.MicPort, m.Speakers, m.Mic).Value;
+                    type = Fb.Message.AudioStarted;
+                    break;
                 case SetStreamRateMessage m:
                     body = Fb.SetStreamRate.CreateSetStreamRate(b, m.ScreenKey, m.Fps, m.Kbps).Value;
                     type = Fb.Message.SetStreamRate;
@@ -249,6 +257,16 @@ namespace ScreenPortal.Infrastructure.Protocol
                 {
                     var f = e.BodyAsScreenFailed();
                     return new ScreenFailedMessage(f.ScreenKey, f.Reason);
+                }
+                case Fb.Message.StartAudio:
+                {
+                    var a = e.BodyAsStartAudio();
+                    return new StartAudioMessage(a.UdpPort, a.Playback, a.Mic);
+                }
+                case Fb.Message.AudioStarted:
+                {
+                    var a = e.BodyAsAudioStarted();
+                    return new AudioStartedMessage(a.MicPort, a.Speakers, a.Mic);
                 }
                 case Fb.Message.SetStreamRate:
                 {
