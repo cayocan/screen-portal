@@ -129,6 +129,25 @@ namespace ScreenPortal.Infrastructure.Protocol
                     body = Fb.Hotkey.CreateHotkey(b, (byte)m.Action, m.ScreenKey).Value;
                     type = Fb.Message.Hotkey;
                     break;
+                case StartCursorMessage m:
+                    body = Fb.StartCursor.CreateStartCursor(b, m.UdpPort).Value;
+                    type = Fb.Message.StartCursor;
+                    break;
+                case CursorShapeMessage m:
+                {
+                    var bgra = Fb.CursorShape.CreateBgraVectorBlock(b, m.Bgra);
+                    body = Fb.CursorShape.CreateCursorShape(b, m.ShapeId, m.Width, m.Height, m.HotX, m.HotY, m.Scale, bgra).Value;
+                    type = Fb.Message.CursorShape;
+                    break;
+                }
+                case CursorEnterMessage m:
+                    body = Fb.CursorEnter.CreateCursorEnter(b, m.ScreenKey, m.X, m.Y).Value;
+                    type = Fb.Message.CursorEnter;
+                    break;
+                case SetEditModeMessage m:
+                    body = Fb.SetEditMode.CreateSetEditMode(b, m.On).Value;
+                    type = Fb.Message.SetEditMode;
+                    break;
                 case StartAudioMessage m:
                     body = Fb.StartAudio.CreateStartAudio(b, m.UdpPort, m.Playback, m.Mic).Value;
                     type = Fb.Message.StartAudio;
@@ -291,6 +310,20 @@ namespace ScreenPortal.Infrastructure.Protocol
                     var h = e.BodyAsHotkey();
                     return new HotkeyMessage((HotkeyAction)h.Action, h.ScreenKey);
                 }
+                case Fb.Message.StartCursor:
+                    return new StartCursorMessage(e.BodyAsStartCursor().UdpPort);
+                case Fb.Message.CursorShape:
+                {
+                    var c = e.BodyAsCursorShape();
+                    return new CursorShapeMessage(c.ShapeId, c.Width, c.Height, c.HotX, c.HotY, c.Scale, c.GetBgraArray());
+                }
+                case Fb.Message.CursorEnter:
+                {
+                    var c = e.BodyAsCursorEnter();
+                    return new CursorEnterMessage(c.ScreenKey, c.X, c.Y);
+                }
+                case Fb.Message.SetEditMode:
+                    return new SetEditModeMessage(e.BodyAsSetEditMode().On);
                 case Fb.Message.StartAudio:
                 {
                     var a = e.BodyAsStartAudio();

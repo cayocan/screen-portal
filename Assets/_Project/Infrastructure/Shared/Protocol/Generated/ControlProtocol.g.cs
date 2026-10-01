@@ -46,6 +46,10 @@ public enum Message : byte
   AudioStarted = 17,
   LayoutChanged = 18,
   Hotkey = 19,
+  StartCursor = 20,
+  CursorShape = 21,
+  CursorEnter = 22,
+  SetEditMode = 23,
 };
 
 
@@ -113,6 +117,18 @@ static public class MessageVerify
         break;
       case Message.Hotkey:
         result = ScreenPortal.Protocol.Fb.HotkeyVerify.Verify(verifier, tablePos);
+        break;
+      case Message.StartCursor:
+        result = ScreenPortal.Protocol.Fb.StartCursorVerify.Verify(verifier, tablePos);
+        break;
+      case Message.CursorShape:
+        result = ScreenPortal.Protocol.Fb.CursorShapeVerify.Verify(verifier, tablePos);
+        break;
+      case Message.CursorEnter:
+        result = ScreenPortal.Protocol.Fb.CursorEnterVerify.Verify(verifier, tablePos);
+        break;
+      case Message.SetEditMode:
+        result = ScreenPortal.Protocol.Fb.SetEditModeVerify.Verify(verifier, tablePos);
         break;
       default: result = true;
         break;
@@ -1192,6 +1208,206 @@ static public class HotkeyVerify
       && verifier.VerifyTableEnd(tablePos);
   }
 }
+public struct StartCursor : IFlatbufferObject
+{
+  private Table __p;
+  public ByteBuffer ByteBuffer { get { return __p.bb; } }
+  public static void ValidateVersion() { FlatBufferConstants.FLATBUFFERS_25_2_10(); }
+  public static StartCursor GetRootAsStartCursor(ByteBuffer _bb) { return GetRootAsStartCursor(_bb, new StartCursor()); }
+  public static StartCursor GetRootAsStartCursor(ByteBuffer _bb, StartCursor obj) { return (obj.__assign(_bb.GetInt(_bb.Position) + _bb.Position, _bb)); }
+  public void __init(int _i, ByteBuffer _bb) { __p = new Table(_i, _bb); }
+  public StartCursor __assign(int _i, ByteBuffer _bb) { __init(_i, _bb); return this; }
+
+  public ushort UdpPort { get { int o = __p.__offset(4); return o != 0 ? __p.bb.GetUshort(o + __p.bb_pos) : (ushort)0; } }
+
+  public static Offset<ScreenPortal.Protocol.Fb.StartCursor> CreateStartCursor(FlatBufferBuilder builder,
+      ushort udp_port = 0) {
+    builder.StartTable(1);
+    StartCursor.AddUdpPort(builder, udp_port);
+    return StartCursor.EndStartCursor(builder);
+  }
+
+  public static void StartStartCursor(FlatBufferBuilder builder) { builder.StartTable(1); }
+  public static void AddUdpPort(FlatBufferBuilder builder, ushort udpPort) { builder.AddUshort(0, udpPort, 0); }
+  public static Offset<ScreenPortal.Protocol.Fb.StartCursor> EndStartCursor(FlatBufferBuilder builder) {
+    int o = builder.EndTable();
+    return new Offset<ScreenPortal.Protocol.Fb.StartCursor>(o);
+  }
+}
+
+
+static public class StartCursorVerify
+{
+  static public bool Verify(Google.FlatBuffers.Verifier verifier, uint tablePos)
+  {
+    return verifier.VerifyTableStart(tablePos)
+      && verifier.VerifyField(tablePos, 4 /*UdpPort*/, 2 /*ushort*/, 2, false)
+      && verifier.VerifyTableEnd(tablePos);
+  }
+}
+public struct CursorShape : IFlatbufferObject
+{
+  private Table __p;
+  public ByteBuffer ByteBuffer { get { return __p.bb; } }
+  public static void ValidateVersion() { FlatBufferConstants.FLATBUFFERS_25_2_10(); }
+  public static CursorShape GetRootAsCursorShape(ByteBuffer _bb) { return GetRootAsCursorShape(_bb, new CursorShape()); }
+  public static CursorShape GetRootAsCursorShape(ByteBuffer _bb, CursorShape obj) { return (obj.__assign(_bb.GetInt(_bb.Position) + _bb.Position, _bb)); }
+  public void __init(int _i, ByteBuffer _bb) { __p = new Table(_i, _bb); }
+  public CursorShape __assign(int _i, ByteBuffer _bb) { __init(_i, _bb); return this; }
+
+  public uint ShapeId { get { int o = __p.__offset(4); return o != 0 ? __p.bb.GetUint(o + __p.bb_pos) : (uint)0; } }
+  public ushort Width { get { int o = __p.__offset(6); return o != 0 ? __p.bb.GetUshort(o + __p.bb_pos) : (ushort)0; } }
+  public ushort Height { get { int o = __p.__offset(8); return o != 0 ? __p.bb.GetUshort(o + __p.bb_pos) : (ushort)0; } }
+  public ushort HotX { get { int o = __p.__offset(10); return o != 0 ? __p.bb.GetUshort(o + __p.bb_pos) : (ushort)0; } }
+  public ushort HotY { get { int o = __p.__offset(12); return o != 0 ? __p.bb.GetUshort(o + __p.bb_pos) : (ushort)0; } }
+  public byte Scale { get { int o = __p.__offset(14); return o != 0 ? __p.bb.Get(o + __p.bb_pos) : (byte)1; } }
+  public byte Bgra(int j) { int o = __p.__offset(16); return o != 0 ? __p.bb.Get(__p.__vector(o) + j * 1) : (byte)0; }
+  public int BgraLength { get { int o = __p.__offset(16); return o != 0 ? __p.__vector_len(o) : 0; } }
+#if ENABLE_SPAN_T
+  public Span<byte> GetBgraBytes() { return __p.__vector_as_span<byte>(16, 1); }
+#else
+  public ArraySegment<byte>? GetBgraBytes() { return __p.__vector_as_arraysegment(16); }
+#endif
+  public byte[] GetBgraArray() { return __p.__vector_as_array<byte>(16); }
+
+  public static Offset<ScreenPortal.Protocol.Fb.CursorShape> CreateCursorShape(FlatBufferBuilder builder,
+      uint shape_id = 0,
+      ushort width = 0,
+      ushort height = 0,
+      ushort hot_x = 0,
+      ushort hot_y = 0,
+      byte scale = 1,
+      VectorOffset bgraOffset = default(VectorOffset)) {
+    builder.StartTable(7);
+    CursorShape.AddBgra(builder, bgraOffset);
+    CursorShape.AddShapeId(builder, shape_id);
+    CursorShape.AddHotY(builder, hot_y);
+    CursorShape.AddHotX(builder, hot_x);
+    CursorShape.AddHeight(builder, height);
+    CursorShape.AddWidth(builder, width);
+    CursorShape.AddScale(builder, scale);
+    return CursorShape.EndCursorShape(builder);
+  }
+
+  public static void StartCursorShape(FlatBufferBuilder builder) { builder.StartTable(7); }
+  public static void AddShapeId(FlatBufferBuilder builder, uint shapeId) { builder.AddUint(0, shapeId, 0); }
+  public static void AddWidth(FlatBufferBuilder builder, ushort width) { builder.AddUshort(1, width, 0); }
+  public static void AddHeight(FlatBufferBuilder builder, ushort height) { builder.AddUshort(2, height, 0); }
+  public static void AddHotX(FlatBufferBuilder builder, ushort hotX) { builder.AddUshort(3, hotX, 0); }
+  public static void AddHotY(FlatBufferBuilder builder, ushort hotY) { builder.AddUshort(4, hotY, 0); }
+  public static void AddScale(FlatBufferBuilder builder, byte scale) { builder.AddByte(5, scale, 1); }
+  public static void AddBgra(FlatBufferBuilder builder, VectorOffset bgraOffset) { builder.AddOffset(6, bgraOffset.Value, 0); }
+  public static VectorOffset CreateBgraVector(FlatBufferBuilder builder, byte[] data) { builder.StartVector(1, data.Length, 1); for (int i = data.Length - 1; i >= 0; i--) builder.AddByte(data[i]); return builder.EndVector(); }
+  public static VectorOffset CreateBgraVectorBlock(FlatBufferBuilder builder, byte[] data) { builder.StartVector(1, data.Length, 1); builder.Add(data); return builder.EndVector(); }
+  public static VectorOffset CreateBgraVectorBlock(FlatBufferBuilder builder, ArraySegment<byte> data) { builder.StartVector(1, data.Count, 1); builder.Add(data); return builder.EndVector(); }
+  public static VectorOffset CreateBgraVectorBlock(FlatBufferBuilder builder, IntPtr dataPtr, int sizeInBytes) { builder.StartVector(1, sizeInBytes, 1); builder.Add<byte>(dataPtr, sizeInBytes); return builder.EndVector(); }
+  public static void StartBgraVector(FlatBufferBuilder builder, int numElems) { builder.StartVector(1, numElems, 1); }
+  public static Offset<ScreenPortal.Protocol.Fb.CursorShape> EndCursorShape(FlatBufferBuilder builder) {
+    int o = builder.EndTable();
+    return new Offset<ScreenPortal.Protocol.Fb.CursorShape>(o);
+  }
+}
+
+
+static public class CursorShapeVerify
+{
+  static public bool Verify(Google.FlatBuffers.Verifier verifier, uint tablePos)
+  {
+    return verifier.VerifyTableStart(tablePos)
+      && verifier.VerifyField(tablePos, 4 /*ShapeId*/, 4 /*uint*/, 4, false)
+      && verifier.VerifyField(tablePos, 6 /*Width*/, 2 /*ushort*/, 2, false)
+      && verifier.VerifyField(tablePos, 8 /*Height*/, 2 /*ushort*/, 2, false)
+      && verifier.VerifyField(tablePos, 10 /*HotX*/, 2 /*ushort*/, 2, false)
+      && verifier.VerifyField(tablePos, 12 /*HotY*/, 2 /*ushort*/, 2, false)
+      && verifier.VerifyField(tablePos, 14 /*Scale*/, 1 /*byte*/, 1, false)
+      && verifier.VerifyVectorOfData(tablePos, 16 /*Bgra*/, 1 /*byte*/, false)
+      && verifier.VerifyTableEnd(tablePos);
+  }
+}
+public struct CursorEnter : IFlatbufferObject
+{
+  private Table __p;
+  public ByteBuffer ByteBuffer { get { return __p.bb; } }
+  public static void ValidateVersion() { FlatBufferConstants.FLATBUFFERS_25_2_10(); }
+  public static CursorEnter GetRootAsCursorEnter(ByteBuffer _bb) { return GetRootAsCursorEnter(_bb, new CursorEnter()); }
+  public static CursorEnter GetRootAsCursorEnter(ByteBuffer _bb, CursorEnter obj) { return (obj.__assign(_bb.GetInt(_bb.Position) + _bb.Position, _bb)); }
+  public void __init(int _i, ByteBuffer _bb) { __p = new Table(_i, _bb); }
+  public CursorEnter __assign(int _i, ByteBuffer _bb) { __init(_i, _bb); return this; }
+
+  public uint ScreenKey { get { int o = __p.__offset(4); return o != 0 ? __p.bb.GetUint(o + __p.bb_pos) : (uint)0; } }
+  public int X { get { int o = __p.__offset(6); return o != 0 ? __p.bb.GetInt(o + __p.bb_pos) : (int)0; } }
+  public int Y { get { int o = __p.__offset(8); return o != 0 ? __p.bb.GetInt(o + __p.bb_pos) : (int)0; } }
+
+  public static Offset<ScreenPortal.Protocol.Fb.CursorEnter> CreateCursorEnter(FlatBufferBuilder builder,
+      uint screen_key = 0,
+      int x = 0,
+      int y = 0) {
+    builder.StartTable(3);
+    CursorEnter.AddY(builder, y);
+    CursorEnter.AddX(builder, x);
+    CursorEnter.AddScreenKey(builder, screen_key);
+    return CursorEnter.EndCursorEnter(builder);
+  }
+
+  public static void StartCursorEnter(FlatBufferBuilder builder) { builder.StartTable(3); }
+  public static void AddScreenKey(FlatBufferBuilder builder, uint screenKey) { builder.AddUint(0, screenKey, 0); }
+  public static void AddX(FlatBufferBuilder builder, int x) { builder.AddInt(1, x, 0); }
+  public static void AddY(FlatBufferBuilder builder, int y) { builder.AddInt(2, y, 0); }
+  public static Offset<ScreenPortal.Protocol.Fb.CursorEnter> EndCursorEnter(FlatBufferBuilder builder) {
+    int o = builder.EndTable();
+    return new Offset<ScreenPortal.Protocol.Fb.CursorEnter>(o);
+  }
+}
+
+
+static public class CursorEnterVerify
+{
+  static public bool Verify(Google.FlatBuffers.Verifier verifier, uint tablePos)
+  {
+    return verifier.VerifyTableStart(tablePos)
+      && verifier.VerifyField(tablePos, 4 /*ScreenKey*/, 4 /*uint*/, 4, false)
+      && verifier.VerifyField(tablePos, 6 /*X*/, 4 /*int*/, 4, false)
+      && verifier.VerifyField(tablePos, 8 /*Y*/, 4 /*int*/, 4, false)
+      && verifier.VerifyTableEnd(tablePos);
+  }
+}
+public struct SetEditMode : IFlatbufferObject
+{
+  private Table __p;
+  public ByteBuffer ByteBuffer { get { return __p.bb; } }
+  public static void ValidateVersion() { FlatBufferConstants.FLATBUFFERS_25_2_10(); }
+  public static SetEditMode GetRootAsSetEditMode(ByteBuffer _bb) { return GetRootAsSetEditMode(_bb, new SetEditMode()); }
+  public static SetEditMode GetRootAsSetEditMode(ByteBuffer _bb, SetEditMode obj) { return (obj.__assign(_bb.GetInt(_bb.Position) + _bb.Position, _bb)); }
+  public void __init(int _i, ByteBuffer _bb) { __p = new Table(_i, _bb); }
+  public SetEditMode __assign(int _i, ByteBuffer _bb) { __init(_i, _bb); return this; }
+
+  public bool On { get { int o = __p.__offset(4); return o != 0 ? 0!=__p.bb.Get(o + __p.bb_pos) : (bool)false; } }
+
+  public static Offset<ScreenPortal.Protocol.Fb.SetEditMode> CreateSetEditMode(FlatBufferBuilder builder,
+      bool on = false) {
+    builder.StartTable(1);
+    SetEditMode.AddOn(builder, on);
+    return SetEditMode.EndSetEditMode(builder);
+  }
+
+  public static void StartSetEditMode(FlatBufferBuilder builder) { builder.StartTable(1); }
+  public static void AddOn(FlatBufferBuilder builder, bool on) { builder.AddBool(0, on, false); }
+  public static Offset<ScreenPortal.Protocol.Fb.SetEditMode> EndSetEditMode(FlatBufferBuilder builder) {
+    int o = builder.EndTable();
+    return new Offset<ScreenPortal.Protocol.Fb.SetEditMode>(o);
+  }
+}
+
+
+static public class SetEditModeVerify
+{
+  static public bool Verify(Google.FlatBuffers.Verifier verifier, uint tablePos)
+  {
+    return verifier.VerifyTableStart(tablePos)
+      && verifier.VerifyField(tablePos, 4 /*On*/, 1 /*bool*/, 1, false)
+      && verifier.VerifyTableEnd(tablePos);
+  }
+}
 public struct Envelope : IFlatbufferObject
 {
   private Table __p;
@@ -1226,6 +1442,10 @@ public struct Envelope : IFlatbufferObject
   public ScreenPortal.Protocol.Fb.AudioStarted BodyAsAudioStarted() { return Body<ScreenPortal.Protocol.Fb.AudioStarted>().Value; }
   public ScreenPortal.Protocol.Fb.LayoutChanged BodyAsLayoutChanged() { return Body<ScreenPortal.Protocol.Fb.LayoutChanged>().Value; }
   public ScreenPortal.Protocol.Fb.Hotkey BodyAsHotkey() { return Body<ScreenPortal.Protocol.Fb.Hotkey>().Value; }
+  public ScreenPortal.Protocol.Fb.StartCursor BodyAsStartCursor() { return Body<ScreenPortal.Protocol.Fb.StartCursor>().Value; }
+  public ScreenPortal.Protocol.Fb.CursorShape BodyAsCursorShape() { return Body<ScreenPortal.Protocol.Fb.CursorShape>().Value; }
+  public ScreenPortal.Protocol.Fb.CursorEnter BodyAsCursorEnter() { return Body<ScreenPortal.Protocol.Fb.CursorEnter>().Value; }
+  public ScreenPortal.Protocol.Fb.SetEditMode BodyAsSetEditMode() { return Body<ScreenPortal.Protocol.Fb.SetEditMode>().Value; }
 
   public static Offset<ScreenPortal.Protocol.Fb.Envelope> CreateEnvelope(FlatBufferBuilder builder,
       ushort protocol_version = 0,

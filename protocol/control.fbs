@@ -31,10 +31,17 @@ table AudioStarted { mic_port:ushort; speakers:bool; mic:bool; }
 table ScreenAngles { screen_key:uint; azimuth_deg:float; elevation_deg:float; half_width_deg:float; half_height_deg:float; }
 table LayoutChanged { screens:[ScreenAngles]; }
 table Hotkey { action:ubyte; screen_key:uint; }
+// 3B: cursor no headset. StartCursor (headset → host): porta UDP do MouseState. CursorShape (host → headset): forma nova,
+// uma vez (bgra = width×height, hotspot em pixels do bitmap; scale = quantas vezes o bitmap foi reduzido para caber).
+// CursorEnter (headset → host): o cursor 3D tocou a tela no pixel (x, y). SetEditMode (headset → host).
+table StartCursor { udp_port:ushort; }
+table CursorShape { shape_id:uint; width:ushort; height:ushort; hot_x:ushort; hot_y:ushort; scale:ubyte = 1; bgra:[ubyte]; }
+table CursorEnter { screen_key:uint; x:int; y:int; }
+table SetEditMode { on:bool; }
 
 union Message { Hello, PairingRequired, PairingResult, Welcome, StartStream, StreamStarted, StreamStopped, Ping, Pong, Bye,
                 AcquireScreen, ScreenReady, ScreenFailed, ReleaseScreen, SetStreamRate,
-                StartAudio, AudioStarted, LayoutChanged, Hotkey }
+                StartAudio, AudioStarted, LayoutChanged, Hotkey, StartCursor, CursorShape, CursorEnter, SetEditMode }
 
 table Envelope { protocol_version:ushort; body:Message; }
 
