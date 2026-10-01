@@ -27,10 +27,13 @@ namespace ScreenPortal.App.Manipulation
         private readonly EditMode _edit;
         private readonly ScreenManipulationController _manipulation;
         private readonly ScreenPortal.App.Cursor.WorldCursor _world;
+        private readonly ScreenPortal.App.Cursor.MouseMenu _menu;
 
         public HotkeyDispatcher(WorkspaceStore store, ICommandBus bus, IHeadPoseSource head, ConnectionStateMachine connection = null,
-            EditMode edit = null, ScreenManipulationController manipulation = null, ScreenPortal.App.Cursor.WorldCursor world = null)
+            EditMode edit = null, ScreenManipulationController manipulation = null, ScreenPortal.App.Cursor.WorldCursor world = null,
+            ScreenPortal.App.Cursor.MouseMenu menu = null)
         {
+            _menu = menu;
             _world = world;
             _edit = edit;
             _manipulation = manipulation;
@@ -53,8 +56,10 @@ namespace ScreenPortal.App.Manipulation
             {
                 case HotkeyAction.ToggleEditMode: _edit?.Toggle(); return;
                 case HotkeyAction.FindCursor: _world?.CenterOnView(); return;
+                case HotkeyAction.OpenMenu: _menu?.Toggle(); return;
                 case HotkeyAction.Escape:
-                    if (_manipulation != null && _manipulation.IsDragging) _edit?.RequestCancel(); // Esc cancela o arraste
+                    if (_menu != null && _menu.Open) _menu.Close(); // Esc fecha o menu primeiro
+                    else if (_manipulation != null && _manipulation.IsDragging) _edit?.RequestCancel(); // Esc cancela o arraste
                     else _edit?.Set(false); // parado: sai do modo edição
                     return;
                 case HotkeyAction.Undo: _bus.Undo(); return;

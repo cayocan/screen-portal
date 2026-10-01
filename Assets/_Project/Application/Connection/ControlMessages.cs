@@ -346,6 +346,8 @@ namespace ScreenPortal.App.Connection
         Escape,
         /// <summary>Cursor 3D perdido no mundo: volta para a frente dos olhos.</summary>
         FindCursor,
+        /// <summary>3C: abre/fecha o menu do app onde o cursor está.</summary>
+        OpenMenu,
     }
 
     /// <summary>3B: o headset pede o MouseState (UDP) nesta porta.</summary>

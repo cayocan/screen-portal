@@ -19,6 +19,7 @@ namespace ScreenPortal.App.Manipulation
         private readonly ICommandBus _bus;
         private readonly EditMode _edit;
         private readonly IManipulationInput _mouse;
+        private readonly ScreenPortal.App.Cursor.MouseMenu _mouseMenu;
         private bool _prevRightSelect;
         private bool _prevPanelVisible;
 
@@ -27,8 +28,10 @@ namespace ScreenPortal.App.Manipulation
         public int MenuHover { get; private set; } = -1;
 
         public InteractionRouter(IManipulationInput right, IManipulationInput left, ScreenManipulationController manipulation,
-            WristMenu menu, IWristMenuPanel panel, ICommandBus bus, EditMode edit = null, IManipulationInput mouse = null)
+            WristMenu menu, IWristMenuPanel panel, ICommandBus bus, EditMode edit = null, IManipulationInput mouse = null,
+            ScreenPortal.App.Cursor.MouseMenu mouseMenu = null)
         {
+            _mouseMenu = mouseMenu;
             _edit = edit;
             _mouse = mouse;
             _right = right ?? NullManipulationInput.Instance;
@@ -57,8 +60,11 @@ namespace ScreenPortal.App.Manipulation
                 else if (left.RedoPressed) _bus.Redo();
             }
 
+            bool menuByMouse = _mouseMenu != null && _mouseMenu.Open;
+            _panel?.Float(menuByMouse, menuByMouse ? _mouseMenu.Pose : default);
             MenuHover = -1;
             bool rightSelect = right.SelectHeld;
+            bool rightPressed = rightSelect && !_prevRightSelect;
             bool panelVisible = _panel != null && _panel.Visible;
             if (!panelVisible && _prevPanelVisible) _menu.OnHidden();
             _prevPanelVisible = panelVisible;
@@ -72,6 +78,11 @@ namespace ScreenPortal.App.Manipulation
                 right.HasRay = false; // SelectHeld continua: o controlador só pega a tela num gatilho novo
             }
             _prevRightSelect = rightSelect;
+            if (menuByMouse)
+            {
+                if (rightPressed && MenuHover < 0) _mouseMenu.Close(); // clique fora fecha (e não pega tela nenhuma)
+                right = default;
+            }
 
             if (!editing)
             {

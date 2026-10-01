@@ -83,8 +83,12 @@ namespace ScreenPortal.Composition
             // 3A: atalhos globais do PC → Commands na tela sob o cursor do mouse
             builder.Register(r => new HotkeyDispatcher(r.Resolve<WorkspaceStore>(), r.Resolve<ICommandBus>(), r.Resolve<IHeadPoseSource>(),
                 r.Resolve<ConnectionStateMachine>(), r.Resolve<EditMode>(), r.Resolve<ScreenManipulationController>(),
-                r.Resolve<ScreenPortal.App.Cursor.WorldCursor>()), Lifetime.Singleton);
-            builder.RegisterBuildCallback(c => c.Resolve<HotkeyDispatcher>()); // assina a conexão já na montagem
+                r.Resolve<ScreenPortal.App.Cursor.WorldCursor>(), r.Resolve<ScreenPortal.App.Cursor.MouseMenu>()), Lifetime.Singleton);
+            builder.RegisterBuildCallback(c => c.Resolve<HotkeyDispatcher>());
+            // 3C: menu do app pelo mouse (Ctrl+Alt+M), flutuando onde o cursor está
+            builder.Register(r => new ScreenPortal.App.Cursor.MouseMenu(r.Resolve<EditMode>(), r.Resolve<IHeadPoseSource>(),
+                r.Resolve<ScreenPortal.App.Cursor.CursorSync>(), r.Resolve<ScreenPortal.App.Cursor.WorldCursor>(), r.Resolve<WorkspaceStore>()),
+                Lifetime.Singleton); // assina a conexão já na montagem
             // Controle parado perde o laser; tchau liga/desliga as mãos (laser, interação e modelo).
             builder.Register<HandsMode>(Lifetime.Singleton);
             builder.RegisterBuildCallback(c =>
@@ -95,7 +99,8 @@ namespace ScreenPortal.Composition
                 : new PointerFilter(pointer, r.Resolve<HandsMode>(), r.Resolve<IHeadPoseSource>(), r.Resolve<IClock>());
             builder.Register(r => new InteractionRouter(Filtered(env.RightPointer, r), Filtered(env.LeftPointer, r),
                 r.Resolve<ScreenManipulationController>(), r.Resolve<WristMenu>(), env.MenuPanel, r.Resolve<ICommandBus>(),
-                r.Resolve<EditMode>(), r.Resolve<ScreenPortal.App.Cursor.MousePointer>()), Lifetime.Singleton);
+                r.Resolve<EditMode>(), r.Resolve<ScreenPortal.App.Cursor.MousePointer>(), r.Resolve<ScreenPortal.App.Cursor.MouseMenu>()),
+                Lifetime.Singleton);
             builder.Register(r => new ManipulationPresenter(env.ScreensRoot, env.UnlitMaterial,
                 r.Resolve<ScreenManipulationController>(), r.Resolve<WorkspaceStore>(), views, r.Resolve<InteractionRouter>()), Lifetime.Singleton);
 

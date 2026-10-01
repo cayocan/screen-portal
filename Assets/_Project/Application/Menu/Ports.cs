@@ -29,6 +29,8 @@ namespace ScreenPortal.App.Menu
         bool Visible { get; }
         Pose Pose { get; }
         void Render(WristMenu menu, int hoverIndex);
+        /// <summary>3C: menu aberto pelo mouse, flutuando nesta pose (sobrepõe o pulso). false = volta ao pulso.</summary>
+        void Float(bool on, Pose pose);
     }
 
     /// <summary>O que o menu precisa saber do PC (implementado pelo HostSync).</summary>

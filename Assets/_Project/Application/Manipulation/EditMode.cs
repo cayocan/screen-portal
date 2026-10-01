@@ -24,7 +24,16 @@ namespace ScreenPortal.App.Manipulation
         public bool Enabled { get; private set; }
         /// <summary>Ligado só enquanto <c>Ctrl+Alt</c> está segurado.</summary>
         public bool Temporary { get; private set; }
-        public bool IsOn => Enabled || Temporary;
+        /// <summary>Menu do app aberto pelo mouse: segura a edição (o mouse vira o cursor 3D que escolhe os itens).</summary>
+        public bool MenuHold { get; private set; }
+        public bool IsOn => Enabled || Temporary || MenuHold;
+
+        public void SetMenuHold(bool hold)
+        {
+            if (MenuHold == hold) return;
+            MenuHold = hold;
+            Publish();
+        }
 
         public event Action Changed;
 
@@ -62,6 +71,7 @@ namespace ScreenPortal.App.Manipulation
         {
             Enabled = false;
             Temporary = false;
+            MenuHold = false;
             _sentOn = false; // o host novo começa com o mouse livre
             Changed?.Invoke();
         }
