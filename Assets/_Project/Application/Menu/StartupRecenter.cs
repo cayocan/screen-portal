@@ -24,6 +24,9 @@ namespace ScreenPortal.App.Menu
 
         public bool Done { get; private set; }
 
+        /// <summary>Sessão restaurada: a superfície já está onde o usuário deixou.</summary>
+        public void Skip() => Done = true;
+
         public void Tick()
         {
             if (Done) return;

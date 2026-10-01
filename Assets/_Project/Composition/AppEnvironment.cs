@@ -28,12 +28,15 @@ namespace ScreenPortal.Composition
         public bool ShowTestScreens { get; }
         /// <summary>Mostra/esconde os modelos das mãos (tchau desliga as mãos).</summary>
         public System.Action<bool> SetHandsVisible { get; }
+        /// <summary>Última sessão (a workspace volta se o app reiniciar).</summary>
+        public ScreenPortal.App.Session.ISessionStore Session { get; }
 
         public AppEnvironment(Transform screensRoot, ConnectionStatusView statusView, IHostDiscovery discovery,
             IPairingStore pairing, ConnectionOptions options,
             IManipulationInput rightPointer = null, IManipulationInput leftPointer = null, IHeadPoseSource head = null,
             IRecenterEvents recenter = null, IWristMenuPanel menuPanel = null, Material unlitMaterial = null,
-            bool showTestScreens = false, System.Action<bool> setHandsVisible = null)
+            bool showTestScreens = false, System.Action<bool> setHandsVisible = null,
+            ScreenPortal.App.Session.ISessionStore session = null)
         {
             ScreensRoot = screensRoot;
             StatusView = statusView;
@@ -48,6 +51,7 @@ namespace ScreenPortal.Composition
             UnlitMaterial = unlitMaterial;
             ShowTestScreens = showTestScreens;
             SetHandsVisible = setHandsVisible;
+            Session = session;
         }
     }
 }

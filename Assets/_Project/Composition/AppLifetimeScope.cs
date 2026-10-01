@@ -56,7 +56,13 @@ namespace ScreenPortal.Composition
 
             AppInstaller.Install(builder, new AppEnvironment(
                 screensRoot != null ? screensRoot : transform, statusView, discovery, pairing, options,
-                right, left, head, new OvrRecenterEvents(), menuPanel, unlitMaterial, Debug.isDebugBuild, SetHandsVisible));
+                right, left, head, new OvrRecenterEvents(), menuPanel, unlitMaterial, Debug.isDebugBuild, SetHandsVisible,
+                new FileSessionStore(System.IO.Path.Combine(Application.persistentDataPath, "last-session.txt"))));
+        }
+
+        private void OnApplicationPause(bool paused)
+        {
+            if (paused && Container != null && Container.TryResolve<AppEntryPoint>(out var entry)) entry.FlushSession();
         }
     }
 }

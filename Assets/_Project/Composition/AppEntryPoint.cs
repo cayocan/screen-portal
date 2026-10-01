@@ -23,11 +23,13 @@ namespace ScreenPortal.Composition
         private readonly HostSync _hostSync;
         private readonly OverlayScreenViewFactory _views;
         private readonly StartupRecenter _startupRecenter;
+        private readonly ScreenPortal.App.Session.SessionAutosave _autosave;
 
         public AppEntryPoint(ScreenViewSynchronizer synchronizer, ConnectionStateMachine connection,
             IControlChannel channel, IHostDiscovery discovery, AppEnvironment env,
             InteractionRouter router, ManipulationPresenter presenter, WristMenu menu,
-            HostSync hostSync, OverlayScreenViewFactory views, StartupRecenter startupRecenter)
+            HostSync hostSync, OverlayScreenViewFactory views, StartupRecenter startupRecenter,
+            ScreenPortal.App.Session.SessionAutosave autosave)
         {
             _synchronizer = synchronizer;
             _connection = connection;
@@ -40,6 +42,7 @@ namespace ScreenPortal.Composition
             _hostSync = hostSync;
             _views = views;
             _startupRecenter = startupRecenter;
+            _autosave = autosave;
         }
 
         public void Start()
@@ -59,7 +62,11 @@ namespace ScreenPortal.Composition
             _hostSync.Tick();
             _router.Tick();
             _presenter.Tick();
+            _autosave.Tick();
         }
+
+        /// <summary>App indo para segundo plano (óculos tirado, sistema fechando): salva já.</summary>
+        public void FlushSession() => _autosave.Flush();
 
         private void OnSystemRecentered() => _menu.Invoke(MenuItemId.Recenter);
 
@@ -67,6 +74,8 @@ namespace ScreenPortal.Composition
         {
             if (_env.Recenter != null) _env.Recenter.Recentered -= OnSystemRecentered;
             (_env.Recenter as IDisposable)?.Dispose();
+            _autosave.Flush();
+            _autosave.Dispose();
             _presenter.Dispose();
             _hostSync.Dispose();
             _views.Bind(null);

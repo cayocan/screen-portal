@@ -29,6 +29,26 @@ namespace ScreenPortal.Domain
             Surface = surface;
         }
 
+        /// <summary>
+        /// Workspace salva (última sessão): ids repetidos ficam de fora, o próximo id passa do maior existente (um id novo
+        /// não pode colidir com um monitor que o host ainda aluga) e um foco que não existe vira nenhum.
+        /// </summary>
+        public static Workspace Restore(IReadOnlyList<VirtualScreen> screens, ScreenId focused, int nextScreenId, LayoutSurface surface)
+        {
+            var kept = new List<VirtualScreen>(screens.Count);
+            int maxId = 0;
+            foreach (var screen in screens)
+            {
+                if (screen == null || kept.Exists(s => s.Id.Equals(screen.Id))) continue;
+                kept.Add(screen);
+                maxId = Math.Max(maxId, screen.Id.Value);
+            }
+            var restored = kept.ToArray();
+            bool focusExists = Array.Exists(restored, s => s.Id.Equals(focused));
+            return new Workspace(restored, focusExists ? focused : ScreenId.None, Math.Max(nextScreenId, maxId + 1),
+                surface ?? LayoutSurface.Default);
+        }
+
         public ScreenId AllocateId() => new ScreenId(NextScreenId);
 
         public bool TryGetScreen(ScreenId id, out VirtualScreen screen)

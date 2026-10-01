@@ -3,6 +3,7 @@ using ScreenPortal.App.Connection;
 using ScreenPortal.App.Manipulation;
 using ScreenPortal.App.Menu;
 using ScreenPortal.App.Screens;
+using ScreenPortal.App.Session;
 using ScreenPortal.Domain.Layout;
 using ScreenPortal.Domain.Spatial;
 using ScreenPortal.Infrastructure.Net;
@@ -24,7 +25,13 @@ namespace ScreenPortal.Composition
         {
             builder.RegisterInstance(env);
             builder.RegisterInstance(env.Options);
-            builder.RegisterInstance(new WorkspaceStore());
+            // Última sessão: se o app reiniciar, a workspace volta (e o host religa os monitores que ainda aluga).
+            var session = env.Session ?? new NullSessionStore();
+            bool restored = SessionCodec.TryDecode(session.Load(), out var lastSession);
+            builder.RegisterInstance(new WorkspaceStore(restored ? lastSession : null));
+            builder.RegisterInstance(session).As<ISessionStore>();
+            builder.Register<SessionAutosave>(Lifetime.Singleton);
+            if (restored) builder.RegisterBuildCallback(c => c.Resolve<StartupRecenter>().Skip());
             builder.RegisterInstance(new CommandJournal()).As<ICommandObserver>().AsSelf();
             builder.Register<CommandBus>(Lifetime.Singleton).As<ICommandBus>();
 
