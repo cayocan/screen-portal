@@ -31,6 +31,7 @@ switch (opts.Command)
     case "stream": return RunStream(opts, cts.Token);
     case "receive": return RunReceive(opts, cts.Token);
     case "display-spike": return RunDisplaySpike(opts);
+    case "audio-test": return ScreenPortal.Host.App.Audio.AudioSelfTest.Run();
     default:
         Console.Error.WriteLine("Uso: Host.App [serve] | stream --target <ip> [...] | receive [...]");
         return 2;
@@ -74,13 +75,16 @@ static int RunServe(Args o, CancellationToken ct)
     }
     using var screens = new ScreenPortal.Host.App.Control.ScreenHost(gpu, o.Int("bitrate", 20_000),
         TimeSpan.FromMinutes(graceMinutes), Log);
+    // 2G: áudio. Devolve a saída padrão do Windows também quando o console é fechado no X.
+    using var audio = new ScreenPortal.Host.App.Audio.AudioHost(Log);
+    using var closing = System.Runtime.InteropServices.PosixSignalRegistration.Create(System.Runtime.InteropServices.PosixSignal.SIGHUP, _ => audio.Dispose());
     var approver = new ScreenPortal.Host.App.Control.MessageBoxPairingApprover();
     string hostName = Environment.MachineName;
 
     using var server = new ScreenPortal.Host.Transport.Control.ControlServer(
         ScreenPortal.Infrastructure.Protocol.ControlProtocol.Port,
         connection => new ScreenPortal.Host.Transport.Control.HeadsetSession(connection, pairing, SavePairing, approver,
-            screens.PhysicalMonitors, screens, hostName, () => ScreenPortal.Host.Domain.Pairing.PairingStore.NewPairingCode(System.Security.Cryptography.RandomNumberGenerator.GetInt32), Log),
+            screens.PhysicalMonitors, screens, hostName, () => ScreenPortal.Host.Domain.Pairing.PairingStore.NewPairingCode(System.Security.Cryptography.RandomNumberGenerator.GetInt32), Log, audio),
         Log);
     server.Start();
     using var keyframes = new KeyframeRequestListener(KeyframeRequestListener.DefaultPort, screens.RequestKeyframe);
@@ -94,7 +98,12 @@ static int RunServe(Args o, CancellationToken ct)
     {
         double s = sw.Elapsed.TotalSeconds;
         sw.Restart();
-        if (server.ConnectionCount > 0) Log(screens.TakeStats(s));
+        if (server.ConnectionCount > 0)
+        {
+            Log(screens.TakeStats(s));
+            string audioStats = audio.TakeStats();
+            if (audioStats.Length > 0) Log(audioStats);
+        }
     }
     return 0;
 }

@@ -83,6 +83,43 @@ public class HeadsetSessionTests
         }
     }
 
+    private sealed class FakeAudio : IAudioHost
+    {
+        public readonly List<string> Calls = new();
+
+        public AudioStartResult Start(string deviceId, long generation, string address, ushort udpPort, bool playback, bool mic)
+        {
+            lock (Calls) Calls.Add($"start {address}:{udpPort} {playback} {mic}");
+            return new AudioStartResult(9301, true, mic);
+        }
+
+        public void Stop(string deviceId, long generation)
+        {
+            lock (Calls) Calls.Add($"stop {deviceId}");
+        }
+    }
+
+    [Fact]
+    public async Task StartAudio_StartsTheHostAudio_RepliesAudioStarted_AndClosingStopsIt()
+    {
+        var conn = new FakeConnection();
+        var pairing = new PairingStore();
+        var audio = new FakeAudio();
+        var session = new HeadsetSession(conn, pairing, () => { }, new FakeApprover(true), new FakeMonitors(), new FakeScreens(), "CAYO-PC",
+            () => "482913", _ => { }, audio);
+        session.OnMessage(new HelloMessage("dev-1", "Quest", ""));
+        await session.Idle.WaitAsync(TimeSpan.FromSeconds(5));
+        session.OnMessage(new StartAudioMessage(9300, true, true));
+        await session.Idle.WaitAsync(TimeSpan.FromSeconds(5));
+        var started = conn.Last<AudioStartedMessage>();
+        Assert.NotNull(started);
+        Assert.Equal((ushort)9301, started!.MicPort);
+        Assert.True(started.Mic);
+        session.OnClosed();
+        await session.Idle.WaitAsync(TimeSpan.FromSeconds(5));
+        Assert.Equal(new[] { "start 192.168.0.171:9300 True True", "stop dev-1" }, audio.Calls);
+    }
+
     private static (HeadsetSession session, FakeConnection conn, PairingStore pairing, FakeScreens screens, FakeApprover approver) Create(bool approve)
     {
         var conn = new FakeConnection();

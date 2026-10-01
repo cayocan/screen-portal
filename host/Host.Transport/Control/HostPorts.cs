@@ -57,3 +57,13 @@ public interface IScreenHost
     void SetRate(string deviceId, long generation, uint screenKey, int fps, int kbps);
     void Disconnected(string deviceId, long generation);
 }
+
+/// <summary>2G: resposta ao StartAudio — porta do microfone no host e o que está disponível.</summary>
+public readonly record struct AudioStartResult(ushort MicPort, bool Speakers, bool Mic);
+
+/// <summary>2G: áudio do headset atual (som do PC → Quest, microfone do Quest → PC).</summary>
+public interface IAudioHost
+{
+    AudioStartResult Start(string deviceId, long generation, string address, ushort udpPort, bool playback, bool mic);
+    void Stop(string deviceId, long generation);
+}

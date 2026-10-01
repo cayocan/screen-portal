@@ -16,4 +16,8 @@
     <ProjectReference Include="..\Host.Transport\Host.Transport.csproj" />
     <ProjectReference Include="..\Host.Shared\Host.Shared.csproj" />
   </ItemGroup>
+  <ItemGroup>
+    <PackageReference Include="Concentus" Version="2.2.2" />
+    <PackageReference Include="NAudio.Wasapi" Version="2.2.1" />
+  </ItemGroup>
 </Project>
