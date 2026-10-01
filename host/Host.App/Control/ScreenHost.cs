@@ -30,7 +30,9 @@ public sealed class ScreenHost : IScreenHost, IDisposable
         public ushort StreamId;
         public int Width;
         public int Height;
-        public DisplayInfo? Captured;     // diagnóstico (bug 2): o display como estava ao criar a captura
+        public DisplayInfo? Captured;
+        public int Fps = 60;              // 2F: taxa pedida pelo headset (o pipeline novo começa no padrão)
+        public int Kbps;     // diagnóstico (bug 2): o display como estava ao criar a captura
     }
 
     private readonly GpuDevice _gpu;
@@ -216,6 +218,7 @@ public sealed class ScreenHost : IScreenHost, IDisposable
             pipeline = new StreamPipeline(_gpu, capture, settings, new IPEndPoint(IPAddress.Parse(address), udpPort), 1, null, streamId, firstFrameId);
             pipeline.Start();
             live.Pipeline = pipeline;
+            if (live.Kbps > 0) pipeline.SetRate(live.Fps, live.Kbps); // captura recriada pelo host: mantém a taxa da 2F
             live.Address = address;
             live.Port = udpPort;
             live.StreamId = streamId;
@@ -279,6 +282,21 @@ public sealed class ScreenHost : IScreenHost, IDisposable
             foreach (var lease in _leases.ForDevice(deviceId)) StopStream(deviceId, lease.ScreenKey);
             _leases.ExpireAll(deviceId, DateTimeOffset.Now + _disconnectGrace);
             _log($"telas: {deviceId} desconectou; monitores mantidos por {_disconnectGrace.TotalMinutes:0.#} min");
+        }
+    }
+
+    /// <summary>2F: fps e bitrate de uma tela com stream, ao vivo. Loga só quando muda.</summary>
+    public void SetRate(string deviceId, long generation, uint screenKey, int fps, int kbps)
+    {
+        lock (_lock)
+        {
+            if (_disposed || Stale(deviceId, generation, "SetStreamRate")) return;
+            if (!_live.TryGetValue((deviceId, screenKey), out var live) || live.Pipeline == null) return;
+            if (live.Fps == fps && live.Kbps == kbps) return;
+            live.Pipeline.SetRate(fps, kbps);
+            live.Fps = fps;
+            live.Kbps = kbps;
+            _log($"vídeo: tela {screenKey} → {fps} fps, {kbps} kbps");
         }
     }
 

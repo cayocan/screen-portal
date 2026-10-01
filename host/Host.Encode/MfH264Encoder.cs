@@ -44,6 +44,7 @@ public sealed unsafe class MfH264Encoder : IVideoEncoder
     private readonly Thread _inputThread;
     private volatile bool _stop;
     private volatile bool _keyframeRequested = true;
+    private int _pendingBitrateKbps;
     private long _lastKeyframeUs;
 
     public string Name { get; }
@@ -151,6 +152,9 @@ public sealed unsafe class MfH264Encoder : IVideoEncoder
 
     public void RequestKeyframe() => _keyframeRequested = true;
 
+    /// <summary>Bitrate novo (2F), aplicado pelo thread do encoder antes do próximo quadro (ICodecAPI ao vivo).</summary>
+    public void SetBitrate(int kbps) => Interlocked.Exchange(ref _pendingBitrateKbps, kbps);
+
     private void InputLoop()
     {
         long durationHns = 10_000_000L / _settings.Fps;
@@ -169,6 +173,9 @@ public sealed unsafe class MfH264Encoder : IVideoEncoder
                 _pendingTexture = null;
             }
             if (texture is null) { _inputCredits.Release(); continue; }
+
+            int bitrate = Interlocked.Exchange(ref _pendingBitrateKbps, 0);
+            if (bitrate > 0) _codec?.SetUInt32(CodecApi.AVEncCommonMeanBitRate, (uint)bitrate * 1000);
 
             var sample = SampleFor(texture);
             sample.SampleTime = (long)timeUs * 10;
