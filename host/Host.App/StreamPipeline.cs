@@ -55,12 +55,11 @@ public sealed class StreamPipeline : ICaptureFrameSink, IEncodedFrameSink, IDisp
     /// <summary>Próximo frameId do (primeiro) stream: um pipeline que substitui este segue daqui. Ler depois do Dispose.</summary>
     public uint NextFrameId => _packetizers[0].NextFrameId;
 
-    /// <summary>2F: fps (limitador da captura) e bitrate do encoder, ao vivo; sem IDR nem pipeline novo.</summary>
-    public void SetRate(int fps, int kbps)
-    {
-        Interlocked.Exchange(ref _minFrameIntervalUs, MinFrameIntervalUs(fps));
-        _encoder.SetBitrate(kbps);
-    }
+    /// <summary>
+    /// 2F: fps ao vivo (limitador da captura). O bitrate cai na mesma proporção sozinho: o encoder reserva os bits por
+    /// quadro da configuração a 60 fps (ver StreamRateLimits.BaseKbpsAt60).
+    /// </summary>
+    public void SetFps(int fps) => Interlocked.Exchange(ref _minFrameIntervalUs, MinFrameIntervalUs(fps));
 
     private static long MinFrameIntervalUs(int fps) => 1_000_000L / fps - 2_000; // tolerância para jitter do compositor
 

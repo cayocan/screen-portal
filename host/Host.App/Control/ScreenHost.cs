@@ -31,8 +31,8 @@ public sealed class ScreenHost : IScreenHost, IDisposable
         public int Width;
         public int Height;
         public DisplayInfo? Captured;
-        public int Fps = 60;              // 2F: taxa pedida pelo headset (o pipeline novo começa no padrão)
-        public int Kbps;     // diagnóstico (bug 2): o display como estava ao criar a captura
+        public int Fps = 60;              // 2F: fps pedido pelo headset
+        public int BaseKbps;              // 2F: bitrate do encoder a 60 fps (0 = padrão do host)     // diagnóstico (bug 2): o display como estava ao criar a captura
     }
 
     private readonly GpuDevice _gpu;
@@ -222,11 +222,11 @@ public sealed class ScreenHost : IScreenHost, IDisposable
             capture.Diagnostic += message => _log($"vídeo: tela {screenKey} ({display}): {message}");
             _log($"vídeo: tela {screenKey} captura {capture.Width}×{capture.Height} de {display}");
             var fit = ResolutionFit.FromCapture(capture.Width, capture.Height);
-            var settings = new EncoderSettings(fit.Width, fit.Height, 60, _bitrateKbps);
+            var settings = new EncoderSettings(fit.Width, fit.Height, 60, live.BaseKbps > 0 ? live.BaseKbps : _bitrateKbps);
             pipeline = new StreamPipeline(_gpu, capture, settings, new IPEndPoint(IPAddress.Parse(address), udpPort), 1, null, streamId, firstFrameId);
             pipeline.Start();
             live.Pipeline = pipeline;
-            if (live.Kbps > 0) pipeline.SetRate(live.Fps, live.Kbps); // captura recriada pelo host: mantém a taxa da 2F
+            if (live.Fps != 60) pipeline.SetFps(live.Fps); // pipeline recriado: mantém o fps da 2F
             live.Address = address;
             live.Port = udpPort;
             live.StreamId = streamId;
@@ -300,11 +300,20 @@ public sealed class ScreenHost : IScreenHost, IDisposable
         {
             if (_disposed || Stale(deviceId, generation, "SetStreamRate")) return;
             if (!_live.TryGetValue((deviceId, screenKey), out var live) || live.Pipeline == null) return;
-            if (live.Fps == fps && live.Kbps == kbps) return;
-            live.Pipeline.SetRate(fps, kbps);
+            int current = live.BaseKbps > 0 ? live.BaseKbps : _bitrateKbps;
+            int target = ScreenPortal.Host.Domain.Video.StreamRateLimits.BaseKbpsAt60(fps, kbps);
+            bool newEncoder = ScreenPortal.Host.Domain.Video.StreamRateLimits.NeedsNewEncoder(current, target);
+            if (live.Fps == fps && !newEncoder) return;
             live.Fps = fps;
-            live.Kbps = kbps;
-            _log($"vídeo: tela {screenKey} → {fps} fps, {kbps} kbps");
+            if (newEncoder)
+            {
+                live.BaseKbps = target;
+                _log($"vídeo: tela {screenKey} → {fps} fps, encoder novo a {target} kbps (base a 60 fps)");
+                StartPipeline(live, screenKey, live.Address, live.Port, live.StreamId); // mantém os frameIds; aplica o fps
+                return;
+            }
+            live.Pipeline.SetFps(fps);
+            _log($"vídeo: tela {screenKey} → {fps} fps");
         }
     }
 

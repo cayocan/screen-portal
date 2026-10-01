@@ -32,7 +32,7 @@ namespace ScreenPortal.Tests
         {
             Assert.That(FrameRates.Kbps(FrameRateMode.Auto, 60), Is.EqualTo(20000));
             Assert.That(FrameRates.Kbps(FrameRateMode.Auto, 15), Is.EqualTo(5000));
-            Assert.That(FrameRates.Kbps(FrameRateMode.Eco, 5), Is.EqualTo(2000));
+            Assert.That(FrameRates.Kbps(FrameRateMode.Eco, 5), Is.EqualTo(1667), "mesmos bits por quadro: sem piso");
             Assert.That(FrameRates.Kbps(FrameRateMode.Video, 60), Is.EqualTo(30000));
             Assert.That(FrameRates.Kbps(FrameRateMode.Video, 30), Is.EqualTo(15000), "Vídeo rebaixado pelo orçamento: proporcional");
         }
