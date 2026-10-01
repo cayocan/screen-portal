@@ -74,7 +74,8 @@ static int RunServe(Args o, CancellationToken ct)
         graceMinutes = 1;
     }
     using var screens = new ScreenPortal.Host.App.Control.ScreenHost(gpu, o.Int("bitrate", 20_000),
-        TimeSpan.FromMinutes(graceMinutes), Log);
+        TimeSpan.FromMinutes(graceMinutes), Log,
+        Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData), "ScreenPortal", "scales.json"));
     // 2G: áudio. Devolve a saída padrão do Windows também quando o console é fechado no X.
     using var audio = new ScreenPortal.Host.App.Audio.AudioHost(Log);
     using var closing = System.Runtime.InteropServices.PosixSignalRegistration.Create(System.Runtime.InteropServices.PosixSignal.SIGHUP, _ => audio.Dispose());
