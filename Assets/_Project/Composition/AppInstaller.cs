@@ -62,7 +62,7 @@ namespace ScreenPortal.Composition
             builder.Register<ScreenManipulationController>(Lifetime.Singleton);
             builder.Register<StartupRecenter>(Lifetime.Singleton);
             builder.Register(r => new WristMenu(r.Resolve<WorkspaceStore>(), r.Resolve<ICommandBus>(), r.Resolve<IHeadPoseSource>(),
-                r.Resolve<IHostCatalog>(), env.ShowTestScreens), Lifetime.Singleton);
+                r.Resolve<IHostCatalog>(), env.ShowTestScreens, r.Resolve<RateSync>()), Lifetime.Singleton);
             // Controle parado perde o laser; tchau liga/desliga as mãos (laser, interação e modelo).
             builder.Register<HandsMode>(Lifetime.Singleton);
             builder.RegisterBuildCallback(c =>

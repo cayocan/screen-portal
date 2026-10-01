@@ -23,6 +23,7 @@ namespace ScreenPortal.App.Menu
         AddTestScreen,
         Curvature,
         Recreate,
+        FrameRate,
     }
 
     public enum MenuPage
@@ -32,6 +33,7 @@ namespace ScreenPortal.App.Menu
         Resolutions,
         Mirrors,
         Curvature,
+        FrameRate,
     }
 
     /// <summary>
@@ -41,7 +43,7 @@ namespace ScreenPortal.App.Menu
     /// </summary>
     public sealed class WristMenu
     {
-        public const int MaxItems = 13;
+        public const int MaxItems = 14;
         public const int ComfortableVideoScreens = 4;
         public const string TooManyNotice = "Mais de 4 telas:\npode haver quedas e travamentos";
         public const string BackLabel = "← Voltar";
@@ -53,14 +55,14 @@ namespace ScreenPortal.App.Menu
         {
             MenuItemId.Undo, MenuItemId.Redo, MenuItemId.ToggleMode, MenuItemId.Recenter, MenuItemId.AlignPosture,
             MenuItemId.ToggleGrid, MenuItemId.AddVirtual, MenuItemId.AddMirror, MenuItemId.ReturnToSurface, MenuItemId.RemoveScreen,
-            MenuItemId.Curvature, MenuItemId.Recreate,
+            MenuItemId.Curvature, MenuItemId.Recreate, MenuItemId.FrameRate,
         };
 
         private static readonly MenuItemId[] MainItemsWithTest =
         {
             MenuItemId.Undo, MenuItemId.Redo, MenuItemId.ToggleMode, MenuItemId.Recenter, MenuItemId.AlignPosture,
             MenuItemId.ToggleGrid, MenuItemId.AddVirtual, MenuItemId.AddMirror, MenuItemId.ReturnToSurface, MenuItemId.RemoveScreen,
-            MenuItemId.Curvature, MenuItemId.Recreate, MenuItemId.AddTestScreen,
+            MenuItemId.Curvature, MenuItemId.Recreate, MenuItemId.FrameRate, MenuItemId.AddTestScreen,
         };
 
         private readonly WorkspaceStore _store;
@@ -69,6 +71,8 @@ namespace ScreenPortal.App.Menu
         private readonly IHostCatalog _host;
         private readonly MenuItemId[] _main;
         private readonly CurvatureMenu _curvature = new CurvatureMenu();
+        private readonly FrameRateMenu _frameRate = new FrameRateMenu();
+        private readonly ScreenPortal.App.Screens.RateSync _rates;
         private int _testScreens;
         private int _aspect;
         private string _notice = string.Empty;
@@ -92,8 +96,10 @@ namespace ScreenPortal.App.Menu
         public MenuPage Page { get; private set; } = MenuPage.Main;
         public Orientation Orientation { get; private set; } = Orientation.Landscape;
 
-        public WristMenu(WorkspaceStore store, ICommandBus bus, IHeadPoseSource head, IHostCatalog host = null, bool showTestScreens = false)
+        public WristMenu(WorkspaceStore store, ICommandBus bus, IHeadPoseSource head, IHostCatalog host = null, bool showTestScreens = false,
+            ScreenPortal.App.Screens.RateSync rates = null)
         {
+            _rates = rates;
             _store = store;
             _bus = bus;
             _head = head;
@@ -111,6 +117,7 @@ namespace ScreenPortal.App.Menu
                     case MenuPage.Resolutions: return ResolutionCatalog.Count(_aspect) + 1;
                     case MenuPage.Mirrors: return MirrorCount + 1;
                     case MenuPage.Curvature: return CurvatureMenu.ItemCount + 1;
+                    case MenuPage.FrameRate: return FrameRateMenu.ItemCount + 1;
                     default: return _main.Length;
                 }
             }
@@ -128,6 +135,7 @@ namespace ScreenPortal.App.Menu
             get
             {
                 if (Page == MenuPage.Curvature) return _curvature.Status(_store.State);
+                if (Page == MenuPage.FrameRate) return _frameRate.Status(_store.State, _rates);
                 if (IsRecreating) return _recreateTitle;
                 var ws = _store.State;
                 bool connected = _host.IsConnected;
@@ -163,6 +171,8 @@ namespace ScreenPortal.App.Menu
                     return MirrorLabels()[index];
                 case MenuPage.Curvature:
                     return CurvatureMenu.Label(index, FocusedCurvature());
+                case MenuPage.FrameRate:
+                    return FrameRateMenu.Label(index, IsCurrentFrameRate(index));
                 default:
                     return Label(_main[index]);
             }
@@ -185,6 +195,7 @@ namespace ScreenPortal.App.Menu
                 case MenuItemId.RemoveScreen: return "Remover tela";
                 case MenuItemId.AddTestScreen: return "+ Tela de teste";
                 case MenuItemId.Curvature: return "Curvatura ▸";
+                case MenuItemId.FrameRate: return "Taxa de quadros ▸";
                 case MenuItemId.Recreate: return RecreateLabel;
                 default: return id.ToString();
             }
@@ -210,6 +221,7 @@ namespace ScreenPortal.App.Menu
                 case MenuPage.Resolutions: return _host.IsConnected && !IsCurrent(index);
                 case MenuPage.Mirrors: return _host.IsConnected;
                 case MenuPage.Curvature: return HasFocusedScreen();
+                case MenuPage.FrameRate: return HasFocusedVideoScreen();
                 default: return IsEnabled(_main[index]);
             }
         }
@@ -226,6 +238,8 @@ namespace ScreenPortal.App.Menu
                     return ws.Contains(ws.FocusedScreenId);
                 case MenuItemId.ReturnToSurface:
                     return ws.TryGetScreen(ws.FocusedScreenId, out var focused) && focused.Placement.IsLoose;
+                case MenuItemId.FrameRate:
+                    return HasFocusedVideoScreen();
                 case MenuItemId.AddVirtual:
                 case MenuItemId.AddMirror:
                     return _host.IsConnected;
@@ -279,6 +293,9 @@ namespace ScreenPortal.App.Menu
                 case MenuPage.Curvature:
                     _bus.Send(new SetScreenCurvature(_store.State.FocusedScreenId, CurvaturePresets.Value(index)));
                     return; // fica na página: dá para comparar os presets
+                case MenuPage.FrameRate:
+                    _bus.Send(new SetFrameRateMode(_store.State.FocusedScreenId, FrameRateMenu.Mode(index)));
+                    return; // fica na página: mostra o fps concedido
                 default:
                     Invoke(_main[index]);
                     return;
@@ -318,6 +335,9 @@ namespace ScreenPortal.App.Menu
                     break;
                 case MenuItemId.Curvature:
                     Page = MenuPage.Curvature;
+                    break;
+                case MenuItemId.FrameRate:
+                    Page = MenuPage.FrameRate;
                     break;
                 case MenuItemId.AddTestScreen:
                     _bus.Send(TestScreens.Next(_testScreens++));
@@ -384,6 +404,18 @@ namespace ScreenPortal.App.Menu
         }
 
         /// <returns>Curvatura pedida da tela em foco, ou −1 (nenhum preset marcado).</returns>
+        private bool HasFocusedVideoScreen()
+        {
+            var ws = _store.State;
+            return ws.TryGetScreen(ws.FocusedScreenId, out var screen) && screen.Source.HasVideo;
+        }
+
+        private bool IsCurrentFrameRate(int index)
+        {
+            var ws = _store.State;
+            return ws.TryGetScreen(ws.FocusedScreenId, out var screen) && screen.FrameRateMode.Equals(FrameRateMenu.Mode(index));
+        }
+
         private float FocusedCurvature()
         {
             var ws = _store.State;
