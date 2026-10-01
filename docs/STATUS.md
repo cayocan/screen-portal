@@ -1,6 +1,6 @@
 # Status do projeto
 
-**Fase atual:** **Fase 2 — multi-monitor livre**: **Fase 2 concluída** (2A–2E 29–30/09, 2F e 2G 01/10/2026) → próxima: **Fase 3** (mouse e teclado em primeiro lugar).
+**Fase atual:** **Fase 2 — multi-monitor livre: concluída** (2A–2E 29–30/09, 2F e 2G 01/10/2026) → próxima: **Fase 3** (mouse e teclado em primeiro lugar).
 Brief: [brief.md](brief.md) v1.3.2 (ADRs 0002–0006).
 
 ## Fase 0 — resultado
