@@ -94,6 +94,12 @@ namespace ScreenPortal.Composition
             builder.Register(r => new ManipulationPresenter(env.ScreensRoot, env.UnlitMaterial,
                 r.Resolve<ScreenManipulationController>(), r.Resolve<WorkspaceStore>(), views, r.Resolve<InteractionRouter>()), Lifetime.Singleton);
 
+            // 3B: cursor do PC desenhado no headset (posição por UDP, formas pelo controle)
+            builder.Register(r => new ScreenPortal.App.Cursor.CursorSync(r.Resolve<ConnectionStateMachine>(),
+                new UdpMouseStateReceiver(r.Resolve<IClock>()), r.Resolve<IClock>()), Lifetime.Singleton);
+            builder.Register(r => new ScreenPortal.Presentation.Cursor.CursorView(env.ScreensRoot, r.Resolve<WorkspaceStore>(),
+                r.Resolve<ScreenPortal.App.Cursor.CursorSync>()), Lifetime.Singleton);
+
             builder.RegisterEntryPoint<AppEntryPoint>().AsSelf();
         }
     }
