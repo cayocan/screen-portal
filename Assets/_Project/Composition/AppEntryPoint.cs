@@ -28,14 +28,17 @@ namespace ScreenPortal.Composition
         private readonly LayoutSync _layout;
         private readonly ScreenPortal.App.Cursor.CursorSync _cursor;
         private readonly ScreenPortal.Presentation.Cursor.CursorView _cursorView;
+        private readonly ScreenPortal.App.Cursor.WorldCursor _worldCursor;
 
         public AppEntryPoint(ScreenViewSynchronizer synchronizer, ConnectionStateMachine connection,
             IControlChannel channel, IHostDiscovery discovery, AppEnvironment env,
             InteractionRouter router, ManipulationPresenter presenter, WristMenu menu,
             HostSync hostSync, OverlayScreenViewFactory views, StartupRecenter startupRecenter,
             ScreenPortal.App.Session.SessionAutosave autosave, RateSync rates, LayoutSync layout,
-            ScreenPortal.App.Cursor.CursorSync cursor, ScreenPortal.Presentation.Cursor.CursorView cursorView)
+            ScreenPortal.App.Cursor.CursorSync cursor, ScreenPortal.Presentation.Cursor.CursorView cursorView,
+            ScreenPortal.App.Cursor.WorldCursor worldCursor)
         {
+            _worldCursor = worldCursor;
             _cursor = cursor;
             _cursorView = cursorView;
             _layout = layout;
@@ -74,6 +77,8 @@ namespace ScreenPortal.Composition
             _router.Tick();
             _presenter.Tick();
             _cursor.Tick();
+            var mouse = _cursor.Current;
+            _worldCursor.Tick(in mouse);
             _cursorView.Tick();
             _autosave.Tick();
         }

@@ -4,6 +4,8 @@ using ScreenPortal.App;
 using ScreenPortal.App.Connection;
 using ScreenPortal.App.Cursor;
 using ScreenPortal.Domain.Screens;
+using ScreenPortal.Domain.Spatial;
+using Pose = ScreenPortal.Domain.Spatial.Pose;
 using UnityEngine;
 
 namespace ScreenPortal.Presentation.Cursor
@@ -21,16 +23,18 @@ namespace ScreenPortal.Presentation.Cursor
 
         private readonly WorkspaceStore _store;
         private readonly CursorSync _sync;
+        private readonly WorldCursor _world;
         private readonly Dictionary<uint, byte[]> _canvases = new Dictionary<uint, byte[]>();
         private readonly GameObject _root;
         private readonly OVROverlay _overlay;
         private readonly Texture2D _texture;
         private uint _shownShape;
 
-        public CursorView(Transform parent, WorkspaceStore store, CursorSync sync)
+        public CursorView(Transform parent, WorkspaceStore store, CursorSync sync, WorldCursor world)
         {
             _store = store;
             _sync = sync;
+            _world = world;
             _root = new GameObject("Cursor");
             _root.transform.SetParent(parent, false);
             _texture = new Texture2D(Canvas, Canvas, TextureFormat.BGRA32, false)
@@ -65,9 +69,14 @@ namespace ScreenPortal.Presentation.Cursor
         public void Tick()
         {
             var s = _sync.Current;
-            if (s.Mode != MouseMode.Screen || !_canvases.TryGetValue(s.ShapeId, out var canvas) || !_sync.TryGetShape(s.ShapeId, out var shape)
-                || !CursorPlacement.OnScreen(_store.State, new ScreenId((int)s.ScreenKey), s.X, s.Y, Canvas, Canvas,
-                    shape.HotX, shape.HotY, shape.Scale, out var pose, out float w, out float h))
+            Pose pose = default;
+            float w = 0f, h = 0f;
+            bool shown = _canvases.TryGetValue(s.ShapeId, out var canvas) && _sync.TryGetShape(s.ShapeId, out var shape)
+                         && (s.Mode == MouseMode.Screen
+                             ? CursorPlacement.OnScreen(_store.State, new ScreenId((int)s.ScreenKey), s.X, s.Y, Canvas, Canvas,
+                                 shape.HotX, shape.HotY, shape.Scale, out pose, out w, out h)
+                             : InWorld(shape, out pose, out w, out h));
+            if (!shown)
             {
                 _overlay.hidden = true;
                 return;
@@ -82,6 +91,21 @@ namespace ScreenPortal.Presentation.Cursor
             t.SetLocalPositionAndRotation(pose.Position.ToUnity(), pose.Rotation.ToUnity()); // mesmo espaço das telas
             t.localScale = new Vector3(w, h, 1f);
             _overlay.hidden = false;
+        }
+
+        /// <summary>Cursor 3D (Mundo/Edição): de frente para a cabeça, hotspot no ponto, tamanho angular da tela de saída.</summary>
+        private bool InWorld(CursorShapeMessage shape, out Pose pose, out float w, out float h)
+        {
+            pose = default;
+            w = h = 0f;
+            if (!_world.Active) return false;
+            float mpp = _world.MetersPerPixel * shape.Scale;
+            w = h = Canvas * mpp;
+            var rotation = Quat.LookRotation(_world.Direction, Vec3.Up); // +Z para longe de quem olha, como as telas
+            var center = _world.Point + (rotation * Vec3.Right) * ((Canvas * 0.5f - shape.HotX) * mpp)
+                                      - (rotation * Vec3.Up) * ((Canvas * 0.5f - shape.HotY) * mpp);
+            pose = new Pose(center, rotation);
+            return true;
         }
 
         public void Dispose()
