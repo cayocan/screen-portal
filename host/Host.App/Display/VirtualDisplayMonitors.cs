@@ -1,3 +1,4 @@
+using ScreenPortal.Host.Domain.Display;
 using ScreenPortal.Host.Domain.Screens;
 
 namespace ScreenPortal.Host.App.Display;
@@ -8,4 +9,14 @@ public sealed class VirtualDisplayMonitors(IVirtualDisplayDriver driver, int ref
     public VirtualMonitor Create(int width, int height) => driver.Create(width, height, refresh);
     public void Remove(VirtualMonitor monitor) => driver.Remove(monitor);
     public string DisplayName(VirtualMonitor monitor) => monitor.Display.DeviceName;
+    public RectI Bounds(VirtualMonitor monitor) => Win32Displays.Current(monitor.Display.DeviceName).Bounds;
+
+    public IReadOnlyList<RectI> OthersBounds(VirtualMonitor except) =>
+        Win32Displays.Snapshot()
+            .Where(d => !d.DeviceName.Equals(except.Display.DeviceName, StringComparison.OrdinalIgnoreCase))
+            .Select(d => d.Bounds)
+            .ToList();
+
+    public bool MoveTo(VirtualMonitor monitor, int x, int y) =>
+        DisplayConfigPosition.SetPosition(monitor.Display.DeviceName, x, y) == 0;
 }

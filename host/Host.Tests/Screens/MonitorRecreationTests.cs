@@ -1,3 +1,4 @@
+using ScreenPortal.Host.Domain.Display;
 using ScreenPortal.Host.Domain.Screens;
 
 namespace ScreenPortal.Host.Tests.Screens;
@@ -25,6 +26,17 @@ public class MonitorRecreationTests
         }
 
         public string DisplayName(Monitor monitor) => monitor.Name;
+
+        // O antigo estava em cima do principal; o novo nasce onde o Windows quiser (à direita).
+        public RectI OldBounds = new(0, -1440, 2560, 1440);
+        public RectI Bounds(Monitor monitor) => monitor == Old ? OldBounds : new RectI(2560, 0, 1920, 1080);
+        public IReadOnlyList<RectI> OthersBounds(Monitor except) => [new RectI(0, 0, 2560, 1080)];
+
+        public bool MoveTo(Monitor monitor, int x, int y)
+        {
+            Calls.Add($"place {monitor.Name} at {x},{y}");
+            return true;
+        }
 
         public int MoveWindows(Monitor from, Monitor to)
         {
@@ -62,7 +74,8 @@ public class MonitorRecreationTests
         Assert.True(result.Ok);
         Assert.Equal(@"\\.\DISPLAY9", result.Monitor!.Name);
         Assert.Equal(2, result.WindowsMoved);
-        Assert.Equal(new[] { "create 1920×1080", @"move \\.\DISPLAY5 → \\.\DISPLAY9", "stop", @"remove \\.\DISPLAY5" }, fakes.Calls);
+        Assert.Equal(new[] { "create 1920×1080", @"move \\.\DISPLAY5 → \\.\DISPLAY9", "stop", @"remove \\.\DISPLAY5",
+            @"place \\.\DISPLAY9 at 0,-1080" }, fakes.Calls); // o novo ocupa o lugar do antigo no Windows
     }
 
     [Fact]
