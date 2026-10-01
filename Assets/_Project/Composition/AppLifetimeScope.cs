@@ -28,6 +28,17 @@ namespace ScreenPortal.Composition
         [SerializeField] private WristMenuPanel menuPanel;
         [SerializeField] private Material unlitMaterial;
 
+        /// <summary>Esconde/mostra a malha das mãos. O OVRMeshRenderer religaria a malha a cada quadro: desliga ele também.</summary>
+        private void SetHandsVisible(bool visible)
+        {
+            foreach (var hand in new[] { leftHand, rightHand })
+            {
+                if (hand == null) continue;
+                foreach (var meshRenderer in hand.GetComponentsInChildren<OVRMeshRenderer>(true)) meshRenderer.enabled = visible;
+                foreach (var skinned in hand.GetComponentsInChildren<SkinnedMeshRenderer>(true)) skinned.enabled = visible;
+            }
+        }
+
         protected override void Configure(IContainerBuilder builder)
         {
             bool android = Application.platform == RuntimePlatform.Android;
@@ -45,7 +56,7 @@ namespace ScreenPortal.Composition
 
             AppInstaller.Install(builder, new AppEnvironment(
                 screensRoot != null ? screensRoot : transform, statusView, discovery, pairing, options,
-                right, left, head, new OvrRecenterEvents(), menuPanel, unlitMaterial, Debug.isDebugBuild));
+                right, left, head, new OvrRecenterEvents(), menuPanel, unlitMaterial, Debug.isDebugBuild, SetHandsVisible));
         }
     }
 }

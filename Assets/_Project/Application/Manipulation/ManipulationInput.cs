@@ -20,6 +20,16 @@ namespace ScreenPortal.App.Manipulation
         public bool CancelPressed;
         public bool UndoPressed;
         public bool RedoPressed;
+
+        /// <summary>Mão rastreada (não controle): entra no modo das mãos e no detector de tchau.</summary>
+        public bool IsHand;
+        public Vec3 PalmPosition;
+        /// <summary>Normal da palma (para onde a palma aponta).</summary>
+        public Vec3 PalmNormal;
+        /// <summary>Mão aberta: sem pinça e sem punho.</summary>
+        public bool HandOpen;
+
+        public bool AnyButton => SelectHeld || GripHeld || CancelPressed || UndoPressed || RedoPressed || DistanceDeltaM != 0f;
     }
 
     public interface IManipulationInput
