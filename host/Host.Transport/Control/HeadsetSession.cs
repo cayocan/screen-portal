@@ -56,6 +56,9 @@ public sealed class HeadsetSession(
             case ReleaseScreenMessage release when _welcomed:
                 Enqueue(() => OnRelease(release));
                 break;
+            case SetStreamRateMessage rate when _welcomed:
+                Enqueue(() => OnSetRate(rate));
+                break;
             case PingMessage ping:
                 connection.Send(new PongMessage(ping.SentUs));
                 break;
@@ -140,6 +143,13 @@ public sealed class HeadsetSession(
     {
         if (!_welcomed || _deviceId == null) return;
         screens.Release(_deviceId, _generation, release.ScreenKey, TimeSpan.FromMilliseconds(release.GraceMs));
+    }
+
+    private void OnSetRate(SetStreamRateMessage rate)
+    {
+        if (!_welcomed || _deviceId == null) return;
+        var (fps, kbps) = ScreenPortal.Host.Domain.Video.StreamRateLimits.Clamp(rate.Fps, (int)Math.Min(rate.Kbps, int.MaxValue));
+        screens.SetRate(_deviceId, _generation, rate.ScreenKey, fps, kbps);
     }
 
     public void OnClosed()

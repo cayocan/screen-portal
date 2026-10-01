@@ -72,6 +72,11 @@ public class HeadsetSessionTests
             lock (Calls) { Calls.Add($"release {screenKey} {grace.TotalMilliseconds}"); Generations.Add(generation); }
         }
 
+        public void SetRate(string deviceId, long generation, uint screenKey, int fps, int kbps)
+        {
+            lock (Calls) { Calls.Add($"rate {screenKey} {fps} {kbps}"); Generations.Add(generation); }
+        }
+
         public void Disconnected(string deviceId, long generation)
         {
             lock (Calls) { Calls.Add($"disconnected {deviceId}"); Generations.Add(generation); }
@@ -134,12 +139,13 @@ public class HeadsetSessionTests
 
         session.OnMessage(new AcquireScreenMessage(7, ScreenKind.Virtual, 3840, 2160, 0));
         session.OnMessage(new StartStreamMessage(7, 9000, 0));
+        session.OnMessage(new SetStreamRateMessage(7, 15, 900000)); // kbps fora da faixa: o host limita
         session.OnMessage(new ReleaseScreenMessage(7, 10000));
         await session.Idle.WaitAsync(TimeSpan.FromSeconds(5));
         Assert.Equal(2160u, conn.Last<ScreenReadyMessage>()!.Height);
         Assert.Equal(1440u, conn.Last<StreamStartedMessage>()!.Height);
         Assert.Equal("192.168.0.171", screens.LastAddress);
-        Assert.Equal(new[] { "acquire 7", "start 7:9000", "release 7 10000" }, screens.Calls);
+        Assert.Equal(new[] { "acquire 7", "start 7:9000", "rate 7 15 50000", "release 7 10000" }, screens.Calls);
 
         session.OnMessage(new PingMessage(9));
         Assert.Equal(9UL, conn.Last<PongMessage>()!.SentUs);

@@ -79,6 +79,11 @@ namespace ScreenPortal.Tests
             var release = (ReleaseScreenMessage)RoundTrip(new ReleaseScreenMessage(5, 10000));
             Assert.That(release.ScreenKey, Is.EqualTo(5u));
             Assert.That(release.GraceMs, Is.EqualTo(10000u));
+
+            var rate = (SetStreamRateMessage)RoundTrip(new SetStreamRateMessage(4, 15, 5000));
+            Assert.That(rate.ScreenKey, Is.EqualTo(4u));
+            Assert.That(rate.Fps, Is.EqualTo((byte)15));
+            Assert.That(rate.Kbps, Is.EqualTo(5000u));
         }
 
         [Test]

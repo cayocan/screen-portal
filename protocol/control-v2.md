@@ -43,3 +43,8 @@ encerra o stream. Portas de vídeo do headset: 9000 + `stream_id`. Detalhes: ADR
 O codec (`ControlMessageCodec.Decode`) verifica o envelope e depois despacha o verificador do corpo pelo `BodyType`, como
 workaround de um bug do runtime Google.FlatBuffers 25.2.10 (`Verifier.VerifyUnion` passa o type id errado). Reavaliar ao
 atualizar o pacote Google.FlatBuffers.
+
+## SetStreamRate (Fase 2F)
+Headset → host: `SetStreamRate { screen_key, fps, kbps }` muda fps e bitrate de uma tela com stream, ao vivo (sem
+recriar o pipeline nem pedir IDR). O host limita fps a 1–60 e kbps a 1 000–50 000. O headset manda só quando o valor
+muda e de novo depois que o stream da tela recomeça (um pipeline novo começa no padrão: 60 fps, 20 Mbps).

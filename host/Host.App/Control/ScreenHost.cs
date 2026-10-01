@@ -30,7 +30,9 @@ public sealed class ScreenHost : IScreenHost, IDisposable
         public ushort StreamId;
         public int Width;
         public int Height;
-        public DisplayInfo? Captured;     // diagnóstico (bug 2): o display como estava ao criar a captura
+        public DisplayInfo? Captured;
+        public int Fps = 60;              // 2F: fps pedido pelo headset
+        public int BaseKbps;              // 2F: bitrate do encoder a 60 fps (0 = padrão do host)     // diagnóstico (bug 2): o display como estava ao criar a captura
     }
 
     private readonly GpuDevice _gpu;
@@ -120,15 +122,23 @@ public sealed class ScreenHost : IScreenHost, IDisposable
         if (!ScreenAcquireResult.TryValidateVirtualSize(request.Width, request.Height, out var invalid)) return invalid;
         try
         {
-            _driver ??= SudoVdaDriver.Open(_log);
-        }
-        catch (Exception e)
-        {
-            return new ScreenAcquireResult(false, 0, 0, "SudoVDA não disponível: " + e.Message);
-        }
-        try
-        {
-            var monitor = _driver.Create((int)request.Width, (int)request.Height, 60);
+            VirtualMonitor monitor;
+            try
+            {
+                _driver ??= SudoVdaDriver.Open(_log);
+                monitor = _driver.Create((int)request.Width, (int)request.Height, 60);
+            }
+            catch (Exception first)
+            {
+                // Driver caído (código 43) ou handle velho: reinicia o dispositivo e tenta uma vez de novo.
+                _log($"telas: SudoVDA falhou ({first.Message}); reiniciando o dispositivo");
+                _driver?.Dispose();
+                _driver = null;
+                if (!SudoVdaRecovery.TryRestartDevice(_log))
+                    return new ScreenAcquireResult(false, 0, 0, "SudoVDA não disponível: " + first.Message);
+                _driver = SudoVdaDriver.Open(_log);
+                monitor = _driver.Create((int)request.Width, (int)request.Height, 60);
+            }
             string name = monitor.Display.DeviceName;
             _leases.Add(new ScreenLease(deviceId, request.ScreenKey, ScreenLeaseKind.Virtual, (int)request.Width, (int)request.Height, 0, name));
             _live[(deviceId, request.ScreenKey)] = new Live { Monitor = monitor, DisplayName = name };
@@ -212,10 +222,11 @@ public sealed class ScreenHost : IScreenHost, IDisposable
             capture.Diagnostic += message => _log($"vídeo: tela {screenKey} ({display}): {message}");
             _log($"vídeo: tela {screenKey} captura {capture.Width}×{capture.Height} de {display}");
             var fit = ResolutionFit.FromCapture(capture.Width, capture.Height);
-            var settings = new EncoderSettings(fit.Width, fit.Height, 60, _bitrateKbps);
+            var settings = new EncoderSettings(fit.Width, fit.Height, 60, live.BaseKbps > 0 ? live.BaseKbps : _bitrateKbps);
             pipeline = new StreamPipeline(_gpu, capture, settings, new IPEndPoint(IPAddress.Parse(address), udpPort), 1, null, streamId, firstFrameId);
             pipeline.Start();
             live.Pipeline = pipeline;
+            if (live.Fps != 60) pipeline.SetFps(live.Fps); // pipeline recriado: mantém o fps da 2F
             live.Address = address;
             live.Port = udpPort;
             live.StreamId = streamId;
@@ -279,6 +290,30 @@ public sealed class ScreenHost : IScreenHost, IDisposable
             foreach (var lease in _leases.ForDevice(deviceId)) StopStream(deviceId, lease.ScreenKey);
             _leases.ExpireAll(deviceId, DateTimeOffset.Now + _disconnectGrace);
             _log($"telas: {deviceId} desconectou; monitores mantidos por {_disconnectGrace.TotalMinutes:0.#} min");
+        }
+    }
+
+    /// <summary>2F: fps e bitrate de uma tela com stream, ao vivo. Loga só quando muda.</summary>
+    public void SetRate(string deviceId, long generation, uint screenKey, int fps, int kbps)
+    {
+        lock (_lock)
+        {
+            if (_disposed || Stale(deviceId, generation, "SetStreamRate")) return;
+            if (!_live.TryGetValue((deviceId, screenKey), out var live) || live.Pipeline == null) return;
+            int current = live.BaseKbps > 0 ? live.BaseKbps : _bitrateKbps;
+            int target = ScreenPortal.Host.Domain.Video.StreamRateLimits.BaseKbpsAt60(fps, kbps);
+            bool newEncoder = ScreenPortal.Host.Domain.Video.StreamRateLimits.NeedsNewEncoder(current, target);
+            if (live.Fps == fps && !newEncoder) return;
+            live.Fps = fps;
+            if (newEncoder)
+            {
+                live.BaseKbps = target;
+                _log($"vídeo: tela {screenKey} → {fps} fps, encoder novo a {target} kbps (base a 60 fps)");
+                StartPipeline(live, screenKey, live.Address, live.Port, live.StreamId); // mantém os frameIds; aplica o fps
+                return;
+            }
+            live.Pipeline.SetFps(fps);
+            _log($"vídeo: tela {screenKey} → {fps} fps");
         }
     }
 

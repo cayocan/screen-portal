@@ -20,7 +20,7 @@ public sealed class StreamPipeline : ICaptureFrameSink, IEncodedFrameSink, IDisp
     private readonly VideoPacketizer[] _packetizers;
     private readonly UdpVideoSender[] _senders;
     private readonly Stream? _dump;
-    private readonly long _minFrameIntervalUs;
+    private long _minFrameIntervalUs; // 2F: muda ao vivo (SetRate)
     private ulong _lastAcceptedUs;
 
     // Estatísticas (lidas pela thread de log; imprecisão de corrida é aceitável).
@@ -34,7 +34,7 @@ public sealed class StreamPipeline : ICaptureFrameSink, IEncodedFrameSink, IDisp
         _capture = capture;
         _converter = new Nv12Converter(gpu.Device, gpu.Context, capture.Width, capture.Height, settings.Width, settings.Height);
         _encoder = new MfH264Encoder(gpu.Device, settings, this);
-        _minFrameIntervalUs = 1_000_000L / settings.Fps - 2_000; // tolerância para jitter do compositor
+        _minFrameIntervalUs = MinFrameIntervalUs(settings.Fps);
 
         _packetizers = new VideoPacketizer[streamCount];
         _senders = new UdpVideoSender[streamCount];
@@ -55,12 +55,20 @@ public sealed class StreamPipeline : ICaptureFrameSink, IEncodedFrameSink, IDisp
     /// <summary>Próximo frameId do (primeiro) stream: um pipeline que substitui este segue daqui. Ler depois do Dispose.</summary>
     public uint NextFrameId => _packetizers[0].NextFrameId;
 
+    /// <summary>
+    /// 2F: fps ao vivo (limitador da captura). O bitrate cai na mesma proporção sozinho: o encoder reserva os bits por
+    /// quadro da configuração a 60 fps (ver StreamRateLimits.BaseKbpsAt60).
+    /// </summary>
+    public void SetFps(int fps) => Interlocked.Exchange(ref _minFrameIntervalUs, MinFrameIntervalUs(fps));
+
+    private static long MinFrameIntervalUs(int fps) => 1_000_000L / fps - 2_000; // tolerância para jitter do compositor
+
     /// <summary>Reconexão: o decoder do headset precisa de um IDR para voltar a mostrar imagem.</summary>
     public void RequestKeyframe() => _encoder.RequestKeyframe();
 
     public void OnFrame(Vortice.Direct3D11.ID3D11Texture2D bgraTexture, int width, int height, ulong captureTimeUs)
     {
-        if (_lastAcceptedUs != 0 && (long)(captureTimeUs - _lastAcceptedUs) < _minFrameIntervalUs)
+        if (_lastAcceptedUs != 0 && (long)(captureTimeUs - _lastAcceptedUs) < Interlocked.Read(ref _minFrameIntervalUs))
         {
             _skipped++;
             return;

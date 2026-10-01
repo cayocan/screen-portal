@@ -112,6 +112,10 @@ namespace ScreenPortal.Infrastructure.Protocol
                     body = Fb.ScreenFailed.CreateScreenFailed(b, m.ScreenKey, b.CreateString(m.Reason)).Value;
                     type = Fb.Message.ScreenFailed;
                     break;
+                case SetStreamRateMessage m:
+                    body = Fb.SetStreamRate.CreateSetStreamRate(b, m.ScreenKey, m.Fps, m.Kbps).Value;
+                    type = Fb.Message.SetStreamRate;
+                    break;
                 case ReleaseScreenMessage m:
                     body = Fb.ReleaseScreen.CreateReleaseScreen(b, m.ScreenKey, m.GraceMs).Value;
                     type = Fb.Message.ReleaseScreen;
@@ -245,6 +249,11 @@ namespace ScreenPortal.Infrastructure.Protocol
                 {
                     var f = e.BodyAsScreenFailed();
                     return new ScreenFailedMessage(f.ScreenKey, f.Reason);
+                }
+                case Fb.Message.SetStreamRate:
+                {
+                    var r = e.BodyAsSetStreamRate();
+                    return new SetStreamRateMessage(r.ScreenKey, r.Fps, r.Kbps);
                 }
                 case Fb.Message.ReleaseScreen:
                 {

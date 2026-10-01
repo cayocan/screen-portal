@@ -22,9 +22,11 @@ table AcquireScreen { screen_key:uint; kind:ScreenKind; width:uint; height:uint;
 table ScreenReady { screen_key:uint; width:uint; height:uint; }
 table ScreenFailed { screen_key:uint; reason:string; }
 table ReleaseScreen { screen_key:uint; grace_ms:uint; }
+// 2F: fps e bitrate de uma tela com stream, aplicados ao vivo pelo host (sem recriar o pipeline).
+table SetStreamRate { screen_key:uint; fps:ubyte; kbps:uint; }
 
 union Message { Hello, PairingRequired, PairingResult, Welcome, StartStream, StreamStarted, StreamStopped, Ping, Pong, Bye,
-                AcquireScreen, ScreenReady, ScreenFailed, ReleaseScreen }
+                AcquireScreen, ScreenReady, ScreenFailed, ReleaseScreen, SetStreamRate }
 
 table Envelope { protocol_version:ushort; body:Message; }
 

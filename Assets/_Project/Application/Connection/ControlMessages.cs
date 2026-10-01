@@ -19,6 +19,7 @@ namespace ScreenPortal.App.Connection
         ScreenReady,
         ScreenFailed,
         ReleaseScreen,
+        SetStreamRate,
     }
 
     public enum ByeReason
@@ -248,6 +249,22 @@ namespace ScreenPortal.App.Connection
     }
 
     /// <summary>Headset → host: pare o stream e remova o monitor depois de <see cref="GraceMs"/> (undo reata).</summary>
+    /// <summary>2F: fps e bitrate de uma tela com stream (headset → host), aplicados ao vivo.</summary>
+    public sealed class SetStreamRateMessage : ControlMessage
+    {
+        public override ControlMessageKind Kind => ControlMessageKind.SetStreamRate;
+        public uint ScreenKey { get; }
+        public byte Fps { get; }
+        public uint Kbps { get; }
+
+        public SetStreamRateMessage(uint screenKey, byte fps, uint kbps)
+        {
+            ScreenKey = screenKey;
+            Fps = fps;
+            Kbps = kbps;
+        }
+    }
+
     public sealed class ReleaseScreenMessage : ControlMessage
     {
         public override ControlMessageKind Kind => ControlMessageKind.ReleaseScreen;

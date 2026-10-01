@@ -53,5 +53,7 @@ public interface IScreenHost
     ScreenAcquireResult Acquire(string deviceId, long generation, AcquireScreenMessage request);
     bool StartStream(string deviceId, long generation, uint screenKey, string address, ushort udpPort, ushort streamId, out int width, out int height);
     void Release(string deviceId, long generation, uint screenKey, TimeSpan grace);
+    /// <summary>2F: fps e bitrate do stream de uma tela, ao vivo (valores já limitados).</summary>
+    void SetRate(string deviceId, long generation, uint screenKey, int fps, int kbps);
     void Disconnected(string deviceId, long generation);
 }

@@ -227,6 +227,47 @@ namespace ScreenPortal.Tests
         }
 
         [Test]
+        public void FrameRateItem_NeedsAFocusedVideoScreen()
+        {
+            var r = new Rig();
+            int index = r.Menu.IndexOf(MenuItemId.FrameRate);
+            Assert.That(r.Menu.Label(index), Is.EqualTo("Taxa de quadros ▸"));
+            Assert.That(r.Menu.IsEnabled(index), Is.False, "sem tela em foco");
+            r.Menu.Invoke(MenuItemId.AddTestScreen);
+            Assert.That(r.Menu.IsEnabled(index), Is.False, "tela de teste não tem vídeo");
+            r.Menu.Invoke(MenuItemId.AddMirror);
+            r.Menu.Invoke(1);
+            Assert.That(r.Menu.IsEnabled(index), Is.True);
+        }
+
+        [Test]
+        public void FrameRatePage_ListsTheModes_MarksTheCurrent_SendsSetFrameRateMode_Undoable()
+        {
+            var r = new Rig();
+            r.Menu.Invoke(MenuItemId.AddMirror);
+            r.Menu.Invoke(1);
+            r.Menu.Invoke(MenuItemId.FrameRate);
+            Assert.That(r.Menu.Page, Is.EqualTo(MenuPage.FrameRate));
+            Assert.That(r.Menu.ItemCount, Is.EqualTo(6));
+            Assert.That(r.Menu.Label(0), Is.EqualTo("● Auto"));
+            Assert.That(r.Menu.Label(1), Is.EqualTo("Vídeo"));
+            Assert.That(r.Menu.Label(2), Is.EqualTo("Fixo 30"));
+            Assert.That(r.Menu.Label(3), Is.EqualTo("Fixo 15"));
+            Assert.That(r.Menu.Label(4), Is.EqualTo("Eco"));
+            Assert.That(r.Menu.Label(5), Is.EqualTo(WristMenu.BackLabel));
+            Assert.That(r.Menu.StatusLine, Is.EqualTo("Auto"), "sem RateSync: só o modo");
+
+            r.Menu.Invoke(1); // Vídeo
+            Assert.That(r.Store.State.Screens[0].FrameRateMode, Is.EqualTo(FrameRateMode.Video));
+            Assert.That(r.Menu.Page, Is.EqualTo(MenuPage.FrameRate), "fica na página");
+            Assert.That(r.Menu.Label(1), Is.EqualTo("● Vídeo"));
+            Assert.That(r.Menu.StatusLine, Is.EqualTo("Vídeo"));
+
+            r.Menu.Invoke(MenuItemId.Undo);
+            Assert.That(r.Store.State.Screens[0].FrameRateMode, Is.EqualTo(FrameRateMode.Auto));
+        }
+
+        [Test]
         public void CurvaturePage_ListsPresets_MarksTheCurrent_AndSendsSetScreenCurvature()
         {
             var r = new Rig();
