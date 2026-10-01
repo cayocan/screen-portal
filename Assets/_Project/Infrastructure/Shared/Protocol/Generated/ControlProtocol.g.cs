@@ -41,6 +41,7 @@ public enum Message : byte
   ScreenReady = 12,
   ScreenFailed = 13,
   ReleaseScreen = 14,
+  SetStreamRate = 15,
 };
 
 
@@ -93,6 +94,9 @@ static public class MessageVerify
         break;
       case Message.ReleaseScreen:
         result = ScreenPortal.Protocol.Fb.ReleaseScreenVerify.Verify(verifier, tablePos);
+        break;
+      case Message.SetStreamRate:
+        result = ScreenPortal.Protocol.Fb.SetStreamRateVerify.Verify(verifier, tablePos);
         break;
       default: result = true;
         break;
@@ -889,6 +893,53 @@ static public class ReleaseScreenVerify
       && verifier.VerifyTableEnd(tablePos);
   }
 }
+public struct SetStreamRate : IFlatbufferObject
+{
+  private Table __p;
+  public ByteBuffer ByteBuffer { get { return __p.bb; } }
+  public static void ValidateVersion() { FlatBufferConstants.FLATBUFFERS_25_2_10(); }
+  public static SetStreamRate GetRootAsSetStreamRate(ByteBuffer _bb) { return GetRootAsSetStreamRate(_bb, new SetStreamRate()); }
+  public static SetStreamRate GetRootAsSetStreamRate(ByteBuffer _bb, SetStreamRate obj) { return (obj.__assign(_bb.GetInt(_bb.Position) + _bb.Position, _bb)); }
+  public void __init(int _i, ByteBuffer _bb) { __p = new Table(_i, _bb); }
+  public SetStreamRate __assign(int _i, ByteBuffer _bb) { __init(_i, _bb); return this; }
+
+  public uint ScreenKey { get { int o = __p.__offset(4); return o != 0 ? __p.bb.GetUint(o + __p.bb_pos) : (uint)0; } }
+  public byte Fps { get { int o = __p.__offset(6); return o != 0 ? __p.bb.Get(o + __p.bb_pos) : (byte)0; } }
+  public uint Kbps { get { int o = __p.__offset(8); return o != 0 ? __p.bb.GetUint(o + __p.bb_pos) : (uint)0; } }
+
+  public static Offset<ScreenPortal.Protocol.Fb.SetStreamRate> CreateSetStreamRate(FlatBufferBuilder builder,
+      uint screen_key = 0,
+      byte fps = 0,
+      uint kbps = 0) {
+    builder.StartTable(3);
+    SetStreamRate.AddKbps(builder, kbps);
+    SetStreamRate.AddScreenKey(builder, screen_key);
+    SetStreamRate.AddFps(builder, fps);
+    return SetStreamRate.EndSetStreamRate(builder);
+  }
+
+  public static void StartSetStreamRate(FlatBufferBuilder builder) { builder.StartTable(3); }
+  public static void AddScreenKey(FlatBufferBuilder builder, uint screenKey) { builder.AddUint(0, screenKey, 0); }
+  public static void AddFps(FlatBufferBuilder builder, byte fps) { builder.AddByte(1, fps, 0); }
+  public static void AddKbps(FlatBufferBuilder builder, uint kbps) { builder.AddUint(2, kbps, 0); }
+  public static Offset<ScreenPortal.Protocol.Fb.SetStreamRate> EndSetStreamRate(FlatBufferBuilder builder) {
+    int o = builder.EndTable();
+    return new Offset<ScreenPortal.Protocol.Fb.SetStreamRate>(o);
+  }
+}
+
+
+static public class SetStreamRateVerify
+{
+  static public bool Verify(Google.FlatBuffers.Verifier verifier, uint tablePos)
+  {
+    return verifier.VerifyTableStart(tablePos)
+      && verifier.VerifyField(tablePos, 4 /*ScreenKey*/, 4 /*uint*/, 4, false)
+      && verifier.VerifyField(tablePos, 6 /*Fps*/, 1 /*byte*/, 1, false)
+      && verifier.VerifyField(tablePos, 8 /*Kbps*/, 4 /*uint*/, 4, false)
+      && verifier.VerifyTableEnd(tablePos);
+  }
+}
 public struct Envelope : IFlatbufferObject
 {
   private Table __p;
@@ -918,6 +969,7 @@ public struct Envelope : IFlatbufferObject
   public ScreenPortal.Protocol.Fb.ScreenReady BodyAsScreenReady() { return Body<ScreenPortal.Protocol.Fb.ScreenReady>().Value; }
   public ScreenPortal.Protocol.Fb.ScreenFailed BodyAsScreenFailed() { return Body<ScreenPortal.Protocol.Fb.ScreenFailed>().Value; }
   public ScreenPortal.Protocol.Fb.ReleaseScreen BodyAsReleaseScreen() { return Body<ScreenPortal.Protocol.Fb.ReleaseScreen>().Value; }
+  public ScreenPortal.Protocol.Fb.SetStreamRate BodyAsSetStreamRate() { return Body<ScreenPortal.Protocol.Fb.SetStreamRate>().Value; }
 
   public static Offset<ScreenPortal.Protocol.Fb.Envelope> CreateEnvelope(FlatBufferBuilder builder,
       ushort protocol_version = 0,
