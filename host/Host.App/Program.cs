@@ -88,7 +88,9 @@ static int RunServe(Args o, CancellationToken ct)
         Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData), "ScreenPortal", "hotkeys.json"),
         screens.ScreenAt, hotkeyRouter, Log);
     // 3B: cursor desenhado no headset (posição por UDP, formas pelo controle)
-    using var cursorFeed = new ScreenPortal.Host.App.Control.CursorFeed(screens.ScreenAt, Log);
+    // 3B-2: fora das telas o mouse é engolido e vira o cursor 3D do headset (hook de baixo nível; só com headset)
+    using var mouseHook = new ScreenPortal.Host.App.Control.MouseHook(Log);
+    using var cursorFeed = new ScreenPortal.Host.App.Control.CursorFeed(screens.ScreenAt, mouseHook, Log);
 
     using var server = new ScreenPortal.Host.Transport.Control.ControlServer(
         ScreenPortal.Infrastructure.Protocol.ControlProtocol.Port,

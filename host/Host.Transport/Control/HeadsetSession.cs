@@ -65,6 +65,12 @@ public sealed class HeadsetSession(
             case StartCursorMessage startCursor when _welcomed && cursor != null && _deviceId != null:
                 cursor.Start(_deviceId, this, connection.RemoteAddress, startCursor.UdpPort, connection.Send);
                 break;
+            case CursorEnterMessage enter when _welcomed && cursor != null && _deviceId != null:
+                cursor.Enter(_deviceId, this, enter.ScreenKey, enter.X, enter.Y);
+                break;
+            case SetEditModeMessage edit when _welcomed && cursor != null && _deviceId != null:
+                cursor.SetEditMode(_deviceId, this, edit.On);
+                break;
             case LayoutChangedMessage layout when _welcomed:
                 Enqueue(() =>
                 {
