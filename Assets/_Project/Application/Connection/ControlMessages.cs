@@ -20,6 +20,8 @@ namespace ScreenPortal.App.Connection
         ScreenFailed,
         ReleaseScreen,
         SetStreamRate,
+        StartAudio,
+        AudioStarted,
     }
 
     public enum ByeReason
@@ -262,6 +264,38 @@ namespace ScreenPortal.App.Connection
             ScreenKey = screenKey;
             Fps = fps;
             Kbps = kbps;
+        }
+    }
+
+    /// <summary>2G: liga/desliga o som do PC e o microfone (headset → host). <see cref="UdpPort"/> = onde o headset recebe o som.</summary>
+    public sealed class StartAudioMessage : ControlMessage
+    {
+        public override ControlMessageKind Kind => ControlMessageKind.StartAudio;
+        public ushort UdpPort { get; }
+        public bool Playback { get; }
+        public bool Mic { get; }
+
+        public StartAudioMessage(ushort udpPort, bool playback, bool mic)
+        {
+            UdpPort = udpPort;
+            Playback = playback;
+            Mic = mic;
+        }
+    }
+
+    /// <summary>2G: resposta do host: porta do microfone e o que está disponível (drivers do Steam).</summary>
+    public sealed class AudioStartedMessage : ControlMessage
+    {
+        public override ControlMessageKind Kind => ControlMessageKind.AudioStarted;
+        public ushort MicPort { get; }
+        public bool Speakers { get; }
+        public bool Mic { get; }
+
+        public AudioStartedMessage(ushort micPort, bool speakers, bool mic)
+        {
+            MicPort = micPort;
+            Speakers = speakers;
+            Mic = mic;
         }
     }
 

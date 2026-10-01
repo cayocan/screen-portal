@@ -24,9 +24,13 @@ table ScreenFailed { screen_key:uint; reason:string; }
 table ReleaseScreen { screen_key:uint; grace_ms:uint; }
 // 2F: fps e bitrate de uma tela com stream, aplicados ao vivo pelo host (sem recriar o pipeline).
 table SetStreamRate { screen_key:uint; fps:ubyte; kbps:uint; }
+// 2G: áudio. StartAudio (headset → host) depois do Welcome e quando os botões mudam; AudioStarted (host → headset).
+table StartAudio { udp_port:ushort; playback:bool; mic:bool; }
+table AudioStarted { mic_port:ushort; speakers:bool; mic:bool; }
 
 union Message { Hello, PairingRequired, PairingResult, Welcome, StartStream, StreamStarted, StreamStopped, Ping, Pong, Bye,
-                AcquireScreen, ScreenReady, ScreenFailed, ReleaseScreen, SetStreamRate }
+                AcquireScreen, ScreenReady, ScreenFailed, ReleaseScreen, SetStreamRate,
+                StartAudio, AudioStarted }
 
 table Envelope { protocol_version:ushort; body:Message; }
 

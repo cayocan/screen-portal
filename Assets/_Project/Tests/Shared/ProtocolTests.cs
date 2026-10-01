@@ -80,6 +80,14 @@ namespace ScreenPortal.Tests
             Assert.That(release.ScreenKey, Is.EqualTo(5u));
             Assert.That(release.GraceMs, Is.EqualTo(10000u));
 
+            var audio = (StartAudioMessage)RoundTrip(new StartAudioMessage(9300, true, false));
+            Assert.That(audio.UdpPort, Is.EqualTo((ushort)9300));
+            Assert.That(audio.Playback, Is.True);
+            Assert.That(audio.Mic, Is.False);
+            var started = (AudioStartedMessage)RoundTrip(new AudioStartedMessage(9301, true, true));
+            Assert.That(started.MicPort, Is.EqualTo((ushort)9301));
+            Assert.That(started.Speakers && started.Mic, Is.True);
+
             var rate = (SetStreamRateMessage)RoundTrip(new SetStreamRateMessage(4, 15, 5000));
             Assert.That(rate.ScreenKey, Is.EqualTo(4u));
             Assert.That(rate.Fps, Is.EqualTo((byte)15));
