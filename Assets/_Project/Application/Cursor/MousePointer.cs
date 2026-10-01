@@ -56,6 +56,7 @@ namespace ScreenPortal.App.Cursor
             input.Direction = _world.Direction;
             input.SelectHeld = s.Left;
             input.GripHeld = s.Right;
+            input.NoSnap = s.Shift;
             input.CancelPressed = _edit.ConsumeCancel();
             if (notches == 0) return true;
             if (_manipulation.IsDragging)

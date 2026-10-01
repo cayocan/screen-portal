@@ -16,6 +16,8 @@ namespace ScreenPortal.App.Manipulation
         Resizing,
         /// <summary>Arrastando a alça de curvatura (spec 2E §3).</summary>
         Curving,
+        /// <summary>Arrastando uma parte do gizmo do modo edição (<see cref="ScreenManipulationController.ActiveGizmo"/>).</summary>
+        Gizmo,
     }
 
     /// <summary>
@@ -60,7 +62,19 @@ namespace ScreenPortal.App.Manipulation
         public int HoverPointer { get; private set; } = -1;
         public int ActivePointer { get; private set; } = -1;
         public ManipulationPreview Preview { get; } = new ManipulationPreview();
-        public bool IsDragging => State == ManipulationState.Moving || State == ManipulationState.Resizing || State == ManipulationState.Curving;
+        public bool IsDragging => State == ManipulationState.Moving || State == ManipulationState.Resizing || State == ManipulationState.Curving
+                                  || State == ManipulationState.Gizmo;
+
+        /// <summary>Modo edição: gizmo (mover/girar/escalar) na tela em foco.</summary>
+        public bool GizmoEnabled { get; set; }
+        /// <summary>Parte do gizmo sob o ponteiro (realce).</summary>
+        public GizmoPart HoverGizmo { get; private set; }
+        /// <summary>Parte do gizmo sendo arrastada.</summary>
+        public GizmoPart ActiveGizmo { get; private set; }
+
+        private GizmoFrame _gizmo;
+        private float _gizmoStart;
+        private Vec3 _gizmoRef;
 
         public ScreenManipulationController(WorkspaceStore store, ICommandBus bus)
         {
@@ -88,9 +102,113 @@ namespace ScreenPortal.App.Manipulation
             State = ManipulationState.Idle;
             HoverHit = default;
             HoverPointer = -1;
+            HoverGizmo = GizmoPart.None;
             var ws = _store.State;
+            if (GizmoEnabled && ws.TryGetScreen(ws.FocusedScreenId, out var focused))
+            {
+                var frame = ScreenGizmo.Frame(focused, ws.Surface);
+                if (TryGizmo(0, in right, _prevSelectRight, focused, in frame)) return;
+                if (HoverPointer < 0 && TryGizmo(1, in left, _prevSelectLeft, focused, in frame)) return;
+                if (HoverPointer >= 0) return; // ponteiro no gizmo: não pega a tela atrás dele
+            }
             if (TryHover(0, in right, _prevSelectRight, ws)) return;
             TryHover(1, in left, _prevSelectLeft, ws);
+        }
+
+        /// <returns>true se começou um arraste do gizmo.</returns>
+        private bool TryGizmo(int pointer, in ManipulationInput input, bool previousSelect, VirtualScreen screen, in GizmoFrame frame)
+        {
+            if (!input.HasRay) return false;
+            var part = ScreenGizmo.Pick(in frame, input.Origin, input.Direction);
+            if (part == GizmoPart.None) return false;
+            if (HoverPointer < 0)
+            {
+                HoverPointer = pointer;
+                HoverGizmo = part;
+                State = ManipulationState.Hover;
+            }
+            if (!input.SelectHeld || previousSelect) return false;
+            BeginGizmo(pointer, in input, screen, part, in frame);
+            return true;
+        }
+
+        private void BeginGizmo(int pointer, in ManipulationInput input, VirtualScreen screen, GizmoPart part, in GizmoFrame frame)
+        {
+            var surface = _store.State.Surface;
+            _screen = screen.Id;
+            ActivePointer = pointer;
+            HoverPointer = pointer;
+            ActiveGizmo = part;
+            HoverGizmo = part;
+            _gizmo = frame;
+            _startPlacement = screen.Placement;
+            _startWidth = screen.WidthMeters;
+            _aspect = screen.Resolution.AspectRatio;
+            _startPose = surface.ToPose(screen.Placement);
+            _startCurvature = screen.Curvature;
+            _startCurveRadius = CurvedGeometry.Of(screen, surface).RadiusM;
+            Preview.Begin(screen.Id, _startPose, screen.Placement, screen.WidthMeters, screen.HeightMeters, screen.Curvature);
+            State = ManipulationState.Gizmo;
+            switch (part)
+            {
+                case GizmoPart.MoveX:
+                case GizmoPart.MoveY:
+                    ScreenGizmo.AxisParameter(frame.Origin, frame.Axis(part), input.Origin, input.Direction, out _gizmoStart);
+                    break;
+                case GizmoPart.Scale:
+                    ScreenGizmo.AxisParameter(frame.Origin, ScaleAxis(in frame), input.Origin, input.Direction, out _gizmoStart);
+                    break;
+                default:
+                    _gizmoRef = ScreenGizmo.Perpendicular(frame.Axis(part));
+                    ScreenGizmo.RingAngle(frame.Origin, frame.Axis(part), _gizmoRef, input.Origin, input.Direction, out _gizmoStart);
+                    break;
+            }
+        }
+
+        /// <summary>Escalar: arrastar o cubo para cima/direita cresce, para baixo/esquerda encolhe.</summary>
+        private static Vec3 ScaleAxis(in GizmoFrame f) => (f.Right + f.Up).Normalized;
+
+        private void UpdateGizmo(in ManipulationInput active, in ManipulationInput other)
+        {
+            var f = _gizmo;
+            var surface = _store.State.Surface;
+            switch (ActiveGizmo)
+            {
+                case GizmoPart.MoveX:
+                case GizmoPart.MoveY:
+                {
+                    if (!ScreenGizmo.AxisParameter(f.Origin, f.Axis(ActiveGizmo), active.Origin, active.Direction, out float s)) return;
+                    var position = _startPose.Position + f.Axis(ActiveGizmo) * (s - _gizmoStart);
+                    if (_startPlacement.IsLoose)
+                    {
+                        Preview.SetLoose(new Pose(position, _startPose.Rotation));
+                        return;
+                    }
+                    var at = surface.FromWorldPosition(position);
+                    var candidate = surface.Mode == LayoutMode.Cylinder
+                        ? CylinderMath.FromAzimuthHeight(at.AzimuthDeg, CylinderMath.Height(at), CylinderMath.HorizontalRadius(_startPlacement))
+                        : Placement.OnSurface(at.AzimuthDeg, at.ElevationDeg, _startPlacement.DistanceM);
+                    Preview.SetPlacement(candidate, surface.ToPose(candidate));
+                    return;
+                }
+                case GizmoPart.Scale:
+                {
+                    if (!ScreenGizmo.AxisParameter(f.Origin, ScaleAxis(in f), active.Origin, active.Direction, out float s)) return;
+                    float width = ScreenLimits.ClampWidth(_startWidth * (float)Math.Exp((s - _gizmoStart) / f.Size));
+                    Preview.SetSize(width, width / _aspect);
+                    return;
+                }
+                default:
+                {
+                    var axis = f.Axis(ActiveGizmo);
+                    if (!ScreenGizmo.RingAngle(f.Origin, axis, _gizmoRef, active.Origin, active.Direction, out float angle)) return;
+                    float delta = angle - _gizmoStart;
+                    if (!active.NoSnap && !other.SelectHeld) delta = ScreenGizmo.SnapAngle(delta);
+                    // girar solta a tela da superfície (Liberdade; Voltar à superfície a devolve)
+                    Preview.SetLoose(new Pose(_startPose.Position, Quat.AngleAxis(delta, axis) * _startPose.Rotation));
+                    return;
+                }
+            }
         }
 
         /// <returns>true se começou um arraste.</returns>
@@ -163,6 +281,11 @@ namespace ScreenPortal.App.Manipulation
                 return;
             }
             if (!active.HasRay) return;
+            if (State == ManipulationState.Gizmo)
+            {
+                UpdateGizmo(in active, in other);
+                return;
+            }
             if (State == ManipulationState.Resizing)
             {
                 UpdateResize(in active);
@@ -272,7 +395,7 @@ namespace ScreenPortal.App.Manipulation
         private void Commit()
         {
             var id = _screen;
-            bool resizing = State == ManipulationState.Resizing;
+            bool resizing = State == ManipulationState.Resizing || (State == ManipulationState.Gizmo && ActiveGizmo == GizmoPart.Scale);
             bool curving = State == ManipulationState.Curving;
             bool loose = Preview.IsLoose;
             var placement = Preview.Placement;
@@ -306,6 +429,7 @@ namespace ScreenPortal.App.Manipulation
         {
             State = ManipulationState.Idle;
             ActivePointer = -1;
+            ActiveGizmo = GizmoPart.None;
             _loose = false;
             Preview.End();
         }

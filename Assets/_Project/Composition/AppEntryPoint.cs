@@ -31,6 +31,7 @@ namespace ScreenPortal.Composition
         private readonly ScreenPortal.App.Cursor.WorldCursor _worldCursor;
         private readonly EditMode _edit;
         private readonly EditModeBadge _badge;
+        private readonly GizmoView _gizmo;
 
         public AppEntryPoint(ScreenViewSynchronizer synchronizer, ConnectionStateMachine connection,
             IControlChannel channel, IHostDiscovery discovery, AppEnvironment env,
@@ -38,8 +39,9 @@ namespace ScreenPortal.Composition
             HostSync hostSync, OverlayScreenViewFactory views, StartupRecenter startupRecenter,
             ScreenPortal.App.Session.SessionAutosave autosave, RateSync rates, LayoutSync layout,
             ScreenPortal.App.Cursor.CursorSync cursor, ScreenPortal.Presentation.Cursor.CursorView cursorView,
-            ScreenPortal.App.Cursor.WorldCursor worldCursor, EditMode edit, EditModeBadge badge)
+            ScreenPortal.App.Cursor.WorldCursor worldCursor, EditMode edit, EditModeBadge badge, GizmoView gizmo)
         {
+            _gizmo = gizmo;
             _edit = edit;
             _badge = badge;
             _worldCursor = worldCursor;
@@ -84,6 +86,7 @@ namespace ScreenPortal.Composition
             _worldCursor.Tick(in mouse);
             _router.Tick();
             _presenter.Tick();
+            _gizmo.Tick();
             _cursorView.Tick();
             _badge.Tick(UnityEngine.Time.deltaTime);
             _autosave.Tick();
@@ -103,6 +106,7 @@ namespace ScreenPortal.Composition
             _layout.Dispose();
             _cursorView.Dispose();
             _badge.Dispose();
+            _gizmo.Dispose();
             _edit.Dispose();
             _cursor.Dispose();
             _presenter.Dispose();

@@ -59,3 +59,11 @@ Fora do escopo: clicar no conteúdo das telas com o laser, menu pelo mouse, mold
 
 ## 7. Testes
 Host (xUnit, puro): `MouseRouter` (estados, borda → Quest/fora do Quest/nada, `CursorEnter`, queda da sessão, edição engole tudo); conversão de cursor monocromático; codec das mensagens novas. Headset (NUnit, puro): `WorldCursor` (delta → graus, toque → pixel em plana e curva, 80 ms), `MousePointer` → `ManipulationInput`, `EditMode` (lasers só nele, desligar cancela arraste, desligar sobre tela entra nela), pixel → ponto 3D do cursor. Simulator e Quest como em §6.
+
+## 8. Gizmo do modo edição (pedido do Cayo, 01/10)
+Gizmo **universal** (como o da Unity) na tela em foco, só no modo edição: setas X/Y movem (na tela da superfície,
+azimute/elevação — ela continua na superfície; solta, eixos da própria tela), anéis X/Y/Z giram (passos de 5°, `Shift`
+desliga o ímã), cubo do centro escala (só a largura; a resolução nunca). **Girar solta a tela da superfície** (opção 1;
+"Voltar à superfície" e desfazer a devolvem). Profundidade na roda/analógico (seta apontando para quem olha não dá para
+pegar). Anéis maiores que as setas (1,3×) para nunca se cruzarem. Clicar no conteúdo da tela também move (o clique não
+vai ao Windows na edição). Um Command ao soltar, como o resto da manipulação. `Ctrl+Alt+Home` traz o cursor 3D perdido.

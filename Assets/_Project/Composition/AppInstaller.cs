@@ -109,6 +109,8 @@ namespace ScreenPortal.Composition
             builder.Register(r => new ScreenPortal.App.Cursor.MousePointer(r.Resolve<ScreenPortal.App.Cursor.CursorSync>(),
                 r.Resolve<ScreenPortal.App.Cursor.WorldCursor>(), r.Resolve<ScreenManipulationController>(), r.Resolve<HotkeyDispatcher>(),
                 r.Resolve<WorkspaceStore>(), r.Resolve<EditMode>()), Lifetime.Singleton);
+            builder.Register(r => new GizmoView(env.ScreensRoot, env.UnlitMaterial, r.Resolve<ScreenManipulationController>(),
+                r.Resolve<WorkspaceStore>()), Lifetime.Singleton);
             builder.Register(r => new EditModeBadge(env.ScreensRoot, r.Resolve<EditMode>(), r.Resolve<IHeadPoseSource>()), Lifetime.Singleton);
 
             builder.RegisterEntryPoint<AppEntryPoint>().AsSelf();

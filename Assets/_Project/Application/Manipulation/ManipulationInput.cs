@@ -18,6 +18,8 @@ namespace ScreenPortal.App.Manipulation
         /// <summary>Quanto afastar (+) ou aproximar (−) neste quadro: analógico ou puxar/empurrar a mão.</summary>
         public float DistanceDeltaM;
         public bool CancelPressed;
+        /// <summary>Desliga ímãs neste quadro (Shift no mouse): princípio Liberdade.</summary>
+        public bool NoSnap;
         public bool UndoPressed;
         public bool RedoPressed;
 

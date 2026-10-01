@@ -47,6 +47,7 @@ namespace ScreenPortal.App.Manipulation
             LastLeft = left;
             bool editing = _edit == null || _edit.IsOn;
             _manipulation.GrabContent = _edit != null && editing;
+            _manipulation.GizmoEnabled = _edit != null && editing;
             if (editing && _mouse != null && !right.SelectHeld && !right.GripHeld && _mouse.Read(out var mouse) && mouse.HasRay)
                 right = mouse; // o mouse é o ponteiro de quem está no teclado
 
