@@ -24,12 +24,13 @@ namespace ScreenPortal.Composition
         private readonly OverlayScreenViewFactory _views;
         private readonly StartupRecenter _startupRecenter;
         private readonly ScreenPortal.App.Session.SessionAutosave _autosave;
+        private readonly RateSync _rates;
 
         public AppEntryPoint(ScreenViewSynchronizer synchronizer, ConnectionStateMachine connection,
             IControlChannel channel, IHostDiscovery discovery, AppEnvironment env,
             InteractionRouter router, ManipulationPresenter presenter, WristMenu menu,
             HostSync hostSync, OverlayScreenViewFactory views, StartupRecenter startupRecenter,
-            ScreenPortal.App.Session.SessionAutosave autosave)
+            ScreenPortal.App.Session.SessionAutosave autosave, RateSync rates)
         {
             _synchronizer = synchronizer;
             _connection = connection;
@@ -43,6 +44,7 @@ namespace ScreenPortal.Composition
             _views = views;
             _startupRecenter = startupRecenter;
             _autosave = autosave;
+            _rates = rates;
         }
 
         public void Start()
@@ -60,6 +62,7 @@ namespace ScreenPortal.Composition
             _startupRecenter.Tick();
             _connection.Tick();
             _hostSync.Tick();
+            _rates.Tick();
             _router.Tick();
             _presenter.Tick();
             _autosave.Tick();

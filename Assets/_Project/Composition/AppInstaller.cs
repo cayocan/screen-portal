@@ -49,6 +49,13 @@ namespace ScreenPortal.Composition
             // 2C: telas com vídeo sob comando do headset (spec 2026-09-30-fase2c-varias-telas-design.md)
             builder.Register<NativeScreenVideo>(Lifetime.Singleton).As<IScreenVideo>();
             builder.Register<HostSync>(Lifetime.Singleton).AsSelf().As<IHostCatalog>().As<IScreenLinks>();
+            // 2F: fps/bitrate por tela (modo → olhar → orçamento) mandados ao host só quando mudam
+            builder.Register(r =>
+            {
+                var machine = r.Resolve<ConnectionStateMachine>();
+                return new RateSync(r.Resolve<WorkspaceStore>(), r.Resolve<IScreenLinks>(), () => machine.IsLinked, machine.Send,
+                    r.Resolve<IHeadPoseSource>(), r.Resolve<IClock>());
+            }, Lifetime.Singleton);
 
             // 2B: manipulação por controle/mãos + menu de pulso (spec 2026-09-29-fase2b-manipulacao-design.md)
             builder.RegisterInstance(env.Head ?? new FixedHeadPose(Pose.At(LayoutSurface.DefaultCenter))).As<IHeadPoseSource>();
