@@ -75,7 +75,12 @@ namespace ScreenPortal.Composition
             builder.Register<ScreenManipulationController>(Lifetime.Singleton);
             builder.Register<StartupRecenter>(Lifetime.Singleton);
             builder.Register(r => new WristMenu(r.Resolve<WorkspaceStore>(), r.Resolve<ICommandBus>(), r.Resolve<IHeadPoseSource>(),
-                r.Resolve<IHostCatalog>(), env.ShowTestScreens, r.Resolve<RateSync>(), r.Resolve<ScreenPortal.App.Audio.AudioSync>()), Lifetime.Singleton);
+                r.Resolve<IHostCatalog>(), env.ShowTestScreens, r.Resolve<RateSync>(), r.Resolve<ScreenPortal.App.Audio.AudioSync>(),
+                r.Resolve<LayoutSyncSettings>()), Lifetime.Singleton);
+            // 3A: atalhos globais do PC → Commands na tela sob o cursor do mouse
+            builder.Register(r => new HotkeyDispatcher(r.Resolve<WorkspaceStore>(), r.Resolve<ICommandBus>(), r.Resolve<IHeadPoseSource>(),
+                r.Resolve<ConnectionStateMachine>()), Lifetime.Singleton);
+            builder.RegisterBuildCallback(c => c.Resolve<HotkeyDispatcher>()); // assina a conexão já na montagem
             // Controle parado perde o laser; tchau liga/desliga as mãos (laser, interação e modelo).
             builder.Register<HandsMode>(Lifetime.Singleton);
             builder.RegisterBuildCallback(c =>
