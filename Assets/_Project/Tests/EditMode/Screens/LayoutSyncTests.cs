@@ -98,6 +98,21 @@ namespace ScreenPortal.Tests
         }
 
         [Test]
+        public void MenuToggle_TurnsTheArrangementOffAndOn()
+        {
+            var r = new Rig();
+            var menu = new ScreenPortal.App.Menu.WristMenu(r.Store, new CommandBus(r.Store, new ICommandObserver[0]),
+                new ScreenPortal.App.Menu.FixedHeadPose(Pose.Identity), arrange: r.Settings);
+            int index = -1;
+            for (int i = 0; i < menu.ItemCount; i++)
+                if (menu.Label(i) == ScreenPortal.App.Menu.WristMenu.AutoArrangeOn) index = i;
+            Assert.That(index, Is.GreaterThanOrEqualTo(0), "item no menu principal, começa ligado");
+            menu.Invoke(index);
+            Assert.That(r.Settings.Enabled, Is.False);
+            Assert.That(menu.Label(index), Is.EqualTo(ScreenPortal.App.Menu.WristMenu.AutoArrangeOff));
+        }
+
+        [Test]
         public void Reconnecting_SendsTheLayoutAgain()
         {
             var r = new Rig();
