@@ -103,6 +103,19 @@ namespace ScreenPortal.Tests
         }
 
         [Test]
+        public void FindCursor_PutsItInFrontOfTheEyes_AndMovesKeepWorking()
+        {
+            Tick(World(1, _s1, 2559, 720, 0, 0));
+            Tick(World(1, _s1, 2559, 720, 30000, 9000)); // perdido lá atrás
+            _cursor.CenterOnView();
+            Tick(World(1, _s1, 2559, 720, 30000, 9000));
+            Assert.That(Vec3.Dot(_cursor.Direction, Vec3.Forward), Is.GreaterThan(0.999f), "à frente dos olhos");
+            Tick(World(1, _s1, 2559, 720, 30100, 9000));
+            WorldCursor.AnglesOf(_cursor.Direction, out float az, out _);
+            Assert.That(az, Is.GreaterThan(0.5f), "andar para a direita continua valendo");
+        }
+
+        [Test]
         public void ElevationIsLimited()
         {
             Tick(World(1, _s1, 1280, 0, 0, -100000));

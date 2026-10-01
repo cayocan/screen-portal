@@ -52,16 +52,30 @@ namespace ScreenPortal.App.Cursor
         /// <summary>Metros por pixel da forma: o cursor 3D tem o tamanho angular que tinha na tela.</summary>
         public float MetersPerPixel => _metersPerPixel;
 
+        /// <summary>Cursor perdido (Ctrl+Alt+Home): no próximo quadro ele fica à frente dos olhos, na distância de antes.</summary>
+        public void CenterOnView() => _center = true;
+
+        private bool _center;
+
         public void Tick(in MouseState s)
         {
             Active = s.Mode == MouseMode.World || s.Mode == MouseMode.Edit;
             if (!Active)
             {
                 _started = false;
+                _center = false;
                 return;
             }
             var head = _head.HeadPose.Position;
             if (!_started || s.Epoch != _epoch) Begin(in s, head);
+            if (_center)
+            {
+                _center = false;
+                AnglesOf(_head.HeadPose.Rotation * Vec3.Forward, out float az, out float el);
+                _az0 = az - s.Dx * _degPerPx; // a partir daqui os deltas continuam valendo
+                _el0 = el + s.Dy * _degPerPx;
+                _leftExitScreen = true;
+            }
             _az = _az0 + s.Dx * _degPerPx;
             _el = Clamp(_el0 - s.Dy * _degPerPx, -MaxElevationDeg, MaxElevationDeg);
             Origin = head;

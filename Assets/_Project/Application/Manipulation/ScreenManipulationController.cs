@@ -52,6 +52,9 @@ namespace ScreenPortal.App.Manipulation
         private Vec3 _curveOrigin;
         private Vec3 _curveNormal;
 
+        /// <summary>Modo edição (3B): o conteúdo da tela também pega e move (o clique não vai ao Windows nesse modo).</summary>
+        public bool GrabContent { get; set; }
+
         public ManipulationState State { get; private set; }
         public ScreenHit HoverHit { get; private set; }
         public int HoverPointer { get; private set; } = -1;
@@ -95,7 +98,8 @@ namespace ScreenPortal.App.Manipulation
         {
             if (!input.HasRay) return false;
             var hit = ScreenHitTest.Pick(ws, input.Origin, input.Direction);
-            if (hit.Region != HitRegion.Frame && hit.Region != HitRegion.Handle && hit.Region != HitRegion.CurvatureHandle) return false;
+            if (hit.Region != HitRegion.Frame && hit.Region != HitRegion.Handle && hit.Region != HitRegion.CurvatureHandle
+                && !(GrabContent && hit.Region == HitRegion.Content)) return false;
             if (HoverPointer < 0)
             {
                 HoverHit = hit;

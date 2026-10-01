@@ -29,6 +29,8 @@ namespace ScreenPortal.Composition
         private readonly ScreenPortal.App.Cursor.CursorSync _cursor;
         private readonly ScreenPortal.Presentation.Cursor.CursorView _cursorView;
         private readonly ScreenPortal.App.Cursor.WorldCursor _worldCursor;
+        private readonly EditMode _edit;
+        private readonly EditModeBadge _badge;
 
         public AppEntryPoint(ScreenViewSynchronizer synchronizer, ConnectionStateMachine connection,
             IControlChannel channel, IHostDiscovery discovery, AppEnvironment env,
@@ -36,8 +38,10 @@ namespace ScreenPortal.Composition
             HostSync hostSync, OverlayScreenViewFactory views, StartupRecenter startupRecenter,
             ScreenPortal.App.Session.SessionAutosave autosave, RateSync rates, LayoutSync layout,
             ScreenPortal.App.Cursor.CursorSync cursor, ScreenPortal.Presentation.Cursor.CursorView cursorView,
-            ScreenPortal.App.Cursor.WorldCursor worldCursor)
+            ScreenPortal.App.Cursor.WorldCursor worldCursor, EditMode edit, EditModeBadge badge)
         {
+            _edit = edit;
+            _badge = badge;
             _worldCursor = worldCursor;
             _cursor = cursor;
             _cursorView = cursorView;
@@ -74,12 +78,14 @@ namespace ScreenPortal.Composition
             _hostSync.Tick();
             _rates.Tick();
             _layout.Tick();
+            _cursor.Tick(); // mouse antes da interação: o cursor 3D é ponteiro no modo edição
+            var mouse = _cursor.Current;
+            _edit.Tick(in mouse);
+            _worldCursor.Tick(in mouse);
             _router.Tick();
             _presenter.Tick();
-            _cursor.Tick();
-            var mouse = _cursor.Current;
-            _worldCursor.Tick(in mouse);
             _cursorView.Tick();
+            _badge.Tick(UnityEngine.Time.deltaTime);
             _autosave.Tick();
         }
 
@@ -96,6 +102,8 @@ namespace ScreenPortal.Composition
             _autosave.Dispose();
             _layout.Dispose();
             _cursorView.Dispose();
+            _badge.Dispose();
+            _edit.Dispose();
             _cursor.Dispose();
             _presenter.Dispose();
             _hostSync.Dispose();

@@ -342,6 +342,10 @@ namespace ScreenPortal.App.Connection
         CurvatureToggle, CurvatureLess, CurvatureMore,
         CycleFrameRate, Undo, Redo, Recenter, ToggleLayoutMode, AlignPosture, ToggleGrid,
         ToggleEditMode,
+        /// <summary>Esc: o host só o registra com o modo edição ligado (não rouba o Esc do Windows no resto do tempo).</summary>
+        Escape,
+        /// <summary>Cursor 3D perdido no mundo: volta para a frente dos olhos.</summary>
+        FindCursor,
     }
 
     /// <summary>3B: o headset pede o MouseState (UDP) nesta porta.</summary>
