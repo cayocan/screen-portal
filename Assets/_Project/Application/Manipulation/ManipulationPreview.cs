@@ -17,12 +17,14 @@ namespace ScreenPortal.App.Manipulation
         public bool IsLoose { get; private set; }
         public float WidthM { get; private set; }
         public float HeightM { get; private set; }
+        /// <summary>Curvatura pedida (0..1): a da tela, ou o valor em prévia durante o arraste da alça de curvatura.</summary>
+        public float Curvature { get; private set; }
         public bool HasGuideAzimuth { get; private set; }
         public float GuideAzimuthDeg { get; private set; }
         public bool HasGuideElevation { get; private set; }
         public float GuideElevationDeg { get; private set; }
 
-        internal void Begin(ScreenId screen, Pose pose, Placement placement, float widthM, float heightM)
+        internal void Begin(ScreenId screen, Pose pose, Placement placement, float widthM, float heightM, float curvature)
         {
             Active = true;
             Screen = screen;
@@ -31,8 +33,11 @@ namespace ScreenPortal.App.Manipulation
             IsLoose = placement.IsLoose;
             WidthM = widthM;
             HeightM = heightM;
+            Curvature = curvature;
             ClearGuides();
         }
+
+        internal void SetCurvature(float curvature) => Curvature = curvature;
 
         internal void SetPlacement(Placement placement, Pose pose)
         {

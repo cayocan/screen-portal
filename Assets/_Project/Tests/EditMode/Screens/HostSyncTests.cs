@@ -354,6 +354,82 @@ namespace ScreenPortal.Tests
         }
 
         [Test]
+        public void FlatToCurved_ReopensTheDecoderOnTheNewLayer_SameSlot_NoNewAcquire_CurvedToCurvedDoesNot()
+        {
+            var r = new Rig();
+            var id = r.AddVirtual();
+            r.Link();
+            r.Push(new ScreenReadyMessage((uint)id.Value, 2560, 1440));
+            r.Push(new StreamStartedMessage(0, 2560, 1440));
+            Assert.That(r.Video.Opens, Is.EqualTo(1));
+            int acquires = r.C.Channel.Count<AcquireScreenMessage>();
+            int starts = r.C.Channel.Count<StartStreamMessage>();
+
+            r.C.Bus.Send(new SetScreenCurvature(id, 0.6f)); // layer quad → cilindro: Surface nova
+            r.Tick();
+            Assert.That(r.Video.Closes, Is.EqualTo(1));
+            Assert.That(r.Video.Opens, Is.EqualTo(2));
+            Assert.That(r.Video.LastPort, Is.EqualTo(9000), "mesmo slot");
+            Assert.That(r.C.Channel.Count<StartStreamMessage>(), Is.EqualTo(starts + 1), "o host responde com IDR");
+            Assert.That(r.C.Channel.Count<AcquireScreenMessage>(), Is.EqualTo(acquires), "o monitor continua o mesmo");
+
+            r.C.Bus.Send(new SetScreenCurvature(id, 1f)); // curva → curva: só o raio
+            r.Tick();
+            Assert.That(r.Video.Opens, Is.EqualTo(2));
+
+            r.C.Bus.Undo();
+            r.C.Bus.Undo(); // volta a plana
+            r.Tick();
+            Assert.That(r.Video.Opens, Is.EqualTo(3));
+            Assert.That(r.C.Channel.Count<AcquireScreenMessage>(), Is.EqualTo(acquires));
+        }
+
+        [Test]
+        public void ShapeChange_WhileOffline_ClosesTheDecoder_ReconnectOpensTheNewOne()
+        {
+            var r = new Rig();
+            var id = r.AddVirtual();
+            r.Link();
+            r.Push(new ScreenReadyMessage((uint)id.Value, 2560, 1440));
+            r.C.Channel.Push(ChannelEventKind.Disconnected);
+            r.Tick();
+            Assert.That(r.Video.Open.Contains(id), Is.True, "offline o decoder fica");
+            r.C.Bus.Send(new SetScreenCurvature(id, 0.6f));
+            Assert.That(r.Video.Open.Contains(id), Is.False, "a Surface antiga morreu com a layer");
+
+            r.Tick(); // tentativa de reconexão
+            r.C.Channel.Push(ChannelEventKind.Connected);
+            r.C.Channel.Push(ChannelEventKind.Message, NoMonitors);
+            r.Tick();
+            r.Push(new ScreenReadyMessage((uint)id.Value, 2560, 1440));
+            Assert.That(r.Video.Opens, Is.EqualTo(2), "reabre na Surface nova");
+        }
+
+        [Test]
+        public void UndoOfRecreate_AcquiresThePreviousSizeOnTheSameKey_WithoutReleasing()
+        {
+            var r = new Rig();
+            var id = r.AddVirtual();
+            r.Link();
+            r.Push(new ScreenReadyMessage((uint)id.Value, 2560, 1440));
+            r.C.Bus.Send(new RecreateScreen(id, Resolution.Create(1920, 1080)));
+            r.Tick();
+            r.Push(new ScreenReadyMessage((uint)id.Value, 1920, 1080));
+
+            r.C.Bus.Undo();
+            r.Tick();
+            var acquire = r.C.Channel.Last<AcquireScreenMessage>();
+            Assert.That(acquire.ScreenKey, Is.EqualTo((uint)id.Value));
+            Assert.That(acquire.Width, Is.EqualTo(2560u));
+            Assert.That(acquire.Height, Is.EqualTo(1440u));
+            Assert.That(r.C.Channel.Count<ReleaseScreenMessage>(), Is.EqualTo(0), "recriar não libera a chave");
+
+            r.Push(new ScreenReadyMessage((uint)id.Value, 2560, 1440));
+            Assert.That(r.Video.LastResolution, Is.EqualTo(Resolution.Create(2560, 1440)));
+            Assert.That(r.Video.LastPort, Is.EqualTo(9000));
+        }
+
+        [Test]
         public void ScreenFailed_WhileStreaming_ClosesTheDecoder()
         {
             var r = new Rig();

@@ -56,7 +56,7 @@ namespace ScreenPortal.App.Screens
                 {
                     if (!ReferenceEquals(entry.Applied, screen) || !ReferenceEquals(entry.Surface, surface))
                     {
-                        entry.View.Apply(screen, surface.ToPose(screen.Placement));
+                        entry.View.Apply(screen, surface.ToPose(screen.Placement), CurvedGeometry.Of(screen, surface).RadiusM);
                         entry.Applied = screen;
                         entry.Surface = surface;
                     }
@@ -66,7 +66,7 @@ namespace ScreenPortal.App.Screens
                 else
                 {
                     var view = _factory.Create(screen);
-                    view.Apply(screen, surface.ToPose(screen.Placement));
+                    view.Apply(screen, surface.ToPose(screen.Placement), CurvedGeometry.Of(screen, surface).RadiusM);
                     _entries[screen.Id] = new Entry { View = view, Applied = screen, Surface = surface, Seen = true };
                 }
             }

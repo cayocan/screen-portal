@@ -2,6 +2,7 @@
     "name": "ScreenPortal.Editor",
     "rootNamespace": "ScreenPortal.Editor",
     "references": [
+        "Unity.TextMeshPro",
         "UnityEditor.TestRunner",
         "UnityEngine.TestRunner",
         "ScreenPortal.Composition",

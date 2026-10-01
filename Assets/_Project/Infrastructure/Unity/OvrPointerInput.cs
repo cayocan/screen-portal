@@ -16,6 +16,9 @@ namespace ScreenPortal.Infrastructure.Unity
         public const float StickSpeedMps = 1.5f;
         public const float HandPushGain = 3f;
         public const float FistStrength = 0.9f;
+        public const float OpenPinchStrength = 0.5f;
+        /// <summary>Normal da palma no espaço da mão (calibrado na 2B para a esquerda; OpenXR: −Y nas duas mãos).</summary>
+        private static readonly Vector3 PalmNormalLocal = Vector3.down;
 
         private readonly OVRInput.Controller _controller;
         private readonly OVRHand _hand;
@@ -67,6 +70,11 @@ namespace ScreenPortal.Infrastructure.Unity
             input.SelectHeld = _hand.GetFingerIsPinching(OVRHand.HandFinger.Index);
             input.GripHeld = _hand.GetFingerPinchStrength(OVRHand.HandFinger.Middle) > FistStrength
                              && _hand.GetFingerPinchStrength(OVRHand.HandFinger.Ring) > FistStrength;
+            input.IsHand = true;
+            input.PalmPosition = ToDomain(_hand.transform.position);
+            input.PalmNormal = ToDomain(_hand.transform.rotation * PalmNormalLocal);
+            input.HandOpen = !input.SelectHeld && !input.GripHeld
+                             && _hand.GetFingerPinchStrength(OVRHand.HandFinger.Index) < OpenPinchStrength;
             float distance = _head != null ? Vector3.Distance(_hand.transform.position, _head.position) : 0f;
             input.DistanceDeltaM = _lastHandDistance < 0f || !input.SelectHeld ? 0f : (distance - _lastHandDistance) * HandPushGain;
             _lastHandDistance = distance;

@@ -1,6 +1,6 @@
 # Status do projeto
 
-**Fase atual:** **Fase 2 — multi-monitor livre**: 2A (29/09), 2B e 2C (30/09/2026) concluídas → próximas: **2D/2E**.
+**Fase atual:** **Fase 2 — multi-monitor livre**: 2A (29/09), 2B, 2C, 2D e 2E (30/09/2026) concluídas → próximas: **2F/2G**.
 Brief: [brief.md](brief.md) v1.3.2 (ADRs 0002–0006).
 
 ## Fase 0 — resultado
@@ -54,8 +54,8 @@ Cada um com spec → plano → implementação → verificação. Ordem: **2A + 
 | 2A | Spikes: driver de monitor virtual + capacidade do decoder | PC (admin) + Quest | — | ✅ SudoVDA ([ADR 0007](adr/0007-virtual-display-driver.md)); 4×60 fps sem perdas, foco a ~16 ms ([ADR 0008](adr/0008-decode-capacity.md)) |
 | 2B | Superfície de layout Cilindro/Esfera + manipulação (controle/mãos) + undo | Meta XR Simulator | — | ✅ Simulator 17/17 (bug do texto num olho só corrigido, palma calibrada) + Quest: todos os testes passaram — [spec](specs/2026-09-29-fase2b-manipulacao-design.md) · [plano](plans/2026-09-29-fase2b-manipulacao.md) · [verificação](measurements/fase2b-simulator.md) |
 | 2C | Várias telas: monitores virtuais sob comando do headset, N streams | PC + Quest | 2A | ✅ Simulator 1–7 + Quest: 5 telas a 60 fps, 4K, remover/undo, reconexão; UI por cima das telas (Underlay), tela nova à frente da visão, reorganizar monitores no Windows — [spec](specs/2026-09-30-fase2c-varias-telas-design.md) · [plano](plans/2026-09-30-fase2c-varias-telas.md) · [verificação](measurements/fase2c-simulator.md) · [ADR 0009](adr/0009-screen-leases-declarative-sync.md) · [ADR 0010](adr/0010-screens-as-underlay-layers.md) |
-| 2D | Contorno fantasma + recriar + resolução custom (o seletor veio na 2C) | Simulator + Quest | 2B, 2C | — |
-| 2E | Telas curvas (CylinderLayerPolicy, crossfade, medição) | Simulator + Quest | 2B, 2C | — |
+| 2D | Recriar com outra resolução (contorno fantasma e resolução custom saíram, ADR 0012) | Quest | 2B, 2C | ✅ Quest: recriar e desfazer levam as janelas; o monitor novo ocupa o lugar do antigo no Windows — [spec](specs/2026-09-30-fase2d-recriar-design.md) · [plano](plans/2026-09-30-fase2d-recriar.md) · [verificação](measurements/fase2d-recriar.md) |
+| 2E | Telas curvas: toda tela curva é layer cilíndrica (ADR 0011) | Quest | 2B, 2C | ✅ spike (4 cilindros a 60 fps) + Quest: presets, alça, troca sem piscar, UI por cima — [spec](specs/2026-09-30-fase2e-telas-curvas-design.md) · [plano](plans/2026-09-30-fase2e-telas-curvas.md) · [verificação](measurements/fase2e-telas-curvas.md) · também: texto em TMP (ADR 0013), mãos/lasers/tchau, última sessão (ADR 0014) |
 | 2F | Frame rate por tela + BandwidthBudget | testes + Quest | 2A, 2C | — |
 | 2G | Áudio do PC (WASAPI → Opus) | PC + Quest | — | — |
 

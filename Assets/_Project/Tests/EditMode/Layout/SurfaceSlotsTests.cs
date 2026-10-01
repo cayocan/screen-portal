@@ -103,8 +103,8 @@ namespace ScreenPortal.Tests
             {
                 private readonly System.Action _onApply;
                 public View(System.Action onApply) => _onApply = onApply;
-                public void Apply(VirtualScreen screen, Pose pose) => _onApply();
-                public void ApplyTransform(Pose pose, float widthMeters, float heightMeters) { }
+                public void Apply(VirtualScreen screen, Pose pose, float radiusM) => _onApply();
+                public void ApplyTransform(Pose pose, float widthMeters, float heightMeters, float radiusM) { }
                 public void Dispose() { }
             }
         }

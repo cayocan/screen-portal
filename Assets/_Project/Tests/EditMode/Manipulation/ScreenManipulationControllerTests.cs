@@ -175,6 +175,112 @@ namespace ScreenPortal.Tests
             Assert.That(r.Controller.Preview.Placement.AzimuthDeg, Is.EqualTo(9f).Within(0.05f), "sem encaixe");
         }
 
+        private static float TopY => 0.5f / (16f / 9f) + 0.015f; // faixa de cima da moldura
+
+        private static ManipulationInput RayFrom(Vec3 origin, Vec3 dir, bool select) =>
+            new ManipulationInput { HasRay = true, Origin = origin, Direction = dir, SelectHeld = select };
+
+        [Test]
+        public void CurvatureHandle_PushingCurves_PreviewOnly_OneCommandOnRelease_UndoRestores()
+        {
+            var r = new Rig(Placement.OnSurface(0f, 0f, 1.3f));
+            var grab = r.Toward(0, 0f, TopY);
+            r.Right(grab, false);
+            Assert.That(r.Controller.HoverHit.Region, Is.EqualTo(HitRegion.CurvatureHandle));
+            r.Right(grab, true);
+            Assert.That(r.Controller.State, Is.EqualTo(ManipulationState.Curving));
+            Assert.That(r.Controller.IsDragging, Is.True);
+
+            var pushed = Eye + new Vec3(0f, 0f, 0.15f); // 15 cm para a frente (normal da tela = +Z)
+            r.Controller.Update(RayFrom(pushed, grab, true), default);
+            Assert.That(r.Controller.Preview.Curvature, Is.EqualTo(0.5f).Within(1e-4f));
+            Assert.That(r.Recorder.Undoable, Is.Empty, "nada muda durante o arraste");
+            Assert.That(r.Store.State.Screens[0].Curvature, Is.EqualTo(0f));
+
+            r.Controller.Update(RayFrom(pushed, grab, false), default);
+            Assert.That(r.Recorder.Undoable.Count, Is.EqualTo(1));
+            Assert.That(r.Recorder.Undoable[0], Is.TypeOf<SetScreenCurvature>());
+            var screen = r.Store.State.Screens[0];
+            Assert.That(screen.Curvature, Is.EqualTo(0.5f).Within(1e-4f));
+            Assert.That(screen.WidthMeters, Is.EqualTo(1f), "curvar não muda a largura");
+            Assert.That(screen.Resolution, Is.EqualTo(Resolution.Create(1920, 1080)));
+            Assert.That(r.Controller.Preview.Active, Is.False);
+
+            r.Bus.Undo();
+            Assert.That(r.Store.State.Screens[0].Curvature, Is.EqualTo(0f));
+        }
+
+        [Test]
+        public void CurvatureHandle_PullingFlattens_ClampedTo01()
+        {
+            var r = new Rig(Placement.OnSurface(0f, 0f, 1.3f));
+            r.Store.Dispatch(new SetScreenCurvature(r.Store.State.Screens[0].Id, 0.3f));
+            var grab = r.Toward(0, 0f, TopY);
+            r.Right(grab, false);
+            r.Right(grab, true);
+            Assert.That(r.Controller.State, Is.EqualTo(ManipulationState.Curving));
+            r.Controller.Update(RayFrom(Eye + new Vec3(0f, 0f, -0.5f), grab, true), default);
+            Assert.That(r.Controller.Preview.Curvature, Is.EqualTo(0f));
+            r.Controller.Update(RayFrom(Eye + new Vec3(0f, 0f, 0.5f), grab, true), default);
+            Assert.That(r.Controller.Preview.Curvature, Is.EqualTo(1f));
+            r.Controller.Update(RayFrom(Eye + new Vec3(0f, 0f, 0.5f), grab, false), default);
+            Assert.That(r.Store.State.Screens[0].Curvature, Is.EqualTo(1f));
+        }
+
+        [Test]
+        public void CurvatureHandle_Unchanged_OrCancelled_SendsNothing()
+        {
+            var r = new Rig(Placement.OnSurface(0f, 0f, 1.3f));
+            var grab = r.Toward(0, 0f, TopY);
+            r.Right(grab, false);
+            r.Right(grab, true);
+            r.Right(grab, false);
+            Assert.That(r.Recorder.Undoable, Is.Empty, "soltar sem mexer");
+
+            r.Right(grab, true);
+            Assert.That(r.Controller.State, Is.EqualTo(ManipulationState.Curving));
+            r.Controller.Update(RayFrom(Eye + new Vec3(0f, 0f, 0.1f), grab, true), default);
+            r.Right(grab, true, cancel: true);
+            Assert.That(r.Controller.IsDragging, Is.False);
+            r.Right(grab, false);
+            Assert.That(r.Recorder.Undoable, Is.Empty);
+            Assert.That(r.Store.State.Screens[0].Curvature, Is.EqualTo(0f));
+        }
+
+        [Test]
+        public void Preview_CarriesTheScreenCurvature_WhileMoving()
+        {
+            var r = new Rig(Placement.OnSurface(0f, 0f, 1.3f));
+            r.Store.Dispatch(new SetScreenCurvature(r.Store.State.Screens[0].Id, 0.6f));
+            var ws = r.Store.State;
+            var pose = r.PoseOf(0);
+            var grab = (CurvedGeometry.SurfacePoint(pose, CurvedGeometry.Of(ws.Screens[0], ws.Surface).RadiusM, FrameX, 0f) - Eye).Normalized;
+            r.Right(grab, false);
+            r.Right(grab, true);
+            Assert.That(r.Controller.State, Is.EqualTo(ManipulationState.Moving));
+            Assert.That(r.Controller.Preview.Curvature, Is.EqualTo(0.6f));
+        }
+
+        [Test]
+        public void Handle_OnACurvedScreen_ResizesByTheArc()
+        {
+            var r = new Rig(Placement.OnSurface(0f, 0f, 1.3f));
+            r.Store.Dispatch(new SetScreenCurvature(r.Store.State.Screens[0].Id, 0.6f));
+            var ws = r.Store.State;
+            var pose = r.PoseOf(0);
+            float radius = CurvedGeometry.Of(ws.Screens[0], ws.Surface).RadiusM;
+            float hh = 0.5f / (16f / 9f);
+            var corner = (CurvedGeometry.SurfacePoint(pose, radius, 0.5f, hh) - Eye).Normalized;
+            r.Right(corner, false);
+            Assert.That(r.Controller.HoverHit.Region, Is.EqualTo(HitRegion.Handle));
+            r.Right(corner, true);
+            var farther = (CurvedGeometry.SurfacePoint(pose, radius, 0.6f, hh * 1.2f) - Eye).Normalized;
+            r.Right(farther, true);
+            r.Right(farther, false);
+            Assert.That(r.Store.State.Screens[0].WidthMeters, Is.EqualTo(1.2f).Within(0.002f));
+            Assert.That(r.Store.State.Screens[0].Curvature, Is.EqualTo(0.6f), "redimensionar não muda a curvatura");
+        }
+
         [Test]
         public void OnlyOneManipulationAtATime()
         {

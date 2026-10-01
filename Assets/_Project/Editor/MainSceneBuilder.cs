@@ -10,6 +10,8 @@ namespace ScreenPortal.Editor
     {
         public const string ScenePath = "Assets/_Project/Scenes/Main.unity";
         private const string CameraRigPrefab = "Packages/com.meta.xr.sdk.core/Prefabs/OVRCameraRig.prefab";
+        private const string HandPrefab = "Packages/com.meta.xr.sdk.core/Prefabs/OVRHandPrefab.prefab";
+        private const string ControllerPrefab = "Packages/com.meta.xr.sdk.core/Prefabs/OVRControllerPrefab.prefab";
         private const string UnlitMaterialPath = "Assets/_Project/Presentation/Materials/Unlit.mat";
 
         [MenuItem("Screen Portal/Main/Build Main Scene")]
@@ -28,6 +30,8 @@ namespace ScreenPortal.Editor
             var rig = rigGo.GetComponent<OVRCameraRig>();
             var leftHand = AddHand(rig.leftHandAnchor, "LeftOVRHand", 0);   // OVRHand.Hand.HandLeft
             var rightHand = AddHand(rig.rightHandAnchor, "RightOVRHand", 1); // OVRHand.Hand.HandRight
+            AddController(rig.leftControllerAnchor, OVRInput.Controller.LTouch);
+            AddController(rig.rightControllerAnchor, OVRInput.Controller.RTouch);
             var unlit = LoadOrCreateUnlitMaterial();
 
             var menuGo = new GameObject("WristMenu");
@@ -43,16 +47,9 @@ namespace ScreenPortal.Editor
 
             var screensRoot = new GameObject("Screens");
 
-            var statusGo = new GameObject("ConnectionStatus");
+            var text = ScreenPortal.Presentation.UiText.Create("ConnectionStatus", null, 0.768f, TMPro.TextAlignmentOptions.Center, Color.white);
+            var statusGo = text.gameObject;
             statusGo.transform.position = new Vector3(0f, 1.25f, 1.2f);
-            var text = statusGo.AddComponent<TextMesh>();
-            text.font = Resources.GetBuiltinResource<Font>("LegacyRuntime.ttf");
-            statusGo.GetComponent<MeshRenderer>().sharedMaterial = text.font.material;
-            text.fontSize = 64;
-            text.characterSize = 0.012f;
-            text.anchor = TextAnchor.MiddleCenter;
-            text.alignment = TextAlignment.Center;
-            text.color = Color.white;
             var statusView = statusGo.AddComponent<ScreenPortal.Presentation.Connection.ConnectionStatusView>();
             var statusSo = new SerializedObject(statusView);
             statusSo.FindProperty("label").objectReferenceValue = text;
@@ -75,16 +72,37 @@ namespace ScreenPortal.Editor
             Debug.Log("[ScreenPortal] Cena Main gerada: " + ScenePath);
         }
 
-        /// <summary>OVRHand sem malha: só raio (PointerPose) e pinça. HandType é serializado e internal no SDK.</summary>
+        /// <summary>
+        /// Mão com modelo (OVRHandPrefab: OVRHand + esqueleto + malha): raio (PointerPose), pinça e a mão visível.
+        /// HandType, tipo de esqueleto e de malha são serializados (internal no SDK); o esqueleto segue a versão do
+        /// projeto (OVR ou OpenXR).
+        /// </summary>
         private static OVRHand AddHand(Transform anchor, string name, int handType)
         {
-            var go = new GameObject(name);
-            go.transform.SetParent(anchor, false);
-            var hand = go.AddComponent<OVRHand>();
-            var so = new SerializedObject(hand);
-            so.FindProperty("HandType").intValue = handType;
-            so.ApplyModifiedPropertiesWithoutUndo();
+            var go = (GameObject)PrefabUtility.InstantiatePrefab(AssetDatabase.LoadAssetAtPath<GameObject>(HandPrefab), anchor);
+            go.name = name;
+            // Desempacota: o OnValidate do SDK muda tipos sem registrar override, e a cena perderia o valor certo.
+            PrefabUtility.UnpackPrefabInstance(go, PrefabUnpackMode.Completely, InteractionMode.AutomatedAction);
+            int skeleton = (OVRRuntimeSettings.Instance.HandSkeletonVersion == OVRHandSkeletonVersion.OpenXR ? 4 : 0) + handType;
+            var hand = go.GetComponent<OVRHand>();
+            SetInt(hand, "HandType", handType);
+            SetInt(go.GetComponent<OVRSkeleton>(), "_skeletonType", skeleton);
+            SetInt(go.GetComponent<OVRMesh>(), "_meshType", skeleton);
             return hand;
+        }
+
+        /// <summary>Modelo do controle (OVRControllerPrefab escolhe o modelo pelo tipo de controle conectado).</summary>
+        private static void AddController(Transform anchor, OVRInput.Controller controller)
+        {
+            var go = (GameObject)PrefabUtility.InstantiatePrefab(AssetDatabase.LoadAssetAtPath<GameObject>(ControllerPrefab), anchor);
+            go.GetComponent<OVRControllerHelper>().m_controller = controller;
+        }
+
+        private static void SetInt(Object target, string property, int value)
+        {
+            var so = new SerializedObject(target);
+            so.FindProperty(property).intValue = value;
+            so.ApplyModifiedPropertiesWithoutUndo();
         }
 
         /// <summary>Material URP/Unlit como asset: garante o shader no build (Shader.Find em runtime não garante).</summary>

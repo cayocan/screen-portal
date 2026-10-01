@@ -2,6 +2,7 @@
     "name": "ScreenPortal.Presentation",
     "rootNamespace": "ScreenPortal.Presentation",
     "references": [
+        "Unity.TextMeshPro",
         "ScreenPortal.Domain",
         "ScreenPortal.Application",
         "Oculus.VR"

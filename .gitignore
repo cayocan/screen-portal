@@ -59,3 +59,6 @@ Thumbs.db
 tests-dotnet/**/bin/
 tests-dotnet/**/obj/
 .superpowers/
+
+# worktrees dos agentes (Claude Code)
+.claude/worktrees/

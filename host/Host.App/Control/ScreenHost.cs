@@ -105,7 +105,10 @@ public sealed class ScreenHost : IScreenHost, IDisposable
                     _log($"telas: {deviceId}/{request.ScreenKey} reatado ({lease.DisplayName})");
                     return new ScreenAcquireResult(true, lease.Width, lease.Height, "");
                 }
-                Destroy(deviceId, request.ScreenKey); // RecreateScreen: troca o monitor
+                if (request.ScreenKind == ScreenKind.Virtual && lease.Kind == ScreenLeaseKind.Virtual
+                    && _live.TryGetValue((deviceId, request.ScreenKey), out var old) && old.Monitor != null)
+                    return Recreate(deviceId, request, lease, old.Monitor); // RecreateScreen (spec 2D §4)
+                Destroy(deviceId, request.ScreenKey); // outro tipo na mesma chave: troca o monitor
             }
             return request.ScreenKind == ScreenKind.Mirror ? CreateMirror(deviceId, request) : CreateVirtual(deviceId, request);
         }
@@ -136,6 +139,28 @@ public sealed class ScreenHost : IScreenHost, IDisposable
         {
             return new ScreenAcquireResult(false, 0, 0, "Falha ao criar monitor: " + e.Message);
         }
+    }
+
+    /// <summary>
+    /// Recriar (spec 2D §4): cria o novo → move as janelas → para o stream do antigo e o remove → o aluguel passa ao
+    /// novo. Se criar falhar, o antigo fica intacto (com o stream) e a resposta é de falha. Chamar com _lock.
+    /// </summary>
+    private ScreenAcquireResult Recreate(string deviceId, AcquireScreenMessage request, ScreenLease lease, VirtualMonitor oldMonitor)
+    {
+        if (!ScreenAcquireResult.TryValidateVirtualSize(request.Width, request.Height, out var invalid)) return invalid;
+        int width = (int)request.Width, height = (int)request.Height;
+        var recreator = new MonitorRecreator<VirtualMonitor>(new VirtualDisplayMonitors(_driver!, 60), new Win32WindowMover(_log), _log);
+        var result = recreator.Recreate(_leases, lease, oldMonitor, width, height, () => StopStream(deviceId, request.ScreenKey));
+        if (!result.Ok)
+        {
+            _log($"telas: recriar {deviceId}/{request.ScreenKey} em {width}×{height} falhou; {lease.DisplayName} mantido ({result.Error})");
+            return new ScreenAcquireResult(false, 0, 0, result.Error);
+        }
+        string name = result.Monitor!.Display.DeviceName;
+        _live[(deviceId, request.ScreenKey)] = new Live { Monitor = result.Monitor, DisplayName = name };
+        _log($"telas: {deviceId}/{request.ScreenKey} recriado {lease.Width}×{lease.Height} → {width}×{height} " +
+             $"({lease.DisplayName} → {name}, {result.WindowsMoved} janela(s) movida(s))");
+        return new ScreenAcquireResult(true, width, height, "");
     }
 
     private ScreenAcquireResult CreateMirror(string deviceId, AcquireScreenMessage request)
