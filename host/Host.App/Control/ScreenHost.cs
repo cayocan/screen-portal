@@ -122,15 +122,23 @@ public sealed class ScreenHost : IScreenHost, IDisposable
         if (!ScreenAcquireResult.TryValidateVirtualSize(request.Width, request.Height, out var invalid)) return invalid;
         try
         {
-            _driver ??= SudoVdaDriver.Open(_log);
-        }
-        catch (Exception e)
-        {
-            return new ScreenAcquireResult(false, 0, 0, "SudoVDA não disponível: " + e.Message);
-        }
-        try
-        {
-            var monitor = _driver.Create((int)request.Width, (int)request.Height, 60);
+            VirtualMonitor monitor;
+            try
+            {
+                _driver ??= SudoVdaDriver.Open(_log);
+                monitor = _driver.Create((int)request.Width, (int)request.Height, 60);
+            }
+            catch (Exception first)
+            {
+                // Driver caído (código 43) ou handle velho: reinicia o dispositivo e tenta uma vez de novo.
+                _log($"telas: SudoVDA falhou ({first.Message}); reiniciando o dispositivo");
+                _driver?.Dispose();
+                _driver = null;
+                if (!SudoVdaRecovery.TryRestartDevice(_log))
+                    return new ScreenAcquireResult(false, 0, 0, "SudoVDA não disponível: " + first.Message);
+                _driver = SudoVdaDriver.Open(_log);
+                monitor = _driver.Create((int)request.Width, (int)request.Height, 60);
+            }
             string name = monitor.Display.DeviceName;
             _leases.Add(new ScreenLease(deviceId, request.ScreenKey, ScreenLeaseKind.Virtual, (int)request.Width, (int)request.Height, 0, name));
             _live[(deviceId, request.ScreenKey)] = new Live { Monitor = monitor, DisplayName = name };
