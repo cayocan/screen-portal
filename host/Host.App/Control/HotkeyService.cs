@@ -50,6 +50,7 @@ public sealed class HotkeyService : IDisposable
         int ok = 0;
         foreach (var (action, chord) in map)
         {
+            if (!Features.WindowMirrors && action is HotkeyAction.DetachWindow or HotkeyAction.ReattachWindow) continue;
             uint mods = chord.Modifiers | (HotkeyMap.Repeats(action) ? 0 : ModNoRepeat);
             if (RegisterHotKey(IntPtr.Zero, (int)action, mods, chord.VirtualKey)) ok++;
             else _log($"atalhos: {HotkeyMap.Format(chord)} ({action}) já é usado por outro programa; troque em {path}");

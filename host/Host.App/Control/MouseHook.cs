@@ -40,7 +40,7 @@ public sealed class MouseHook : IDisposable
     {
         _log = log;
         _proc = Callback;
-        _router.IsMovingWindow = () => MovingWindow() != IntPtr.Zero;
+        if (Features.WindowMirrors) _router.IsMovingWindow = () => MovingWindow() != IntPtr.Zero; // 3D desligada: arraste nunca sai
         _thread = new Thread(Run) { IsBackground = true, Name = "MouseHook", Priority = ThreadPriority.Highest };
         _thread.Start();
         _ready.Wait(TimeSpan.FromSeconds(2));

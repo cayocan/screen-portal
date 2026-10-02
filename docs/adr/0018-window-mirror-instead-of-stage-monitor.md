@@ -1,6 +1,6 @@
 # ADR 0018 — Janela destacada é um espelho (WGC + popups por PrintWindow), não um monitor-palco
 
-- **Status:** Aceito (Fase 3D, 02/10/2026, aprovado pelo Cayo)
+- **Status:** Aceito (Fase 3D, 02/10/2026), depois **desligado** a pedido do Cayo no mesmo dia: `Features.WindowMirrors = false` no host (sem `Ctrl+Alt+D` e sem destacar ao arrastar). O código fica para religar.
 - **Spec:** docs/specs/2026-10-02-fase3d-janela-espelhada-design.md · **Spike:** docs/measurements/fase3d-spike-popups.md
 
 ## Contexto
