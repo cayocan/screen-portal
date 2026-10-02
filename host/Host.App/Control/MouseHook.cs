@@ -23,11 +23,24 @@ public sealed class MouseHook : IDisposable
     private readonly HookProc _proc; // referência viva: o GC não pode coletar o delegate do hook
     private readonly ManualResetEventSlim _ready = new();
     private uint _threadId;
+    private IntPtr _draggedWindow;
+
+    /// <summary>3D: janela arrastada para fora de uma tela (o CursorFeed a destaca). Zero = nenhuma.</summary>
+    public IntPtr TakeDraggedWindow()
+    {
+        lock (_lock)
+        {
+            var w = _draggedWindow;
+            _draggedWindow = IntPtr.Zero;
+            return w;
+        }
+    }
 
     public MouseHook(Action<string> log)
     {
         _log = log;
         _proc = Callback;
+        _router.IsMovingWindow = () => MovingWindow() != IntPtr.Zero;
         _thread = new Thread(Run) { IsBackground = true, Name = "MouseHook", Priority = ThreadPriority.Highest };
         _thread.Start();
         _ready.Wait(TimeSpan.FromSeconds(2));
@@ -124,7 +137,10 @@ public sealed class MouseHook : IDisposable
         {
             switch ((int)wParam)
             {
-                case WmMouseMove: swallow = _router.OnMove(info.pt.X, info.pt.Y, out warp); break;
+                case WmMouseMove:
+                    swallow = _router.OnMove(info.pt.X, info.pt.Y, out warp);
+                    if (_router.TakeLeftDraggingWindow()) _draggedWindow = MovingWindow();
+                    break;
                 case WmLDown: swallow = _router.OnButton(MouseState.ButtonLeft, true); break;
                 case WmLUp: swallow = _router.OnButton(MouseState.ButtonLeft, false); break;
                 case WmRDown: swallow = _router.OnButton(MouseState.ButtonRight, true); break;
@@ -147,6 +163,27 @@ public sealed class MouseHook : IDisposable
         _thread.Join(TimeSpan.FromSeconds(1));
         _ready.Dispose();
     }
+
+    /// <summary>A janela que o Windows está movendo/redimensionando agora (loop modal de arraste), ou zero.</summary>
+    private static IntPtr MovingWindow()
+    {
+        var info = new GuiThreadInfo { cbSize = Marshal.SizeOf<GuiThreadInfo>() };
+        if (!GetGUIThreadInfo(0, ref info)) return IntPtr.Zero;
+        return (info.flags & 0x2) != 0 ? info.hwndMoveSize : IntPtr.Zero; // GUI_INMOVESIZE
+    }
+
+    [StructLayout(LayoutKind.Sequential)] private struct Rect { public int Left, Top, Right, Bottom; }
+
+    [StructLayout(LayoutKind.Sequential)]
+    private struct GuiThreadInfo
+    {
+        public int cbSize;
+        public uint flags;
+        public IntPtr hwndActive, hwndFocus, hwndCapture, hwndMenuOwner, hwndMoveSize, hwndCaret;
+        public Rect rcCaret;
+    }
+
+    [DllImport("user32.dll")] private static extern bool GetGUIThreadInfo(uint threadId, ref GuiThreadInfo info);
 
     private delegate IntPtr HookProc(int code, IntPtr wParam, IntPtr lParam);
 

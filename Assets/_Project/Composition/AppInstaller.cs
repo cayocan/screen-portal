@@ -88,7 +88,7 @@ namespace ScreenPortal.Composition
             builder.RegisterBuildCallback(c => c.Resolve<HotkeyDispatcher>());
             // 3D: janela espelhada (Ctrl+Alt+D no PC → tela-espelho aqui; ADR 0018)
             builder.Register(r => new WindowMirrors(r.Resolve<ConnectionStateMachine>(), r.Resolve<WorkspaceStore>(), r.Resolve<ICommandBus>(),
-                r.Resolve<IHeadPoseSource>()), Lifetime.Singleton);
+                r.Resolve<IHeadPoseSource>(), r.Resolve<ScreenPortal.App.Cursor.WorldCursor>()), Lifetime.Singleton);
             builder.RegisterBuildCallback(c => c.Resolve<WindowMirrors>()); // assina a conexão já na montagem
             // 3C: menu do app pelo mouse (Ctrl+Alt+M), flutuando onde o cursor está
             builder.Register(r => new ScreenPortal.App.Cursor.MouseMenu(r.Resolve<EditMode>(), r.Resolve<IHeadPoseSource>(),

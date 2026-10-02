@@ -44,6 +44,33 @@ public static class WindowMirrorOps
         BringWindowToTop(hwnd);
     }
 
+    /// <summary>Mensagem para o headset espelhar a janela: tamanho em múltiplos de 8, mínimo 320×240.</summary>
+    public static bool TryDetachMessage(IntPtr hwnd, out ScreenPortal.App.Connection.DetachWindowMessage? message, out string why)
+    {
+        message = null;
+        why = "";
+        if (!TryBounds(hwnd, out var bounds))
+        {
+            why = "sem retângulo";
+            return false;
+        }
+        uint w = (uint)(bounds.Width / 8 * 8), h = (uint)(bounds.Height / 8 * 8);
+        if (w < 320 || h < 240)
+        {
+            why = $"janela pequena demais ({bounds.Width}×{bounds.Height})";
+            return false;
+        }
+        message = new ScreenPortal.App.Connection.DetachWindowMessage((uint)hwnd.ToInt64(), w, h, Title(hwnd));
+        return true;
+    }
+
+    /// <summary>Cancela o arraste de janela em andamento (o Windows a devolve ao lugar de antes).</summary>
+    public static void CancelMoveSize()
+    {
+        keybd_event(0x1B, 0, 0, UIntPtr.Zero);      // Esc dentro do loop de mover
+        keybd_event(0x1B, 0, 0x0002, UIntPtr.Zero);
+    }
+
     /// <summary>Janela ativa que dá para espelhar: visível, de topo, não é a área de trabalho nem a barra de tarefas.</summary>
     public static bool TryForegroundWindow(out IntPtr hwnd, out RectI bounds)
     {

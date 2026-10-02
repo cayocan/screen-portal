@@ -18,9 +18,12 @@ namespace ScreenPortal.App.Screens
         private readonly WorkspaceStore _store;
         private readonly ICommandBus _bus;
         private readonly IHeadPoseSource _head;
+        private readonly ScreenPortal.App.Cursor.WorldCursor _world;
 
-        public WindowMirrors(ConnectionStateMachine connection, WorkspaceStore store, ICommandBus bus, IHeadPoseSource head)
+        public WindowMirrors(ConnectionStateMachine connection, WorkspaceStore store, ICommandBus bus, IHeadPoseSource head,
+            ScreenPortal.App.Cursor.WorldCursor world = null)
         {
+            _world = world;
             _connection = connection;
             _store = store;
             _bus = bus;
@@ -50,8 +53,16 @@ namespace ScreenPortal.App.Screens
             foreach (var existing in _store.State.Screens)
                 if (existing.Source.Equals(ScreenSource.Window(detach.WindowId))) return; // já espelhada
             var resolution = Resolution.Create((int)detach.Width, (int)detach.Height);
-            var near = SurfaceSlots.Facing(_store.State.Surface, _head.HeadPose); // nasce à frente da visão
-            _bus.Send(new CreateScreen(resolution, null, ScreenSizing.InitialWidthMeters(resolution), 0f, detach.Title,
+            var surface = _store.State.Surface;
+            // arrastada para o vazio: nasce onde o cursor 3D está; pelo atalho: à frente da visão
+            Placement? at = null;
+            if (_world != null && _world.Active)
+            {
+                var p = surface.FromWorldPosition(_world.Point);
+                at = Placement.OnSurface(p.AzimuthDeg, p.ElevationDeg, p.DistanceM);
+            }
+            var near = SurfaceSlots.Facing(surface, _head.HeadPose);
+            _bus.Send(new CreateScreen(resolution, at, ScreenSizing.InitialWidthMeters(resolution), 0f, detach.Title,
                 ScreenSource.Window(detach.WindowId), near));
         }
 

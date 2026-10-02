@@ -110,18 +110,15 @@ public sealed class HotkeyService : IDisposable
             _log("destacar: nenhuma janela ativa que dê para espelhar");
             return;
         }
-        uint w = (uint)(bounds.Width / 8 * 8), h = (uint)(bounds.Height / 8 * 8);
-        if (w < 320 || h < 240)
+        if (!ScreenPortal.Host.App.Display.WindowMirrorOps.TryDetachMessage(hwnd, out var message, out var why))
         {
-            _log($"destacar: janela pequena demais ({bounds.Width}×{bounds.Height})");
+            _log($"destacar: {why}");
             return;
         }
-        string title = ScreenPortal.Host.App.Display.WindowMirrorOps.Title(hwnd);
-        var message = new DetachWindowMessage((uint)hwnd.ToInt64(), w, h, title);
         var target = GetCursorPos(out var p) ? _screenAt(MonitorName(p)) : null;
-        if (target is { } t) _router.Send(t.DeviceId, message);
-        else foreach (var device in _router.Devices) _router.Send(device, message);
-        _log($"destacar: \"{title}\" {w}×{h}");
+        if (target is { } t) _router.Send(t.DeviceId, message!);
+        else foreach (var device in _router.Devices) _router.Send(device, message!);
+        _log($"destacar: \"{message!.Title}\" {message.Width}×{message.Height}");
     }
 
     private static string MonitorName(Point p)

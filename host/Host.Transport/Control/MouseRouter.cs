@@ -40,6 +40,19 @@ public sealed class MouseRouter
 
     public bool Swallowing => _connected && (Mode == MouseMode.World || Mode == MouseMode.Edit);
 
+    /// <summary>3D: o Windows está movendo uma janela (arraste pela barra de título)? Só consultado na borda.</summary>
+    public Func<bool>? IsMovingWindow { get; set; }
+
+    /// <summary>3D: a última saída para o Mundo foi arrastando uma janela (o host a destaca ali). Lido e zerado pelo host.</summary>
+    public bool LeftDraggingWindow { get; private set; }
+
+    public bool TakeLeftDraggingWindow()
+    {
+        bool v = LeftDraggingWindow;
+        LeftDraggingWindow = false;
+        return v;
+    }
+
     /// <summary>Espelho de janela em que o cursor está (0 = nenhum) e o retângulo dele no desktop.</summary>
     public uint WindowKey => _window?.ScreenKey ?? 0;
     public RectI WindowBounds => _window?.Bounds ?? default;
@@ -98,10 +111,23 @@ public sealed class MouseRouter
             return true;
         }
         var from = MonitorAt(_lastX, _lastY);
-        if (from is not { ScreenKey: not 0 } current || _passedDown != 0)
+        if (from is not { ScreenKey: not 0 } current)
         {
             Track(x, y);
             return false;
+        }
+        bool draggingWindow = false;
+        if (_passedDown != 0)
+        {
+            // arraste nunca sai — exceto arrastar uma janela pela barra de título para o vazio (spec 3D §1, item 5)
+            bool leaving = !(x >= current.Bounds.X && x < current.Bounds.Right && y >= current.Bounds.Y && y < current.Bounds.Bottom)
+                           || ReachedFreeEdge(current.Bounds, x, y);
+            if (!leaving || IsMovingWindow?.Invoke() != true)
+            {
+                Track(x, y);
+                return false;
+            }
+            draggingWindow = true;
         }
         var b = current.Bounds;
         var target = MonitorAt(x, y);
@@ -120,6 +146,11 @@ public sealed class MouseRouter
         warp = Leave(MouseMode.World, current, ex, ey);
         Dx = x - ex;
         Dy = y - ey;
+        if (draggingWindow)
+        {
+            Buttons = _passedDown; // o botão continua segurado no mundo
+            LeftDraggingWindow = true;
+        }
         return true;
     }
 
@@ -155,6 +186,7 @@ public sealed class MouseRouter
         if (!down && (_passedDown & button) != 0)
         {
             _passedDown &= (byte)~button; // a soltura de um clique que o Windows viu sempre chega a ele
+            Buttons &= (byte)~button;
             return false;
         }
         if (Swallowing)

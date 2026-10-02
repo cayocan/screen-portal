@@ -261,3 +261,41 @@ public class MouseRouterWindowTests
         Assert.Equal(0u, r.WindowKey);
     }
 }
+
+public class MouseRouterWindowDragTests
+{
+    private static readonly RouterMonitor Q1 = new("DISPLAY60", new RectI(1920, 0, 2560, 1440), 1);
+
+    private static MouseRouter Router(bool moving)
+    {
+        var r = new MouseRouter { IsMovingWindow = () => moving };
+        r.SetMonitors(new[] { Q1 });
+        r.SetConnected(true);
+        r.OnMove(4470, 700, out _);
+        r.OnButton(MouseState.ButtonLeft, true); // pegou a barra de título (o Windows viu o clique)
+        return r;
+    }
+
+    [Fact]
+    public void DraggingAWindowPastTheEdge_LeavesToTheWorld_HoldingTheButton()
+    {
+        var r = Router(moving: true);
+        Assert.True(r.OnMove(4479, 700, out _));
+        Assert.Equal(MouseMode.World, r.Mode);
+        Assert.True(r.TakeLeftDraggingWindow());
+        Assert.False(r.TakeLeftDraggingWindow(), "lido uma vez");
+        Assert.Equal(MouseState.ButtonLeft, r.Buttons);
+        Assert.False(r.OnButton(MouseState.ButtonLeft, false), "a soltura chega ao Windows");
+        Assert.Equal(0, r.Buttons);
+    }
+
+    [Fact]
+    public void DraggingSomethingElse_StillNeverLeaves()
+    {
+        var r = Router(moving: false);
+        Assert.False(r.OnMove(4479, 700, out _));
+        Assert.False(r.OnMove(4479, 700, out _));
+        Assert.Equal(MouseMode.Screen, r.Mode);
+        Assert.False(r.TakeLeftDraggingWindow());
+    }
+}

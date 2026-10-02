@@ -171,6 +171,8 @@ public sealed class CursorFeed : ICursorHost, IDisposable
             if (refresh) _monitorsAt = now;
         }
         if (refresh) RefreshMonitors(routerDevice);
+        var dragged = _hook.TakeDraggedWindow();
+        if (dragged != IntPtr.Zero && routerDevice != null) DetachDragged(dragged, routerDevice, targets, devices);
         if (!_capture.Read(out int x, out int y, out var shape)) return;
         _hook.Read(out var mode, out uint epoch, out uint exitKey, out int exitX, out int exitY, out int dx, out int dy,
             out int wheel, out byte buttons);
@@ -243,6 +245,20 @@ public sealed class CursorFeed : ICursorHost, IDisposable
             t.HasLast = true;
             t.LastSentTicks = now;
         }
+    }
+
+    /// <summary>3D: janela arrastada para o vazio: cancela o arraste no Windows e a espelha onde o cursor 3D está.</summary>
+    private void DetachDragged(IntPtr hwnd, string device, Target[] targets, string[] devices)
+    {
+        WindowMirrorOps.CancelMoveSize();
+        if (!WindowMirrorOps.TryDetachMessage(hwnd, out var message, out var why))
+        {
+            _log($"destacar (arrastar): {why}");
+            return;
+        }
+        for (int i = 0; i < targets.Length; i++)
+            if (devices[i] == device) targets[i].Send(message!);
+        _log($"destacar (arrastar): \"{message!.Title}\" {message.Width}×{message.Height}");
     }
 
     private static (string Name, int Left, int Top) MonitorAt(int x, int y)
