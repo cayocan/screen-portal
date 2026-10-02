@@ -20,6 +20,10 @@ namespace ScreenPortal.App.Manipulation
         public bool CancelPressed;
         /// <summary>Desliga ímãs neste quadro (Shift no mouse): princípio Liberdade.</summary>
         public bool NoSnap;
+        /// <summary>Cliques da roda neste quadro (+ para cima). Segurando uma parte do gizmo, ajuste fino do valor dela.</summary>
+        public int WheelSteps;
+        /// <summary>Passo longo no ajuste pela roda (Shift no mouse).</summary>
+        public bool Coarse;
         public bool UndoPressed;
         public bool RedoPressed;
 

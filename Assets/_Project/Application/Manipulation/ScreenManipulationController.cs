@@ -73,6 +73,8 @@ namespace ScreenPortal.App.Manipulation
         public GizmoPart ActiveGizmo { get; private set; }
 
         private GizmoFrame _gizmo;
+        private float _gizmoWheel; // ajuste pela roda: metros, graus ou log do tamanho
+        private float _gizmoDrag;  // último valor do arraste (o raio pode ficar de perfil num quadro)
         private float _gizmoStart;
         private Vec3 _gizmoRef;
 
@@ -141,6 +143,8 @@ namespace ScreenPortal.App.Manipulation
             ActiveGizmo = part;
             HoverGizmo = part;
             _gizmo = frame;
+            _gizmoWheel = 0f;
+            _gizmoDrag = 0f;
             _startPlacement = screen.Placement;
             _startWidth = screen.WidthMeters;
             _aspect = screen.Resolution.AspectRatio;
@@ -172,13 +176,20 @@ namespace ScreenPortal.App.Manipulation
         {
             var f = _gizmo;
             var surface = _store.State.Surface;
+            if (active.WheelSteps != 0)
+            {
+                float step = ScreenGizmo.WheelStep(ActiveGizmo, active.Coarse);
+                // no cubo cada clique multiplica o tamanho (1 % sobre o atual), nos outros soma
+                _gizmoWheel += active.WheelSteps * (ActiveGizmo == GizmoPart.Scale ? (float)Math.Log(1.0 + step) : step);
+            }
             switch (ActiveGizmo)
             {
                 case GizmoPart.MoveX:
                 case GizmoPart.MoveY:
                 {
-                    if (!ScreenGizmo.AxisParameter(f.Origin, f.Axis(ActiveGizmo), active.Origin, active.Direction, out float s)) return;
-                    var position = _startPose.Position + f.Axis(ActiveGizmo) * (s - _gizmoStart);
+                    if (ScreenGizmo.AxisParameter(f.Origin, f.Axis(ActiveGizmo), active.Origin, active.Direction, out float s))
+                        _gizmoDrag = s - _gizmoStart;
+                    var position = _startPose.Position + f.Axis(ActiveGizmo) * (_gizmoDrag + _gizmoWheel);
                     if (_startPlacement.IsLoose)
                     {
                         Preview.SetLoose(new Pose(position, _startPose.Rotation));
@@ -193,17 +204,20 @@ namespace ScreenPortal.App.Manipulation
                 }
                 case GizmoPart.Scale:
                 {
-                    if (!ScreenGizmo.AxisParameter(f.Origin, ScaleAxis(in f), active.Origin, active.Direction, out float s)) return;
-                    float width = ScreenLimits.ClampWidth(_startWidth * (float)Math.Exp((s - _gizmoStart) / f.Size));
+                    if (ScreenGizmo.AxisParameter(f.Origin, ScaleAxis(in f), active.Origin, active.Direction, out float s))
+                        _gizmoDrag = (s - _gizmoStart) / f.Size;
+                    float width = ScreenLimits.ClampWidth(_startWidth * (float)Math.Exp(_gizmoDrag + _gizmoWheel));
                     Preview.SetSize(width, width / _aspect);
                     return;
                 }
                 default:
                 {
                     var axis = f.Axis(ActiveGizmo);
-                    if (!ScreenGizmo.RingAngle(f.Origin, axis, _gizmoRef, active.Origin, active.Direction, out float angle)) return;
-                    float delta = angle - _gizmoStart;
+                    if (ScreenGizmo.RingAngle(f.Origin, axis, _gizmoRef, active.Origin, active.Direction, out float angle))
+                        _gizmoDrag = angle - _gizmoStart;
+                    float delta = _gizmoDrag;
                     if (!active.NoSnap && !other.SelectHeld) delta = ScreenGizmo.SnapAngle(delta);
+                    delta += _gizmoWheel; // a roda refina depois do ímã de 5°
                     // girar solta a tela da superfície (Liberdade; Voltar à superfície a devolve)
                     Preview.SetLoose(new Pose(_startPose.Position, Quat.AngleAxis(delta, axis) * _startPose.Rotation));
                     return;

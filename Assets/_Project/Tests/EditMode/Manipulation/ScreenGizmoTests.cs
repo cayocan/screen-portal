@@ -132,6 +132,65 @@ namespace ScreenPortal.Tests
             Assert.That(Screen.Resolution, Is.EqualTo(Resolution.Create(2560, 1440)));
         }
 
+        private void Wheel(Vec3 target, int steps, bool coarse)
+        {
+            var input = At(target, true);
+            input.WheelSteps = steps;
+            input.Coarse = coarse;
+            var none = default(ManipulationInput);
+            _controller.Update(in input, in none);
+        }
+
+        private float Roll()
+        {
+            var up = Screen.Placement.LoosePose.Rotation * Vec3.Up;
+            return (float)(System.Math.Atan2(-up.X, up.Y) * 180.0 / System.Math.PI);
+        }
+
+        [Test]
+        public void WheelWhileHoldingARing_RotatesInFineSteps_AndShiftInLongSteps()
+        {
+            var f = Frame;
+            var grab = Ring(f, ScreenGizmo.RingRadius * f.Size, 45f);
+            Step(grab, false);
+            Step(grab, true);
+            Wheel(grab, 3, coarse: false); // sem mexer o mouse
+            Wheel(grab, 1, coarse: true);
+            Step(grab, false);
+            Assert.That(System.Math.Abs(Roll()), Is.EqualTo(18f).Within(0.01f), "3 × 1° + 1 × 15°");
+        }
+
+        [Test]
+        public void WheelWhileHoldingTheCube_ScalesByOnePercent_OrTen()
+        {
+            var f = Frame;
+            Step(f.Origin, false);
+            Step(f.Origin, true);
+            Wheel(f.Origin, 2, coarse: false);
+            Step(f.Origin, false);
+            Assert.That(Screen.WidthMeters, Is.EqualTo(1.28f * 1.01f * 1.01f).Within(1e-4f));
+            Step(f.Origin, false);
+            Step(f.Origin, true);
+            Wheel(f.Origin, -1, coarse: true);
+            Step(f.Origin, false);
+            Assert.That(Screen.WidthMeters, Is.EqualTo(1.28f * 1.01f * 1.01f / 1.1f).Within(1e-4f), "para baixo divide: subir e descer volta ao mesmo tamanho");
+        }
+
+        [Test]
+        public void WheelWhileHoldingAnArrow_MovesFiveMillimetersPerStep()
+        {
+            var f = Frame;
+            var grab = f.Origin + f.Right * (0.6f * f.Size);
+            var before = _store.State.Surface.ToPose(Screen.Placement).Position;
+            Step(grab, false);
+            Step(grab, true);
+            Wheel(grab, 4, coarse: false);
+            Step(grab, false);
+            var after = _store.State.Surface.ToPose(Screen.Placement).Position;
+            Assert.That((after - before).Length, Is.EqualTo(0.02f).Within(0.002f), "4 × 5 mm (ao longo da superfície)");
+            Assert.That(Screen.Placement.IsLoose, Is.False);
+        }
+
         [Test]
         public void WithoutEditMode_ThereIsNoGizmo()
         {

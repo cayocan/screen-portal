@@ -60,6 +60,23 @@ namespace ScreenPortal.App.Manipulation
         public const float PickTolerance = 0.07f; // × Size
         public const float ScaleCube = 0.12f;      // × Size (raio de pick)
         public const float RotationStepDeg = 5f;
+        // Roda segurando uma parte: ajuste fino (passo curto) e, com Shift, passo longo.
+        public const float WheelMoveFineM = 0.005f, WheelMoveCoarseM = 0.05f;
+        public const float WheelRotateFineDeg = 1f, WheelRotateCoarseDeg = 15f;
+        public const float WheelScaleFine = 0.01f, WheelScaleCoarse = 0.10f;
+
+        /// <summary>Quanto um clique da roda muda a parte: metros (setas), graus (anéis) ou fração do tamanho (cubo).</summary>
+        public static float WheelStep(GizmoPart part, bool coarse)
+        {
+            switch (part)
+            {
+                case GizmoPart.MoveX:
+                case GizmoPart.MoveY: return coarse ? WheelMoveCoarseM : WheelMoveFineM;
+                case GizmoPart.Scale: return coarse ? WheelScaleCoarse : WheelScaleFine;
+                case GizmoPart.None: return 0f;
+                default: return coarse ? WheelRotateCoarseDeg : WheelRotateFineDeg;
+            }
+        }
         private const int RingSamples = 48;
 
         public static GizmoFrame Frame(VirtualScreen screen, LayoutSurface surface) => Frame(surface.ToPose(screen.Placement), surface);

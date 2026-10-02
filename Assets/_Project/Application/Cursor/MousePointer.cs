@@ -59,6 +59,12 @@ namespace ScreenPortal.App.Cursor
             input.NoSnap = s.Shift;
             input.CancelPressed = _edit.ConsumeCancel();
             if (notches == 0) return true;
+            if (_manipulation.State == ManipulationState.Gizmo)
+            {
+                input.WheelSteps = notches; // segurando o gizmo: ajuste fino do valor (Shift = passo longo)
+                input.Coarse = s.Shift;
+                return true;
+            }
             if (_manipulation.IsDragging)
             {
                 input.DistanceDeltaM = -notches * WheelStepM; // roda para cima aproxima
