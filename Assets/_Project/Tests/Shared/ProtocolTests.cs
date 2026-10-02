@@ -67,6 +67,10 @@ namespace ScreenPortal.Tests
             Assert.That(a.Width, Is.EqualTo(2560u));
             Assert.That(a.Height, Is.EqualTo(1080u));
             Assert.That(a.PhysicalMonitorId, Is.EqualTo(2u));
+            var w = (AcquireScreenMessage)RoundTrip(new AcquireScreenMessage(5, ScreenKind.Window, 1101, 826, 0, 0x8B05BC));
+            Assert.That((w.ScreenKind, w.WindowId), Is.EqualTo((ScreenKind.Window, 0x8B05BCu)));
+            var d = (DetachWindowMessage)RoundTrip(new DetachWindowMessage(0x8B05BC, 1101, 826, "Sem título - Bloco de Notas"));
+            Assert.That((d.WindowId, d.Width, d.Height, d.Title), Is.EqualTo((0x8B05BCu, 1101u, 826u, "Sem título - Bloco de Notas")));
 
             var ready = (ScreenReadyMessage)RoundTrip(new ScreenReadyMessage(3, 3840, 2160));
             Assert.That(ready.ScreenKey, Is.EqualTo(3u));
@@ -91,6 +95,20 @@ namespace ScreenPortal.Tests
             var hotkey = (HotkeyMessage)RoundTrip(new HotkeyMessage(HotkeyAction.CurvatureMore, 3));
             Assert.That(hotkey.Action, Is.EqualTo(HotkeyAction.CurvatureMore));
             Assert.That(hotkey.ScreenKey, Is.EqualTo(3u));
+            Assert.That(((HotkeyMessage)RoundTrip(new HotkeyMessage(HotkeyAction.ToggleEditMode, 0))).Action,
+                Is.EqualTo(HotkeyAction.ToggleEditMode));
+
+            Assert.That(((StartCursorMessage)RoundTrip(new StartCursorMessage(9310))).UdpPort, Is.EqualTo((ushort)9310));
+            var pixels = new byte[48 * 48 * 4];
+            pixels[0] = 1;
+            pixels[pixels.Length - 1] = 255;
+            var shape = (CursorShapeMessage)RoundTrip(new CursorShapeMessage(0xDEADBEEF, 48, 48, 3, 5, 2, pixels));
+            Assert.That((shape.ShapeId, shape.Width, shape.Height, shape.HotX, shape.HotY, shape.Scale),
+                Is.EqualTo((0xDEADBEEFu, (ushort)48, (ushort)48, (ushort)3, (ushort)5, (byte)2)));
+            Assert.That(shape.Bgra, Is.EqualTo(pixels));
+            var enter = (CursorEnterMessage)RoundTrip(new CursorEnterMessage(4, 1279, -3));
+            Assert.That((enter.ScreenKey, enter.X, enter.Y), Is.EqualTo((4u, 1279, -3)));
+            Assert.That(((SetEditModeMessage)RoundTrip(new SetEditModeMessage(true))).On, Is.True);
 
             var audio = (StartAudioMessage)RoundTrip(new StartAudioMessage(9300, true, false));
             Assert.That(audio.UdpPort, Is.EqualTo((ushort)9300));

@@ -45,6 +45,15 @@ namespace ScreenPortal.Presentation.Menu
 
         public bool Visible { get; private set; }
 
+        private bool _floating;
+        private Pose _floatPose;
+
+        public void Float(bool on, Pose pose)
+        {
+            _floating = on;
+            _floatPose = pose;
+        }
+
         public Pose Pose => new Pose(transform.position.ToDomain(), transform.rotation.ToDomain());
 
         private void Awake() => Build();
@@ -57,6 +66,13 @@ namespace ScreenPortal.Presentation.Menu
             {
                 var normal = (anchor.rotation * palmNormalLocal).normalized;
                 palm = Vector3.Dot(normal, (head.position - anchor.position).normalized) > palmFacingThreshold;
+            }
+            if (_floating)
+            {
+                Visible = true;
+                _content.SetActive(true);
+                transform.SetPositionAndRotation(_floatPose.Position.ToUnity(), _floatPose.Rotation.ToUnity());
+                return;
             }
             Visible = anchor != null && head != null && (controllerMenu || palm);
             _content.SetActive(Visible);

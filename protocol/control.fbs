@@ -3,7 +3,7 @@
 namespace ScreenPortal.Protocol.Fb;
 
 enum ByeReason : ubyte { Shutdown = 0, IncompatibleVersion = 1, PairingRejected = 2, Replaced = 3 }
-enum ScreenKind : ubyte { Virtual = 0, Mirror = 1 }
+enum ScreenKind : ubyte { Virtual = 0, Mirror = 1, Window = 2 }
 
 table Hello { device_id:string; device_name:string; pairing_token:string; }
 table PairingRequired { code:string; }
@@ -18,7 +18,7 @@ table StreamStopped { stream_id:ushort; reason:string; }
 table Ping { sent_us:ulong; }
 table Pong { sent_us:ulong; }
 table Bye { reason:ByeReason; }
-table AcquireScreen { screen_key:uint; kind:ScreenKind; width:uint; height:uint; physical_monitor_id:uint; }
+table AcquireScreen { screen_key:uint; kind:ScreenKind; width:uint; height:uint; physical_monitor_id:uint; window_id:uint; }
 table ScreenReady { screen_key:uint; width:uint; height:uint; }
 table ScreenFailed { screen_key:uint; reason:string; }
 table ReleaseScreen { screen_key:uint; grace_ms:uint; }
@@ -31,10 +31,20 @@ table AudioStarted { mic_port:ushort; speakers:bool; mic:bool; }
 table ScreenAngles { screen_key:uint; azimuth_deg:float; elevation_deg:float; half_width_deg:float; half_height_deg:float; }
 table LayoutChanged { screens:[ScreenAngles]; }
 table Hotkey { action:ubyte; screen_key:uint; }
+// 3B: cursor no headset. StartCursor (headset → host): porta UDP do MouseState. CursorShape (host → headset): forma nova,
+// uma vez (bgra = width×height, hotspot em pixels do bitmap; scale = quantas vezes o bitmap foi reduzido para caber).
+// CursorEnter (headset → host): o cursor 3D tocou a tela no pixel (x, y). SetEditMode (headset → host).
+table StartCursor { udp_port:ushort; }
+table CursorShape { shape_id:uint; width:ushort; height:ushort; hot_x:ushort; hot_y:ushort; scale:ubyte = 1; bgra:[ubyte]; }
+table CursorEnter { screen_key:uint; x:int; y:int; }
+table SetEditMode { on:bool; }
+// 3D: janela espelhada. DetachWindow (host → headset): Ctrl+Alt+D na janela ativa; o headset cria a tela (AcquireScreen
+// kind Window com o window_id) e o host espelha a janela (WGC + popups), sem monitor virtual (ADR 0018).
+table DetachWindow { window_id:uint; width:uint; height:uint; title:string; }
 
 union Message { Hello, PairingRequired, PairingResult, Welcome, StartStream, StreamStarted, StreamStopped, Ping, Pong, Bye,
                 AcquireScreen, ScreenReady, ScreenFailed, ReleaseScreen, SetStreamRate,
-                StartAudio, AudioStarted, LayoutChanged, Hotkey }
+                StartAudio, AudioStarted, LayoutChanged, Hotkey, StartCursor, CursorShape, CursorEnter, SetEditMode, DetachWindow }
 
 table Envelope { protocol_version:ushort; body:Message; }
 

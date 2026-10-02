@@ -49,6 +49,16 @@ O projeto Unity fica **na raiz** do repositório (não em `headset-unity/`). Ond
 - **Unity pelo terminal:** preferir Unity MCP / `unity` CLI com o Editor aberto. Fallback: `Unity.exe -batchmode -quit -projectPath . -runTests` / `-executeMethod` (só com o Editor fechado). **Nunca** `unity command eval` na `main`.
 - Commits pequenos, um propósito cada. PR descreve impacto em latência/performance quando tocar o pipeline.
 
+## Design system (UI/UX)
+
+- Toda UI do app (Quest 3) e do host no PC segue `docs/DesignSystem/`. Antes de criar ou mudar qualquer UI, leia
+  `docs/DesignSystem/IMPLEMENTACAO.md` e o README do componente envolvido em `docs/DesignSystem/components/<Nome>/`.
+- Valores (cores, tamanhos, raios, distâncias) vêm só de `docs/DesignSystem/tokens.json` via `DesignTokens`; nunca use
+  cor ou medida literal no código de UI.
+- Medidas de UI são em graus de visão (16 px de mockup = 1°), convertidas pela distância. Textos da interface em pt-BR,
+  exatamente como nos READMEs dos componentes.
+- Compare o resultado com `docs/DesignSystem/previews/<Nome>.png`.
+
 ## Toolchain desta máquina
 | Ferramenta | Caminho |
 |---|---|

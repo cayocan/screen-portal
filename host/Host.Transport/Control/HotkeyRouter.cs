@@ -28,7 +28,7 @@ public sealed class HotkeyRouter
     }
 
     /// <returns>false se o headset não está conectado.</returns>
-    public bool Send(string deviceId, HotkeyMessage message)
+    public bool Send(string deviceId, ControlMessage message)
     {
         Action<ControlMessage> send;
         lock (_lock)

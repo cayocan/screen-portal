@@ -7,6 +7,7 @@
 > v1.3.3 (30/09/2026) — ADR 0011: **toda tela curva é uma layer cilíndrica** (o limite de 1 cilindro não vale no OpenXR do Quest 3; saem `CylinderLayerPolicy`, crossfade e o modo "nitidez reduzida"). ADR 0012: **sem resolução personalizada**, **sem contorno fantasma** (a tela nasce à frente da visão) e **recriar sem confirmação** (com undo).
 > v1.3.4 (30/09/2026) — ADR 0014: **última sessão salva no headset** (a workspace volta quando o app reinicia; antecipa só esse pedaço da Fase 3b — perfis nomeados e âncoras continuam lá). ADR 0013: texto da interface em TextMeshPro (SDF) e eye buffer em escala 1,0.
 > v1.3.5 (01/10/2026) — ADR 0015: **microfone do Quest no PC** entra no MVP; áudio pelos drivers de streaming do Steam até a Fase 5 (som do PC só no Quest).
+> v1.3.6 (01/10/2026) — ADR 0016: o **arranjo do Windows segue o Quest** por padrão (era o plano B), escala por tela guardada. ADR 0017: o cursor **atravessa o mundo** como cursor 3D em vez de pular vãos (10.6–10.7), monitores fora do Quest seguem pelo Windows, e um **modo edição** global: só nele telas são manipuladas (mouse, controle ou mão; 10.10).
 >
 > **Princípio de produto — Liberdade:** encaixes, grades e regras de layout **ajudam, nunca prendem**. Tudo que gruda pode ser desgrudado e toda tela pode sair da superfície de layout.
 >
@@ -574,6 +575,11 @@ A resolução é escolhida **uma vez, na criação**. É aí que o usuário deci
 
 ### 10.6 Cursor espacial (roteamento do mouse em 3D)
 
+> **v1.3.6 (ADR 0016/0017):** o arranjo do Windows segue o Quest por padrão. Fora das telas o cursor **não pula**: vira
+> um **cursor 3D no mundo** (o host engole o mouse, o headset move o cursor) e entra na tela que tocar, no ponto do
+> toque. "Pular vão"/"Parede" (10.7) saem; a histerese fica; a resistência de borda sai (pedido do Cayo). Monitores fora do Quest seguem
+> pelo Windows. Spec: `docs/specs/2026-10-01-fase3b-cursor-edicao-design.md`. O texto abaixo é o desenho original.
+
 **O problema:** o Windows só entende monitores como **retângulos num plano 2D, colados borda com borda**. Ele não sabe que uma janela está no canto superior esquerdo, afastada, maior que o desktop ou flutuando acima dele. Se dependermos só do Windows, o mouse vai para onde a configuração de monitores mandar, **não para onde a tela está no 3D**.
 
 **Regra de ouro do produto:** o mouse sempre vai na direção em que o usuário **vê** a tela.
@@ -649,6 +655,10 @@ O host registra atalhos globais (`RegisterHotKey`) e os envia ao headset como Co
 | `Ctrl+Alt+Espaço` | (v1.1) Olhar e pular: cursor vai para a tela que você está olhando |
 
 ### 10.10 Mouse-first: mover, afastar e redimensionar as telas com o mouse
+
+> **v1.3.6 (ADR 0017):** há um **modo edição** global (menu, `Ctrl+Alt+E`, `Esc` sai, `Ctrl+Alt` segurado =
+> temporário). Só nele as telas são manipuladas — pelo mouse (cursor 3D como ponteiro), controle ou mão, com a mesma
+> máquina e o mesmo undo. Fora dele, os lasers só servem ao menu.
 
 **Princípio:** tudo que dá pra fazer com as mãos dá pra fazer com **mouse + teclado**, e o **mouse é o caminho principal**. Quem trabalha não quer tirar a mão do mouse pra fazer gestos no ar. As mãos continuam como alternativa, nunca obrigatórias.
 

@@ -58,6 +58,8 @@ public interface IScreenHost
     /// <summary>3A: o arranjo do Windows segue a disposição das telas no Quest.</summary>
     void Arrange(string deviceId, long generation, IReadOnlyList<ScreenAnglesInfo> screens);
     void Disconnected(string deviceId, long generation);
+    /// <summary>3D: uma tela deixou de existir do lado do PC (janela espelhada fechada): o headset é avisado.</summary>
+    event Action<string, uint, string>? ScreenLost;
 }
 
 /// <summary>2G: resposta ao StartAudio — porta do microfone no host e o que está disponível.</summary>

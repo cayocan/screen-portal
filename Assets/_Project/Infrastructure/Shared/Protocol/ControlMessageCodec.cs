@@ -101,7 +101,8 @@ namespace ScreenPortal.Infrastructure.Protocol
                     type = Fb.Message.Bye;
                     break;
                 case AcquireScreenMessage m:
-                    body = Fb.AcquireScreen.CreateAcquireScreen(b, m.ScreenKey, (Fb.ScreenKind)(byte)m.ScreenKind, m.Width, m.Height, m.PhysicalMonitorId).Value;
+                    body = Fb.AcquireScreen.CreateAcquireScreen(b, m.ScreenKey, (Fb.ScreenKind)(byte)m.ScreenKind, m.Width, m.Height, m.PhysicalMonitorId,
+                        m.WindowId).Value;
                     type = Fb.Message.AcquireScreen;
                     break;
                 case ScreenReadyMessage m:
@@ -128,6 +129,29 @@ namespace ScreenPortal.Infrastructure.Protocol
                 case HotkeyMessage m:
                     body = Fb.Hotkey.CreateHotkey(b, (byte)m.Action, m.ScreenKey).Value;
                     type = Fb.Message.Hotkey;
+                    break;
+                case StartCursorMessage m:
+                    body = Fb.StartCursor.CreateStartCursor(b, m.UdpPort).Value;
+                    type = Fb.Message.StartCursor;
+                    break;
+                case CursorShapeMessage m:
+                {
+                    var bgra = Fb.CursorShape.CreateBgraVectorBlock(b, m.Bgra);
+                    body = Fb.CursorShape.CreateCursorShape(b, m.ShapeId, m.Width, m.Height, m.HotX, m.HotY, m.Scale, bgra).Value;
+                    type = Fb.Message.CursorShape;
+                    break;
+                }
+                case CursorEnterMessage m:
+                    body = Fb.CursorEnter.CreateCursorEnter(b, m.ScreenKey, m.X, m.Y).Value;
+                    type = Fb.Message.CursorEnter;
+                    break;
+                case DetachWindowMessage m:
+                    body = Fb.DetachWindow.CreateDetachWindow(b, m.WindowId, m.Width, m.Height, b.CreateString(m.Title)).Value;
+                    type = Fb.Message.DetachWindow;
+                    break;
+                case SetEditModeMessage m:
+                    body = Fb.SetEditMode.CreateSetEditMode(b, m.On).Value;
+                    type = Fb.Message.SetEditMode;
                     break;
                 case StartAudioMessage m:
                     body = Fb.StartAudio.CreateStartAudio(b, m.UdpPort, m.Playback, m.Mic).Value;
@@ -263,7 +287,7 @@ namespace ScreenPortal.Infrastructure.Protocol
                 case Fb.Message.AcquireScreen:
                 {
                     var a = e.BodyAsAcquireScreen();
-                    return new AcquireScreenMessage(a.ScreenKey, (ScreenKind)(byte)a.Kind, a.Width, a.Height, a.PhysicalMonitorId);
+                    return new AcquireScreenMessage(a.ScreenKey, (ScreenKind)(byte)a.Kind, a.Width, a.Height, a.PhysicalMonitorId, a.WindowId);
                 }
                 case Fb.Message.ScreenReady:
                 {
@@ -291,6 +315,25 @@ namespace ScreenPortal.Infrastructure.Protocol
                     var h = e.BodyAsHotkey();
                     return new HotkeyMessage((HotkeyAction)h.Action, h.ScreenKey);
                 }
+                case Fb.Message.StartCursor:
+                    return new StartCursorMessage(e.BodyAsStartCursor().UdpPort);
+                case Fb.Message.CursorShape:
+                {
+                    var c = e.BodyAsCursorShape();
+                    return new CursorShapeMessage(c.ShapeId, c.Width, c.Height, c.HotX, c.HotY, c.Scale, c.GetBgraArray());
+                }
+                case Fb.Message.CursorEnter:
+                {
+                    var c = e.BodyAsCursorEnter();
+                    return new CursorEnterMessage(c.ScreenKey, c.X, c.Y);
+                }
+                case Fb.Message.DetachWindow:
+                {
+                    var d = e.BodyAsDetachWindow();
+                    return new DetachWindowMessage(d.WindowId, d.Width, d.Height, d.Title);
+                }
+                case Fb.Message.SetEditMode:
+                    return new SetEditModeMessage(e.BodyAsSetEditMode().On);
                 case Fb.Message.StartAudio:
                 {
                     var a = e.BodyAsStartAudio();

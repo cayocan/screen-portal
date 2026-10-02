@@ -26,13 +26,27 @@ namespace ScreenPortal.Composition
         private readonly ScreenPortal.App.Session.SessionAutosave _autosave;
         private readonly RateSync _rates;
         private readonly LayoutSync _layout;
+        private readonly ScreenPortal.App.Cursor.CursorSync _cursor;
+        private readonly ScreenPortal.Presentation.Cursor.CursorView _cursorView;
+        private readonly ScreenPortal.App.Cursor.WorldCursor _worldCursor;
+        private readonly EditMode _edit;
+        private readonly EditModeBadge _badge;
+        private readonly GizmoView _gizmo;
 
         public AppEntryPoint(ScreenViewSynchronizer synchronizer, ConnectionStateMachine connection,
             IControlChannel channel, IHostDiscovery discovery, AppEnvironment env,
             InteractionRouter router, ManipulationPresenter presenter, WristMenu menu,
             HostSync hostSync, OverlayScreenViewFactory views, StartupRecenter startupRecenter,
-            ScreenPortal.App.Session.SessionAutosave autosave, RateSync rates, LayoutSync layout)
+            ScreenPortal.App.Session.SessionAutosave autosave, RateSync rates, LayoutSync layout,
+            ScreenPortal.App.Cursor.CursorSync cursor, ScreenPortal.Presentation.Cursor.CursorView cursorView,
+            ScreenPortal.App.Cursor.WorldCursor worldCursor, EditMode edit, EditModeBadge badge, GizmoView gizmo)
         {
+            _gizmo = gizmo;
+            _edit = edit;
+            _badge = badge;
+            _worldCursor = worldCursor;
+            _cursor = cursor;
+            _cursorView = cursorView;
             _layout = layout;
             _synchronizer = synchronizer;
             _connection = connection;
@@ -66,8 +80,15 @@ namespace ScreenPortal.Composition
             _hostSync.Tick();
             _rates.Tick();
             _layout.Tick();
+            _cursor.Tick(); // mouse antes da interação: o cursor 3D é ponteiro no modo edição
+            var mouse = _cursor.Current;
+            _edit.Tick(in mouse);
+            _worldCursor.Tick(in mouse);
             _router.Tick();
             _presenter.Tick();
+            _gizmo.Tick();
+            _cursorView.Tick();
+            _badge.Tick(UnityEngine.Time.deltaTime);
             _autosave.Tick();
         }
 
@@ -83,6 +104,11 @@ namespace ScreenPortal.Composition
             _autosave.Flush();
             _autosave.Dispose();
             _layout.Dispose();
+            _cursorView.Dispose();
+            _badge.Dispose();
+            _gizmo.Dispose();
+            _edit.Dispose();
+            _cursor.Dispose();
             _presenter.Dispose();
             _hostSync.Dispose();
             _views.Bind(null);

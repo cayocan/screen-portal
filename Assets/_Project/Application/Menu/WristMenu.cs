@@ -26,6 +26,7 @@ namespace ScreenPortal.App.Menu
         FrameRate,
         Audio,
         AutoArrange,
+        EditMode,
     }
 
     public enum MenuPage
@@ -46,30 +47,33 @@ namespace ScreenPortal.App.Menu
     /// </summary>
     public sealed class WristMenu
     {
-        public const int MaxItems = 16;
+        public const int MaxItems = 17;
         public const string PlaybackOn = "Som do PC: ligado";
         public const string PlaybackOff = "Som do PC: desligado";
         public const string MicOn = "Microfone: ligado";
         public const string MicOff = "Microfone: mudo";
         public const string AutoArrangeOn = "Arranjo automático: ligado";
         public const string AutoArrangeOff = "Arranjo automático: desligado";
+        public const string EditOn = "Modo edição: ligado";
+        public const string EditOff = "Modo edição: desligado";
         public const int ComfortableVideoScreens = 4;
         public const string TooManyNotice = "Mais de 4 telas:\npode haver quedas e travamentos";
         public const string BackLabel = "← Voltar";
+        public const string ReattachLabel = "Reanexar janela";
         public const string RecreateLabel = "Recriar ▸";
         public const string RecreateTitlePrefix = "Recriar: ";
         public const string CurrentSuffix = " · atual";
 
         private static readonly MenuItemId[] MainItems =
         {
-            MenuItemId.Undo, MenuItemId.Redo, MenuItemId.ToggleMode, MenuItemId.Recenter, MenuItemId.AlignPosture,
+            MenuItemId.EditMode, MenuItemId.Undo, MenuItemId.Redo, MenuItemId.ToggleMode, MenuItemId.Recenter, MenuItemId.AlignPosture,
             MenuItemId.ToggleGrid, MenuItemId.AddVirtual, MenuItemId.AddMirror, MenuItemId.ReturnToSurface, MenuItemId.RemoveScreen,
             MenuItemId.Curvature, MenuItemId.Recreate, MenuItemId.FrameRate, MenuItemId.Audio, MenuItemId.AutoArrange,
         };
 
         private static readonly MenuItemId[] MainItemsWithTest =
         {
-            MenuItemId.Undo, MenuItemId.Redo, MenuItemId.ToggleMode, MenuItemId.Recenter, MenuItemId.AlignPosture,
+            MenuItemId.EditMode, MenuItemId.Undo, MenuItemId.Redo, MenuItemId.ToggleMode, MenuItemId.Recenter, MenuItemId.AlignPosture,
             MenuItemId.ToggleGrid, MenuItemId.AddVirtual, MenuItemId.AddMirror, MenuItemId.ReturnToSurface, MenuItemId.RemoveScreen,
             MenuItemId.Curvature, MenuItemId.Recreate, MenuItemId.FrameRate, MenuItemId.Audio, MenuItemId.AutoArrange,
             MenuItemId.AddTestScreen,
@@ -85,6 +89,7 @@ namespace ScreenPortal.App.Menu
         private readonly ScreenPortal.App.Screens.RateSync _rates;
         private readonly ScreenPortal.App.Audio.AudioSync _audio;
         private readonly ScreenPortal.App.Screens.LayoutSyncSettings _arrange;
+        private readonly ScreenPortal.App.Manipulation.EditMode _edit;
         private int _testScreens;
         private int _aspect;
         private string _notice = string.Empty;
@@ -110,8 +115,9 @@ namespace ScreenPortal.App.Menu
 
         public WristMenu(WorkspaceStore store, ICommandBus bus, IHeadPoseSource head, IHostCatalog host = null, bool showTestScreens = false,
             ScreenPortal.App.Screens.RateSync rates = null, ScreenPortal.App.Audio.AudioSync audio = null,
-            ScreenPortal.App.Screens.LayoutSyncSettings arrange = null)
+            ScreenPortal.App.Screens.LayoutSyncSettings arrange = null, ScreenPortal.App.Manipulation.EditMode edit = null)
         {
+            _edit = edit;
             _arrange = arrange;
             _rates = rates;
             _audio = audio;
@@ -212,11 +218,14 @@ namespace ScreenPortal.App.Menu
                 case MenuItemId.AddVirtual: return "+ Monitor virtual";
                 case MenuItemId.AddMirror: return "+ Espelhar monitor";
                 case MenuItemId.ReturnToSurface: return "Voltar à superfície";
-                case MenuItemId.RemoveScreen: return "Remover tela";
+                case MenuItemId.RemoveScreen:
+                    return _store.State.TryGetScreen(_store.State.FocusedScreenId, out var focused)
+                           && focused.Source.Kind == ScreenSourceKind.Window ? ReattachLabel : "Remover tela";
                 case MenuItemId.AddTestScreen: return "+ Tela de teste";
                 case MenuItemId.Curvature: return "Curvatura ▸";
                 case MenuItemId.FrameRate: return "Taxa de quadros ▸";
                 case MenuItemId.Audio: return "Áudio ▸";
+                case MenuItemId.EditMode: return _edit != null && _edit.Enabled ? EditOn : EditOff;
                 case MenuItemId.AutoArrange: return _arrange != null && _arrange.Enabled ? AutoArrangeOn : AutoArrangeOff;
                 case MenuItemId.Recreate: return RecreateLabel;
                 default: return id.ToString();
@@ -267,6 +276,8 @@ namespace ScreenPortal.App.Menu
                     return _audio != null;
                 case MenuItemId.AutoArrange:
                     return _arrange != null;
+                case MenuItemId.EditMode:
+                    return _edit != null;
                 case MenuItemId.AddVirtual:
                 case MenuItemId.AddMirror:
                     return _host.IsConnected;
@@ -375,6 +386,9 @@ namespace ScreenPortal.App.Menu
                     break;
                 case MenuItemId.AutoArrange:
                     _arrange.Toggle();
+                    break;
+                case MenuItemId.EditMode:
+                    _edit.Toggle();
                     break;
                 case MenuItemId.AddTestScreen:
                     _bus.Send(TestScreens.Next(_testScreens++));

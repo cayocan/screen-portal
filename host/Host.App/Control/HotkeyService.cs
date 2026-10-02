@@ -10,7 +10,7 @@ namespace ScreenPortal.Host.App.Control;
 /// </summary>
 public sealed class HotkeyService : IDisposable
 {
-    private const uint WmHotkey = 0x0312, WmQuit = 0x0012, ModNoRepeat = 0x4000;
+    private const uint WmHotkey = 0x0312, WmQuit = 0x0012, WmApp = 0x8000, ModNoRepeat = 0x4000, VkEscape = 0x1B;
 
     private readonly Func<string, (string DeviceId, uint ScreenKey)?> _screenAt;
     private readonly HotkeyRouter _router;
@@ -50,6 +50,7 @@ public sealed class HotkeyService : IDisposable
         int ok = 0;
         foreach (var (action, chord) in map)
         {
+            if (!Features.WindowMirrors && action is HotkeyAction.DetachWindow or HotkeyAction.ReattachWindow) continue;
             uint mods = chord.Modifiers | (HotkeyMap.Repeats(action) ? 0 : ModNoRepeat);
             if (RegisterHotKey(IntPtr.Zero, (int)action, mods, chord.VirtualKey)) ok++;
             else _log($"atalhos: {HotkeyMap.Format(chord)} ({action}) já é usado por outro programa; troque em {path}");
@@ -57,15 +58,42 @@ public sealed class HotkeyService : IDisposable
         _log($"atalhos: {ok} de {map.Count} registrados ({path})");
         while (GetMessage(out var msg, IntPtr.Zero, 0, 0) > 0)
         {
+            if (msg.message == WmApp)
+            {
+                // 3B: Esc só durante o modo edição (fora dele o Esc é do Windows)
+                if (msg.wParam != IntPtr.Zero) RegisterHotKey(IntPtr.Zero, (int)HotkeyAction.Escape, ModNoRepeat, VkEscape);
+                else UnregisterHotKey(IntPtr.Zero, (int)HotkeyAction.Escape);
+                continue;
+            }
             if (msg.message != WmHotkey) continue;
             try { OnHotkey((HotkeyAction)(int)msg.wParam); }
             catch (Exception e) { _log($"atalhos: {e.GetType().Name}: {e.Message}"); }
         }
         foreach (var action in map.Keys) UnregisterHotKey(IntPtr.Zero, (int)action);
+        UnregisterHotKey(IntPtr.Zero, (int)HotkeyAction.Escape);
     }
+
+    /// <summary>Liga/desliga o Esc global (modo edição do headset).</summary>
+    public void SetEscapeActive(bool on)
+    {
+        if (_threadId != 0) PostThreadMessage(_threadId, WmApp, on ? (IntPtr)1 : IntPtr.Zero, IntPtr.Zero);
+    }
+
+    /// <summary>3D: o espelho de janela sob o cursor (o roteador sabe; o monitor não diz).</summary>
+    public Func<(string DeviceId, uint ScreenKey)?>? ActiveMirror { get; set; }
 
     private void OnHotkey(HotkeyAction action)
     {
+        if (action == HotkeyAction.DetachWindow)
+        {
+            Detach();
+            return;
+        }
+        if (action == HotkeyAction.ReattachWindow && ActiveMirror?.Invoke() is { } mirror)
+        {
+            _router.Send(mirror.DeviceId, new HotkeyMessage(action, mirror.ScreenKey));
+            return;
+        }
         var target = GetCursorPos(out var p) ? _screenAt(MonitorName(p)) : null;
         if (target is { } t)
         {
@@ -73,6 +101,25 @@ public sealed class HotkeyService : IDisposable
             return;
         }
         foreach (var device in _router.Devices) _router.Send(device, new HotkeyMessage(action, 0)); // fora das telas: só ações globais
+    }
+
+    /// <summary>Ctrl+Alt+D: a janela ativa vira uma tela-espelho no headset (ADR 0018). Tamanho em múltiplos de 8.</summary>
+    private void Detach()
+    {
+        if (!ScreenPortal.Host.App.Display.WindowMirrorOps.TryForegroundWindow(out var hwnd, out var bounds))
+        {
+            _log("destacar: nenhuma janela ativa que dê para espelhar");
+            return;
+        }
+        if (!ScreenPortal.Host.App.Display.WindowMirrorOps.TryDetachMessage(hwnd, out var message, out var why))
+        {
+            _log($"destacar: {why}");
+            return;
+        }
+        var target = GetCursorPos(out var p) ? _screenAt(MonitorName(p)) : null;
+        if (target is { } t) _router.Send(t.DeviceId, message!);
+        else foreach (var device in _router.Devices) _router.Send(device, message!);
+        _log($"destacar: \"{message!.Title}\" {message.Width}×{message.Height}");
     }
 
     private static string MonitorName(Point p)

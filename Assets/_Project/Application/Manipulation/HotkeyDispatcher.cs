@@ -24,9 +24,21 @@ namespace ScreenPortal.App.Manipulation
         private readonly ICommandBus _bus;
         private readonly IHeadPoseSource _head;
         private readonly ConnectionStateMachine _connection;
+        private readonly EditMode _edit;
+        private readonly ScreenManipulationController _manipulation;
+        private readonly ScreenPortal.App.Cursor.WorldCursor _world;
+        private readonly ScreenPortal.App.Cursor.MouseMenu _menu;
+        private readonly ScreenPortal.App.Screens.WindowMirrors _mirrors;
 
-        public HotkeyDispatcher(WorkspaceStore store, ICommandBus bus, IHeadPoseSource head, ConnectionStateMachine connection = null)
+        public HotkeyDispatcher(WorkspaceStore store, ICommandBus bus, IHeadPoseSource head, ConnectionStateMachine connection = null,
+            EditMode edit = null, ScreenManipulationController manipulation = null, ScreenPortal.App.Cursor.WorldCursor world = null,
+            ScreenPortal.App.Cursor.MouseMenu menu = null, ScreenPortal.App.Screens.WindowMirrors mirrors = null)
         {
+            _mirrors = mirrors;
+            _menu = menu;
+            _world = world;
+            _edit = edit;
+            _manipulation = manipulation;
             _store = store;
             _bus = bus;
             _head = head;
@@ -44,6 +56,14 @@ namespace ScreenPortal.App.Manipulation
             var ws = _store.State;
             switch (hotkey.Action)
             {
+                case HotkeyAction.ToggleEditMode: _edit?.Toggle(); return;
+                case HotkeyAction.FindCursor: _world?.CenterOnView(); return;
+                case HotkeyAction.OpenMenu: _menu?.Toggle(); return;
+                case HotkeyAction.Escape:
+                    if (_menu != null && _menu.Open) _menu.Close(); // Esc fecha o menu primeiro
+                    else if (_manipulation != null && _manipulation.IsDragging) _edit?.RequestCancel(); // Esc cancela o arraste
+                    else _edit?.Set(false); // parado: sai do modo edição
+                    return;
                 case HotkeyAction.Undo: _bus.Undo(); return;
                 case HotkeyAction.Redo: _bus.Redo(); return;
                 case HotkeyAction.Recenter:
@@ -75,6 +95,9 @@ namespace ScreenPortal.App.Manipulation
                 case HotkeyAction.CurvatureToggle: _bus.Send(new ToggleScreenCurvature(id)); break;
                 case HotkeyAction.CurvatureLess: Curve(screen, -CurvatureStep); break;
                 case HotkeyAction.CurvatureMore: Curve(screen, CurvatureStep); break;
+                case HotkeyAction.ReattachWindow:
+                    _mirrors?.Reattach(id);
+                    break;
                 case HotkeyAction.CycleFrameRate:
                     if (screen.Source.HasVideo) _bus.Send(new SetFrameRateMode(id, NextFrameRate(screen.FrameRateMode)));
                     break;

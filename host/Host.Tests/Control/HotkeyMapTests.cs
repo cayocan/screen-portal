@@ -34,7 +34,7 @@ public class HotkeyMapTests
             Assert.True(HotkeyMap.TryParse(text, out var chord), text);
             Assert.Equal(text, HotkeyMap.Format(chord));
         }
-        Assert.Equal(Enum.GetValues<HotkeyAction>().Length - 1, HotkeyMap.Defaults.Count); // todas menos None
+        Assert.Equal(Enum.GetValues<HotkeyAction>().Length - 2, HotkeyMap.Defaults.Count); // todas menos None e Escape (fixo, só na edição)
     }
 
     [Fact]

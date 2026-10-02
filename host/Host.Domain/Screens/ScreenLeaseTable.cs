@@ -1,6 +1,6 @@
 namespace ScreenPortal.Host.Domain.Screens;
 
-public enum ScreenLeaseKind { Virtual, Mirror }
+public enum ScreenLeaseKind { Virtual, Mirror, Window }
 
 /// <summary>Um monitor (virtual ou espelho) mantido para uma tela de um headset. ExpiresAt null = em uso.</summary>
 public sealed class ScreenLease(string deviceId, uint screenKey, ScreenLeaseKind kind, int width, int height,

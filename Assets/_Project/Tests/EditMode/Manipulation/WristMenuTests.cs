@@ -51,6 +51,8 @@ namespace ScreenPortal.Tests
             public Pose Pose => Pose.At(new Vec3(0f, 1f, 0.4f));
             public int LastHover = -2;
             public void Render(WristMenu menu, int hoverIndex) => LastHover = hoverIndex;
+            public bool Floating;
+            public void Float(bool on, Pose pose) => Floating = on;
         }
 
         [Test]

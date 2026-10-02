@@ -72,6 +72,9 @@ public class HeadsetSessionTests
             lock (Calls) { Calls.Add($"release {screenKey} {grace.TotalMilliseconds}"); Generations.Add(generation); }
         }
 
+        public event Action<string, uint, string>? ScreenLost;
+        public void Lose(string deviceId, uint key, string reason) => ScreenLost?.Invoke(deviceId, key, reason);
+
         public void Arrange(string deviceId, long generation, IReadOnlyList<ScreenAnglesInfo> screens)
         {
             lock (Calls) { Calls.Add($"arrange {screens.Count}"); Generations.Add(generation); }
@@ -123,6 +126,20 @@ public class HeadsetSessionTests
         session.OnClosed();
         await session.Idle.WaitAsync(TimeSpan.FromSeconds(5));
         Assert.Equal(new[] { "start 192.168.0.171:9300 True True", "stop dev-1" }, audio.Calls);
+    }
+
+    [Fact]
+    public void ClosedWindowMirror_TellsTheHeadset_OnlyItsOwn()
+    {
+        var session = Welcomed(out var conn, out var screens);
+        screens.Lose("dev-1", 9, "A janela foi fechada.");
+        screens.Lose("outro", 3, "A janela foi fechada.");
+        var failed = conn.Sent.OfType<ScreenFailedMessage>().ToList();
+        Assert.Single(failed);
+        Assert.Equal(9u, failed[0].ScreenKey);
+        session.OnClosed();
+        screens.Lose("dev-1", 10, "A janela foi fechada.");
+        Assert.Single(conn.Sent.OfType<ScreenFailedMessage>());
     }
 
     [Fact]

@@ -19,7 +19,8 @@ public sealed class HeadsetSession(
     Func<string> newCode,
     Action<string> log,
     IAudioHost? audio = null,
-    HotkeyRouter? hotkeys = null)
+    HotkeyRouter? hotkeys = null,
+    ICursorHost? cursor = null)
 {
     private string? _deviceId;
     private long _generation; // publicado pela escrita volátil de _welcomed
@@ -60,6 +61,15 @@ public sealed class HeadsetSession(
                 break;
             case StartAudioMessage startAudio when _welcomed && audio != null:
                 Enqueue(() => OnStartAudio(startAudio));
+                break;
+            case StartCursorMessage startCursor when _welcomed && cursor != null && _deviceId != null:
+                cursor.Start(_deviceId, this, connection.RemoteAddress, startCursor.UdpPort, connection.Send);
+                break;
+            case CursorEnterMessage enter when _welcomed && cursor != null && _deviceId != null:
+                cursor.Enter(_deviceId, this, enter.ScreenKey, enter.X, enter.Y);
+                break;
+            case SetEditModeMessage edit when _welcomed && cursor != null && _deviceId != null:
+                cursor.SetEditMode(_deviceId, this, edit.On);
                 break;
             case LayoutChangedMessage layout when _welcomed:
                 Enqueue(() =>
@@ -110,6 +120,7 @@ public sealed class HeadsetSession(
         _generation = screens.Claim(_deviceId!, OnReplaced);
         _welcomed = true;
         hotkeys?.Register(_deviceId!, this, connection.Send);
+        screens.ScreenLost += OnScreenLost;
         connection.Send(new WelcomeMessage(hostName, monitors.GetMonitors(), screens.Leases(_deviceId!)));
     }
 
@@ -118,8 +129,16 @@ public sealed class HeadsetSession(
     {
         log($"sessão de {_deviceId} ({connection.RemoteAddress}) substituída por uma nova conexão");
         if (_deviceId != null) hotkeys?.Unregister(_deviceId, this);
+        if (_deviceId != null) cursor?.Stop(_deviceId, this);
+        screens.ScreenLost -= OnScreenLost;
         connection.Send(new ByeMessage(ByeReason.Replaced));
         connection.Close();
+    }
+
+    /// <summary>3D: a janela espelhada fechou no PC: o headset tira a tela.</summary>
+    private void OnScreenLost(string deviceId, uint screenKey, string reason)
+    {
+        if (_welcomed && deviceId == _deviceId) connection.Send(new ScreenFailedMessage(screenKey, reason));
     }
 
     private void Enqueue(Action work)
@@ -180,6 +199,8 @@ public sealed class HeadsetSession(
         string? deviceId = _deviceId;
         long generation = _generation;
         if (deviceId != null) hotkeys?.Unregister(deviceId, this);
+        if (deviceId != null) cursor?.Stop(deviceId, this);
+        screens.ScreenLost -= OnScreenLost;
         if (deviceId != null) Enqueue(() =>
         {
             screens.Disconnected(deviceId, generation);

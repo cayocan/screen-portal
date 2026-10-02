@@ -1,0 +1,58 @@
+<!-- @dsCard group="Modo edição" height=480 width=1000 subtitle="Mover, girar, aproximar e escalar a tela selecionada" -->
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<title>Gizmo — prévia</title>
+<link rel="preconnect" href="https://fonts.googleapis.com"><link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Atkinson+Hyperlegible+Next:wght@400;500;600&family=Atkinson+Hyperlegible+Mono:wght@400;500;600&display=swap">
+<style>html,body{margin:0;height:100%;} body{background:var(--passthrough-dim);}
+.g-halo{fill:none;stroke:var(--halo);stroke-width:13px;stroke-linecap:round;stroke-linejoin:round}
+.g-halo-f{fill:var(--halo)}
+.g-x{stroke:var(--axis-x);fill:none;stroke-width:var(--stroke-world);stroke-linecap:round}
+.g-y{stroke:var(--axis-y);fill:none;stroke-width:var(--stroke-world);stroke-linecap:round}
+.g-z{stroke:var(--axis-z);fill:none;stroke-width:var(--stroke-world);stroke-linecap:round}
+.g-xf{fill:var(--axis-x)} .g-yf{fill:var(--axis-y)} .g-zf{fill:var(--axis-z)}
+.g-on{stroke:var(--edit);fill:none;stroke-width:var(--stroke-world);stroke-linecap:round} .g-onf{fill:var(--edit)}
+.g-s{fill:var(--ink);stroke:var(--halo);stroke-width:4px}
+.g-cap{font-family:var(--font-sans);font-size:30px;font-weight:600;fill:var(--ink);paint-order:stroke;stroke:var(--halo);stroke-width:6px}
+</style>
+</head>
+<body class="sp">
+<div class="sp-stage sp-stage--split" style="height:100%"><div style="justify-content:center"><svg viewBox="0 0 400 400" width="400" height="400"><g transform="translate(200,200)">
+<!-- anéis (vistos em leve perspectiva para nunca ficarem de perfil) -->
+<ellipse class="g-halo" cx="0" cy="0" rx="150" ry="150"/><ellipse class="g-z" cx="0" cy="0" rx="150" ry="150"/>
+<ellipse class="g-halo" cx="0" cy="0" rx="48" ry="150"/><ellipse class="g-x" cx="0" cy="0" rx="48" ry="150"/>
+<ellipse class="g-halo" cx="0" cy="0" rx="150" ry="48"/><ellipse class="g-y" cx="0" cy="0" rx="150" ry="48"/>
+<!-- mover X -->
+<line class="g-halo" x1="20" y1="0" x2="104" y2="0"/><path class="g-halo" d="M100 -18 L132 0 L100 18 Z"/>
+<line class="g-x" x1="20" y1="0" x2="104" y2="0"/><path class="g-xf" d="M100 -18 L132 0 L100 18 Z"/>
+<!-- mover Y -->
+<line class="g-halo" x1="0" y1="-20" x2="0" y2="-104"/><path class="g-halo" d="M-18 -100 L0 -132 L18 -100 Z"/>
+<line class="g-on" x1="0" y1="-20" x2="0" y2="-104"/><path class="g-onf" d="M-18 -100 L0 -132 L18 -100 Z"/>
+<!-- perto/longe: haste abaixo com pega -->
+<line class="g-halo" x1="0" y1="20" x2="0" y2="112"/><rect class="g-halo-f" x="-30" y="100" width="60" height="40" rx="12"/>
+<line class="g-z" x1="0" y1="20" x2="0" y2="104"/><rect class="g-zf" x="-26" y="104" width="52" height="32" rx="10"/>
+<path d="M-12 114 L0 124 L12 114" fill="none" stroke="var(--panel)" stroke-width="4" stroke-linecap="round"/>
+<!-- escalar -->
+<rect class="g-s" x="-14" y="-14" width="28" height="28" rx="4"/>
+</g></svg></div>
+<div style="justify-content:center;flex-direction:column;align-items:center"><svg viewBox="0 0 400 400" width="400" height="400"><g transform="translate(200,200)">
+<!-- anéis (vistos em leve perspectiva para nunca ficarem de perfil) -->
+<ellipse class="g-halo" cx="0" cy="0" rx="150" ry="150"/><ellipse class="g-on" cx="0" cy="0" rx="150" ry="150"/>
+<ellipse class="g-halo" cx="0" cy="0" rx="48" ry="150"/><ellipse class="g-x" cx="0" cy="0" rx="48" ry="150"/>
+<ellipse class="g-halo" cx="0" cy="0" rx="150" ry="48"/><ellipse class="g-y" cx="0" cy="0" rx="150" ry="48"/>
+<!-- mover X -->
+<line class="g-halo" x1="20" y1="0" x2="104" y2="0"/><path class="g-halo" d="M100 -18 L132 0 L100 18 Z"/>
+<line class="g-x" x1="20" y1="0" x2="104" y2="0"/><path class="g-xf" d="M100 -18 L132 0 L100 18 Z"/>
+<!-- mover Y -->
+<line class="g-halo" x1="0" y1="-20" x2="0" y2="-104"/><path class="g-halo" d="M-18 -100 L0 -132 L18 -100 Z"/>
+<line class="g-y" x1="0" y1="-20" x2="0" y2="-104"/><path class="g-yf" d="M-18 -100 L0 -132 L18 -100 Z"/>
+<!-- perto/longe: haste abaixo com pega -->
+<line class="g-halo" x1="0" y1="20" x2="0" y2="112"/><rect class="g-halo-f" x="-30" y="100" width="60" height="40" rx="12"/>
+<line class="g-z" x1="0" y1="20" x2="0" y2="104"/><rect class="g-zf" x="-26" y="104" width="52" height="32" rx="10"/>
+<path d="M-12 114 L0 124 L12 114" fill="none" stroke="var(--panel)" stroke-width="4" stroke-linecap="round"/>
+<!-- escalar -->
+<rect class="g-s" x="-14" y="-14" width="28" height="28" rx="4"/>
+</g></svg></div></div>
+</body>
+</html>
