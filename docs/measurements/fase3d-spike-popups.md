@@ -12,3 +12,14 @@
 | `PrintWindow` do diálogo | ✅ 618×195, 16,1 ms por captura, 420/462 amostras com imagem |
 
 Conclusão: espelho com popups é viável no Windows 10 (WGC para a janela, `PrintWindow` para os popups). → ADR 0018.
+
+## Espelho composto (`ScreenPortalHost mirror-spike`)
+`WindowMirrorCapture` (WGC da janela + `PopupTracker`) no Bloco de Notas 1096×824, lendo de volta a região do menu:
+
+| Momento | Média da região | |
+|---|---|---|
+| Antes | rgb(255,255,255) | texto do Bloco de Notas |
+| Menu aberto | rgb(232,232,232) | o menu aparece no quadro em **~100 ms** |
+| Menu fechado (Esc) | rgb(255,255,255) | 0 px diferentes do quadro inicial |
+
+Obs.: `WM_CANCELMODE` na janela não fecha um menu de `TrackPopupMenu`; `Esc` no próprio menu fecha.
