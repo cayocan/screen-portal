@@ -32,7 +32,9 @@ public sealed class ScreenHost : IScreenHost, IDisposable
         public int Height;
         public DisplayInfo? Captured;
         public int Fps = 60;              // 2F: fps pedido pelo headset
-        public int BaseKbps;              // 2F: bitrate do encoder a 60 fps (0 = padrão do host)     // diagnóstico (bug 2): o display como estava ao criar a captura
+        public int BaseKbps;
+        public IntPtr Window;             // 3D: janela espelhada (sem monitor)
+        public int MirrorWidth, MirrorHeight;              // 2F: bitrate do encoder a 60 fps (0 = padrão do host)     // diagnóstico (bug 2): o display como estava ao criar a captura
     }
 
     private readonly GpuDevice _gpu;
@@ -129,7 +131,8 @@ public sealed class ScreenHost : IScreenHost, IDisposable
     {
         lock (_lock)
             return _leases.ForDevice(deviceId)
-                .Select(l => new ScreenLeaseInfo(l.ScreenKey, l.Kind == ScreenLeaseKind.Mirror ? ScreenKind.Mirror : ScreenKind.Virtual,
+                .Select(l => new ScreenLeaseInfo(l.ScreenKey, l.Kind == ScreenLeaseKind.Mirror ? ScreenKind.Mirror
+                        : l.Kind == ScreenLeaseKind.Window ? ScreenKind.Window : ScreenKind.Virtual,
                     (uint)l.Width, (uint)l.Height))
                 .ToList();
     }
@@ -164,7 +167,9 @@ public sealed class ScreenHost : IScreenHost, IDisposable
             {
                 bool same = request.ScreenKind == ScreenKind.Mirror
                     ? lease.Kind == ScreenLeaseKind.Mirror && lease.PhysicalMonitorId == request.PhysicalMonitorId
-                    : lease.Kind == ScreenLeaseKind.Virtual && lease.Width == request.Width && lease.Height == request.Height;
+                    : request.ScreenKind == ScreenKind.Window
+                        ? lease.Kind == ScreenLeaseKind.Window && lease.PhysicalMonitorId == request.WindowId
+                        : lease.Kind == ScreenLeaseKind.Virtual && lease.Width == request.Width && lease.Height == request.Height;
                 if (same)
                 {
                     _leases.Renew(deviceId, request.ScreenKey);
@@ -176,7 +181,9 @@ public sealed class ScreenHost : IScreenHost, IDisposable
                     return Recreate(deviceId, request, lease, old.Monitor); // RecreateScreen (spec 2D §4)
                 Destroy(deviceId, request.ScreenKey); // outro tipo na mesma chave: troca o monitor
             }
-            return request.ScreenKind == ScreenKind.Mirror ? CreateMirror(deviceId, request) : CreateVirtual(deviceId, request);
+            return request.ScreenKind == ScreenKind.Mirror ? CreateMirror(deviceId, request)
+                : request.ScreenKind == ScreenKind.Window ? CreateWindowMirror(deviceId, request)
+                : CreateVirtual(deviceId, request);
         }
     }
 
@@ -239,6 +246,36 @@ public sealed class ScreenHost : IScreenHost, IDisposable
         return new ScreenAcquireResult(true, width, height, "");
     }
 
+    /// <summary>3D (ADR 0018): espelho de janela, sem monitor virtual. O stream nasce no StartStream.</summary>
+    private ScreenAcquireResult CreateWindowMirror(string deviceId, AcquireScreenMessage request)
+    {
+        var hwnd = (IntPtr)request.WindowId;
+        if (request.WindowId == 0 || !WindowMirrorOps.IsWindow(hwnd)) return new ScreenAcquireResult(false, 0, 0, "A janela não existe mais.");
+        if (!ScreenAcquireResult.TryValidateVirtualSize(request.Width, request.Height, out var invalid)) return invalid;
+        WindowMirrorOps.Restore(hwnd); // minimizada não manda quadros
+        string name = $"janela 0x{request.WindowId:X}";
+        _leases.Add(new ScreenLease(deviceId, request.ScreenKey, ScreenLeaseKind.Window, (int)request.Width, (int)request.Height,
+            request.WindowId, name));
+        _live[(deviceId, request.ScreenKey)] = new Live
+        {
+            DisplayName = name, Window = hwnd, MirrorWidth = (int)request.Width, MirrorHeight = (int)request.Height,
+        };
+        _log($"telas: {name} \"{WindowMirrorOps.Title(hwnd)}\" espelhada {request.Width}×{request.Height} para {deviceId}/{request.ScreenKey}");
+        return new ScreenAcquireResult(true, (int)request.Width, (int)request.Height, "");
+    }
+
+    /// <summary>3D: telas-espelho do headset (para o cursor): chave, janela e retângulo no desktop.</summary>
+    public IReadOnlyList<(uint ScreenKey, IntPtr Window, ScreenPortal.Host.Domain.Display.RectI Bounds)> WindowMirrors(string deviceId)
+    {
+        var list = new List<(uint, IntPtr, ScreenPortal.Host.Domain.Display.RectI)>();
+        lock (_lock)
+            foreach (var ((device, key), live) in _live)
+                if (device == deviceId && live.Window != IntPtr.Zero && WindowMirrorOps.TryBounds(live.Window, out var bounds))
+                    list.Add((key, live.Window, new ScreenPortal.Host.Domain.Display.RectI(bounds.X, bounds.Y,
+                        Math.Min(bounds.Width, live.MirrorWidth), Math.Min(bounds.Height, live.MirrorHeight))));
+        return list;
+    }
+
     private ScreenAcquireResult CreateMirror(string deviceId, AcquireScreenMessage request)
     {
         var monitor = PhysicalMonitors.GetMonitors().FirstOrDefault(m => m.Id == request.PhysicalMonitorId);
@@ -278,14 +315,24 @@ public sealed class ScreenHost : IScreenHost, IDisposable
         uint firstFrameId = live.Pipeline?.NextFrameId ?? 0;
         live.Pipeline = null;
         RebuildKeyframeTargets();
-        WgcMonitorCapture? capture = null;
+        ICaptureSource? capture = null;
         StreamPipeline? pipeline = null;
         try
         {
-            capture = CaptureWithRetry(live.DisplayName, out var captured);
-            live.Captured = captured;
             string display = live.DisplayName;
-            capture.Diagnostic += message => _log($"vídeo: tela {screenKey} ({display}): {message}");
+            if (live.Window != IntPtr.Zero)
+            {
+                // 3D: espelho da janela (WGC da janela + popups), quadro fixo do tamanho do destaque
+                capture = new WindowMirrorCapture(_gpu, live.Window, WgcMonitorCapture.ForWindow(_gpu, live.Window, captureCursor: false),
+                    live.MirrorWidth, live.MirrorHeight);
+            }
+            else
+            {
+                var monitor = CaptureWithRetry(live.DisplayName, out var captured);
+                live.Captured = captured;
+                monitor.Diagnostic += message => _log($"vídeo: tela {screenKey} ({display}): {message}");
+                capture = monitor;
+            }
             _log($"vídeo: tela {screenKey} captura {capture.Width}×{capture.Height} de {display}");
             var fit = ResolutionFit.FromCapture(capture.Width, capture.Height);
             var settings = new EncoderSettings(fit.Width, fit.Height, 60, live.BaseKbps > 0 ? live.BaseKbps : _bitrateKbps);
@@ -437,9 +484,22 @@ public sealed class ScreenHost : IScreenHost, IDisposable
                 DisposeLive(lease.DeviceId, lease.ScreenKey);
                 _log($"telas: {lease.DeviceId}/{lease.ScreenKey} expirou ({lease.DisplayName} {(lease.Kind == ScreenLeaseKind.Virtual ? "removido" : "stream encerrado")})");
             }
+            foreach (var ((device, key), live) in _live.ToList())
+            {
+                if (live.Window == IntPtr.Zero || WindowMirrorOps.IsWindow(live.Window)) continue;
+                Destroy(device, key); // 3D: o app fechou a janela espelhada
+                _log($"telas: {live.DisplayName} fechou; tela {device}/{key} removida");
+                _lost.Add((device, key));
+            }
             FollowDisplayChanges();
         }
+        foreach (var (device, key) in _lost) ScreenLost?.Invoke(device, key, "A janela foi fechada.");
+        _lost.Clear();
     }
+
+    private readonly List<(string, uint)> _lost = new(); // só a thread do Sweep usa
+
+    public event Action<string, uint, string>? ScreenLost;
 
     /// <summary>
     /// Bug 2 da 2C: depois que o monitor muda de posição no desktop (o usuário reorganiza os monitores no Windows ou
