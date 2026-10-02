@@ -1,6 +1,7 @@
 # Status do projeto
 
-**Fase atual:** **Fase 3 — mouse e teclado em primeiro lugar** (3A concluída 01/10/2026) → próxima: **3B** (cursor espacial).
+**Fase atual:** **Fase 3 — mouse e teclado em primeiro lugar: concluída** (3A 01/10, 3B–3C 02/10/2026; 3D implementada e
+desligada) → próxima: **UI/UX** pelo design system em [DesignSystem/](DesignSystem/) (ver `IMPLEMENTACAO.md`).
 Fase 2 — multi-monitor livre: concluída (2A–2E 29–30/09, 2F e 2G 01/10/2026).
 Brief: [brief.md](brief.md) v1.3.2 (ADRs 0002–0006).
 
@@ -66,9 +67,9 @@ Cada um com spec → plano → implementação → verificação. Ordem: **2A + 
 | # | Subprojeto | Onde se testa | Estado |
 |---|---|---|---|
 | 3A | Arranjo do Windows segue o Quest + escala por tela + atalhos globais | PC + Quest | ✅ Quest: arranjo acompanha (e desliga no menu), escala volta, atalhos na tela sob o cursor — [spec](specs/2026-10-01-fase3a-arranjo-atalhos-design.md) · [plano](plans/2026-10-01-fase3a-arranjo-atalhos.md) · [verificação](measurements/fase3a-arranjo-atalhos.md) · [ADR 0016](adr/0016-windows-arrangement-follows-quest.md) |
-| 3B | Cursor espacial (`SpatialMap`) + cursor desenhado no headset | PC + Quest | — |
-| 3C | Moldura mouse-first, cursor 3D, menu pelo mouse | Simulator + Quest | — |
-| 3D | Janela destacada + arrastar janela para o vazio | PC + Quest | — |
+| 3B | Cursor desenhado no headset (compositor layer) + cursor 3D no mundo (sai pela borda, entra onde toca) + modo edição com gizmo (mover X/Y/profundidade, girar, escalar; roda curta/longa) | PC + Quest | ✅ Quest: todos os testes — [spec](specs/2026-10-01-fase3b-cursor-edicao-design.md) · [plano](plans/2026-10-01-fase3b-cursor-edicao.md) · [verificação](measurements/fase3b-3d-cursor-edicao.md) · [ADR 0017](adr/0017-world-cursor-and-edit-mode.md) |
+| 3C | Menu do app pelo mouse (`Ctrl+Alt+M`), cursor perdido (`Ctrl+Alt+Home`) | Quest | ✅ Quest |
+| 3D | Janela espelhada sem monitor virtual (WGC + popups por `PrintWindow`) + arrastar para o vazio | PC | ⏸ implementada e medida no PC, **desligada** a pedido (`Features.WindowMirrors`) — [spec](specs/2026-10-02-fase3d-janela-espelhada-design.md) · [spike](measurements/fase3d-spike-popups.md) · [ADR 0018](adr/0018-window-mirror-instead-of-stage-monitor.md) |
 
 ## Decidido e documentado, para fases futuras
 - **Superfície de layout Cilindro/Esfera** ([ADR 0005](adr/0005-layout-surface-cylinder-sphere.md), brief §10.12,
