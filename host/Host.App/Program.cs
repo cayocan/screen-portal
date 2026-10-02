@@ -33,6 +33,7 @@ switch (opts.Command)
     case "display-spike": return RunDisplaySpike(opts);
     case "audio-test": return ScreenPortal.Host.App.Audio.AudioSelfTest.Run();
     case "cursor-probe": return RunCursorProbe(opts, cts.Token);
+    case "popup-spike": { using var g = new GpuDevice(); return ScreenPortal.Host.App.Display.PopupSpike.Run(g); }
     default:
         Console.Error.WriteLine("Uso: Host.App [serve] | stream --target <ip> [...] | receive [...]");
         return 2;
