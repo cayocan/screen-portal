@@ -22,6 +22,7 @@ public enum ScreenKind : byte
 {
   Virtual = 0,
   Mirror = 1,
+  Window = 2,
 };
 
 public enum Message : byte
@@ -50,6 +51,7 @@ public enum Message : byte
   CursorShape = 21,
   CursorEnter = 22,
   SetEditMode = 23,
+  DetachWindow = 24,
 };
 
 
@@ -129,6 +131,9 @@ static public class MessageVerify
         break;
       case Message.SetEditMode:
         result = ScreenPortal.Protocol.Fb.SetEditModeVerify.Verify(verifier, tablePos);
+        break;
+      case Message.DetachWindow:
+        result = ScreenPortal.Protocol.Fb.DetachWindowVerify.Verify(verifier, tablePos);
         break;
       default: result = true;
         break;
@@ -746,14 +751,17 @@ public struct AcquireScreen : IFlatbufferObject
   public uint Width { get { int o = __p.__offset(8); return o != 0 ? __p.bb.GetUint(o + __p.bb_pos) : (uint)0; } }
   public uint Height { get { int o = __p.__offset(10); return o != 0 ? __p.bb.GetUint(o + __p.bb_pos) : (uint)0; } }
   public uint PhysicalMonitorId { get { int o = __p.__offset(12); return o != 0 ? __p.bb.GetUint(o + __p.bb_pos) : (uint)0; } }
+  public uint WindowId { get { int o = __p.__offset(14); return o != 0 ? __p.bb.GetUint(o + __p.bb_pos) : (uint)0; } }
 
   public static Offset<ScreenPortal.Protocol.Fb.AcquireScreen> CreateAcquireScreen(FlatBufferBuilder builder,
       uint screen_key = 0,
       ScreenPortal.Protocol.Fb.ScreenKind kind = ScreenPortal.Protocol.Fb.ScreenKind.Virtual,
       uint width = 0,
       uint height = 0,
-      uint physical_monitor_id = 0) {
-    builder.StartTable(5);
+      uint physical_monitor_id = 0,
+      uint window_id = 0) {
+    builder.StartTable(6);
+    AcquireScreen.AddWindowId(builder, window_id);
     AcquireScreen.AddPhysicalMonitorId(builder, physical_monitor_id);
     AcquireScreen.AddHeight(builder, height);
     AcquireScreen.AddWidth(builder, width);
@@ -762,12 +770,13 @@ public struct AcquireScreen : IFlatbufferObject
     return AcquireScreen.EndAcquireScreen(builder);
   }
 
-  public static void StartAcquireScreen(FlatBufferBuilder builder) { builder.StartTable(5); }
+  public static void StartAcquireScreen(FlatBufferBuilder builder) { builder.StartTable(6); }
   public static void AddScreenKey(FlatBufferBuilder builder, uint screenKey) { builder.AddUint(0, screenKey, 0); }
   public static void AddKind(FlatBufferBuilder builder, ScreenPortal.Protocol.Fb.ScreenKind kind) { builder.AddByte(1, (byte)kind, 0); }
   public static void AddWidth(FlatBufferBuilder builder, uint width) { builder.AddUint(2, width, 0); }
   public static void AddHeight(FlatBufferBuilder builder, uint height) { builder.AddUint(3, height, 0); }
   public static void AddPhysicalMonitorId(FlatBufferBuilder builder, uint physicalMonitorId) { builder.AddUint(4, physicalMonitorId, 0); }
+  public static void AddWindowId(FlatBufferBuilder builder, uint windowId) { builder.AddUint(5, windowId, 0); }
   public static Offset<ScreenPortal.Protocol.Fb.AcquireScreen> EndAcquireScreen(FlatBufferBuilder builder) {
     int o = builder.EndTable();
     return new Offset<ScreenPortal.Protocol.Fb.AcquireScreen>(o);
@@ -785,6 +794,7 @@ static public class AcquireScreenVerify
       && verifier.VerifyField(tablePos, 8 /*Width*/, 4 /*uint*/, 4, false)
       && verifier.VerifyField(tablePos, 10 /*Height*/, 4 /*uint*/, 4, false)
       && verifier.VerifyField(tablePos, 12 /*PhysicalMonitorId*/, 4 /*uint*/, 4, false)
+      && verifier.VerifyField(tablePos, 14 /*WindowId*/, 4 /*uint*/, 4, false)
       && verifier.VerifyTableEnd(tablePos);
   }
 }
@@ -1408,6 +1418,64 @@ static public class SetEditModeVerify
       && verifier.VerifyTableEnd(tablePos);
   }
 }
+public struct DetachWindow : IFlatbufferObject
+{
+  private Table __p;
+  public ByteBuffer ByteBuffer { get { return __p.bb; } }
+  public static void ValidateVersion() { FlatBufferConstants.FLATBUFFERS_25_2_10(); }
+  public static DetachWindow GetRootAsDetachWindow(ByteBuffer _bb) { return GetRootAsDetachWindow(_bb, new DetachWindow()); }
+  public static DetachWindow GetRootAsDetachWindow(ByteBuffer _bb, DetachWindow obj) { return (obj.__assign(_bb.GetInt(_bb.Position) + _bb.Position, _bb)); }
+  public void __init(int _i, ByteBuffer _bb) { __p = new Table(_i, _bb); }
+  public DetachWindow __assign(int _i, ByteBuffer _bb) { __init(_i, _bb); return this; }
+
+  public uint WindowId { get { int o = __p.__offset(4); return o != 0 ? __p.bb.GetUint(o + __p.bb_pos) : (uint)0; } }
+  public uint Width { get { int o = __p.__offset(6); return o != 0 ? __p.bb.GetUint(o + __p.bb_pos) : (uint)0; } }
+  public uint Height { get { int o = __p.__offset(8); return o != 0 ? __p.bb.GetUint(o + __p.bb_pos) : (uint)0; } }
+  public string Title { get { int o = __p.__offset(10); return o != 0 ? __p.__string(o + __p.bb_pos) : null; } }
+#if ENABLE_SPAN_T
+  public Span<byte> GetTitleBytes() { return __p.__vector_as_span<byte>(10, 1); }
+#else
+  public ArraySegment<byte>? GetTitleBytes() { return __p.__vector_as_arraysegment(10); }
+#endif
+  public byte[] GetTitleArray() { return __p.__vector_as_array<byte>(10); }
+
+  public static Offset<ScreenPortal.Protocol.Fb.DetachWindow> CreateDetachWindow(FlatBufferBuilder builder,
+      uint window_id = 0,
+      uint width = 0,
+      uint height = 0,
+      StringOffset titleOffset = default(StringOffset)) {
+    builder.StartTable(4);
+    DetachWindow.AddTitle(builder, titleOffset);
+    DetachWindow.AddHeight(builder, height);
+    DetachWindow.AddWidth(builder, width);
+    DetachWindow.AddWindowId(builder, window_id);
+    return DetachWindow.EndDetachWindow(builder);
+  }
+
+  public static void StartDetachWindow(FlatBufferBuilder builder) { builder.StartTable(4); }
+  public static void AddWindowId(FlatBufferBuilder builder, uint windowId) { builder.AddUint(0, windowId, 0); }
+  public static void AddWidth(FlatBufferBuilder builder, uint width) { builder.AddUint(1, width, 0); }
+  public static void AddHeight(FlatBufferBuilder builder, uint height) { builder.AddUint(2, height, 0); }
+  public static void AddTitle(FlatBufferBuilder builder, StringOffset titleOffset) { builder.AddOffset(3, titleOffset.Value, 0); }
+  public static Offset<ScreenPortal.Protocol.Fb.DetachWindow> EndDetachWindow(FlatBufferBuilder builder) {
+    int o = builder.EndTable();
+    return new Offset<ScreenPortal.Protocol.Fb.DetachWindow>(o);
+  }
+}
+
+
+static public class DetachWindowVerify
+{
+  static public bool Verify(Google.FlatBuffers.Verifier verifier, uint tablePos)
+  {
+    return verifier.VerifyTableStart(tablePos)
+      && verifier.VerifyField(tablePos, 4 /*WindowId*/, 4 /*uint*/, 4, false)
+      && verifier.VerifyField(tablePos, 6 /*Width*/, 4 /*uint*/, 4, false)
+      && verifier.VerifyField(tablePos, 8 /*Height*/, 4 /*uint*/, 4, false)
+      && verifier.VerifyString(tablePos, 10 /*Title*/, false)
+      && verifier.VerifyTableEnd(tablePos);
+  }
+}
 public struct Envelope : IFlatbufferObject
 {
   private Table __p;
@@ -1446,6 +1514,7 @@ public struct Envelope : IFlatbufferObject
   public ScreenPortal.Protocol.Fb.CursorShape BodyAsCursorShape() { return Body<ScreenPortal.Protocol.Fb.CursorShape>().Value; }
   public ScreenPortal.Protocol.Fb.CursorEnter BodyAsCursorEnter() { return Body<ScreenPortal.Protocol.Fb.CursorEnter>().Value; }
   public ScreenPortal.Protocol.Fb.SetEditMode BodyAsSetEditMode() { return Body<ScreenPortal.Protocol.Fb.SetEditMode>().Value; }
+  public ScreenPortal.Protocol.Fb.DetachWindow BodyAsDetachWindow() { return Body<ScreenPortal.Protocol.Fb.DetachWindow>().Value; }
 
   public static Offset<ScreenPortal.Protocol.Fb.Envelope> CreateEnvelope(FlatBufferBuilder builder,
       ushort protocol_version = 0,

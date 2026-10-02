@@ -28,6 +28,7 @@ namespace ScreenPortal.App.Connection
         CursorShape,
         CursorEnter,
         SetEditMode,
+        DetachWindow,
     }
 
     public enum ByeReason
@@ -43,6 +44,8 @@ namespace ScreenPortal.App.Connection
     {
         Virtual = 0,
         Mirror = 1,
+        /// <summary>3D: janela espelhada (ADR 0018).</summary>
+        Window = 2,
     }
 
     /// <summary>Mensagem do canal de controle, independente de FlatBuffers (o codec fica na Infrastructure).</summary>
@@ -217,14 +220,17 @@ namespace ScreenPortal.App.Connection
         public uint Width { get; }
         public uint Height { get; }
         public uint PhysicalMonitorId { get; }
+        /// <summary>Só em <see cref="ScreenKind.Window"/>: a janela espelhada (HWND).</summary>
+        public uint WindowId { get; }
 
-        public AcquireScreenMessage(uint screenKey, ScreenKind kind, uint width, uint height, uint physicalMonitorId)
+        public AcquireScreenMessage(uint screenKey, ScreenKind kind, uint width, uint height, uint physicalMonitorId, uint windowId = 0)
         {
             ScreenKey = screenKey;
             ScreenKind = kind;
             Width = width;
             Height = height;
             PhysicalMonitorId = physicalMonitorId;
+            WindowId = windowId;
         }
     }
 
@@ -348,6 +354,28 @@ namespace ScreenPortal.App.Connection
         FindCursor,
         /// <summary>3C: abre/fecha o menu do app onde o cursor está.</summary>
         OpenMenu,
+        /// <summary>3D: destacar a janela ativa (tratado no host: vira <see cref="DetachWindowMessage"/>).</summary>
+        DetachWindow,
+        /// <summary>3D: reanexar a janela espelhada sob o cursor.</summary>
+        ReattachWindow,
+    }
+
+    /// <summary>3D: o host pede uma tela-espelho para a janela (Ctrl+Alt+D).</summary>
+    public sealed class DetachWindowMessage : ControlMessage
+    {
+        public override ControlMessageKind Kind => ControlMessageKind.DetachWindow;
+        public uint WindowId { get; }
+        public uint Width { get; }
+        public uint Height { get; }
+        public string Title { get; }
+
+        public DetachWindowMessage(uint windowId, uint width, uint height, string title)
+        {
+            WindowId = windowId;
+            Width = width;
+            Height = height;
+            Title = title ?? string.Empty;
+        }
     }
 
     /// <summary>3B: o headset pede o MouseState (UDP) nesta porta.</summary>

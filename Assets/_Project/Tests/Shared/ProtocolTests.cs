@@ -67,6 +67,10 @@ namespace ScreenPortal.Tests
             Assert.That(a.Width, Is.EqualTo(2560u));
             Assert.That(a.Height, Is.EqualTo(1080u));
             Assert.That(a.PhysicalMonitorId, Is.EqualTo(2u));
+            var w = (AcquireScreenMessage)RoundTrip(new AcquireScreenMessage(5, ScreenKind.Window, 1101, 826, 0, 0x8B05BC));
+            Assert.That((w.ScreenKind, w.WindowId), Is.EqualTo((ScreenKind.Window, 0x8B05BCu)));
+            var d = (DetachWindowMessage)RoundTrip(new DetachWindowMessage(0x8B05BC, 1101, 826, "Sem título - Bloco de Notas"));
+            Assert.That((d.WindowId, d.Width, d.Height, d.Title), Is.EqualTo((0x8B05BCu, 1101u, 826u, "Sem título - Bloco de Notas")));
 
             var ready = (ScreenReadyMessage)RoundTrip(new ScreenReadyMessage(3, 3840, 2160));
             Assert.That(ready.ScreenKey, Is.EqualTo(3u));

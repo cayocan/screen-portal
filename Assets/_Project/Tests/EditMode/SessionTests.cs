@@ -25,6 +25,15 @@ namespace ScreenPortal.Tests
         }
 
         [Test]
+        public void WindowMirrors_AreNotSaved()
+        {
+            var ws = Sample();
+            new CreateScreen(Resolution.Create(1096, 824), null, 0.55f, 0f, "Bloco de Notas", ScreenSource.Window(77)).Apply(ws, out ws);
+            Assert.That(SessionCodec.TryDecode(SessionCodec.Encode(ws), out var back), Is.True);
+            Assert.That(back.Screens.Count, Is.EqualTo(2), "a janela pode não existir ao reabrir (ADR 0018)");
+        }
+
+        [Test]
         public void RoundTrip_KeepsEveryScreenField_TheSurface_TheFocus_AndTheNextId()
         {
             var ws = Sample();

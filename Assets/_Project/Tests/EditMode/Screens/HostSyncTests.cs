@@ -84,6 +84,20 @@ namespace ScreenPortal.Tests
         }
 
         [Test]
+        public void WindowScreen_IsAcquiredAsAWindowMirror_WithItsWindowId()
+        {
+            var r = new Rig();
+            r.AddVirtual();
+            r.Link(ConnectionRig.Welcome);
+            r.C.Bus.Send(new CreateScreen(Resolution.Create(1096, 824), null, 0.55f, 0f, "Bloco de Notas", ScreenSource.Window(0x8B05BC)));
+            r.Tick();
+            var acquire = r.C.Channel.Last<AcquireScreenMessage>();
+            Assert.That(acquire.ScreenKind, Is.EqualTo(ScreenKind.Window));
+            Assert.That(acquire.WindowId, Is.EqualTo(0x8B05BCu));
+            Assert.That((acquire.Width, acquire.Height), Is.EqualTo((1096u, 824u)));
+        }
+
+        [Test]
         public void AutoMirror_OnlyOnTheFirstConnection_AndNotWithScreens()
         {
             var r = new Rig();

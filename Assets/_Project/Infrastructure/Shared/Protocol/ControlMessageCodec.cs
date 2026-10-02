@@ -101,7 +101,8 @@ namespace ScreenPortal.Infrastructure.Protocol
                     type = Fb.Message.Bye;
                     break;
                 case AcquireScreenMessage m:
-                    body = Fb.AcquireScreen.CreateAcquireScreen(b, m.ScreenKey, (Fb.ScreenKind)(byte)m.ScreenKind, m.Width, m.Height, m.PhysicalMonitorId).Value;
+                    body = Fb.AcquireScreen.CreateAcquireScreen(b, m.ScreenKey, (Fb.ScreenKind)(byte)m.ScreenKind, m.Width, m.Height, m.PhysicalMonitorId,
+                        m.WindowId).Value;
                     type = Fb.Message.AcquireScreen;
                     break;
                 case ScreenReadyMessage m:
@@ -143,6 +144,10 @@ namespace ScreenPortal.Infrastructure.Protocol
                 case CursorEnterMessage m:
                     body = Fb.CursorEnter.CreateCursorEnter(b, m.ScreenKey, m.X, m.Y).Value;
                     type = Fb.Message.CursorEnter;
+                    break;
+                case DetachWindowMessage m:
+                    body = Fb.DetachWindow.CreateDetachWindow(b, m.WindowId, m.Width, m.Height, b.CreateString(m.Title)).Value;
+                    type = Fb.Message.DetachWindow;
                     break;
                 case SetEditModeMessage m:
                     body = Fb.SetEditMode.CreateSetEditMode(b, m.On).Value;
@@ -282,7 +287,7 @@ namespace ScreenPortal.Infrastructure.Protocol
                 case Fb.Message.AcquireScreen:
                 {
                     var a = e.BodyAsAcquireScreen();
-                    return new AcquireScreenMessage(a.ScreenKey, (ScreenKind)(byte)a.Kind, a.Width, a.Height, a.PhysicalMonitorId);
+                    return new AcquireScreenMessage(a.ScreenKey, (ScreenKind)(byte)a.Kind, a.Width, a.Height, a.PhysicalMonitorId, a.WindowId);
                 }
                 case Fb.Message.ScreenReady:
                 {
@@ -321,6 +326,11 @@ namespace ScreenPortal.Infrastructure.Protocol
                 {
                     var c = e.BodyAsCursorEnter();
                     return new CursorEnterMessage(c.ScreenKey, c.X, c.Y);
+                }
+                case Fb.Message.DetachWindow:
+                {
+                    var d = e.BodyAsDetachWindow();
+                    return new DetachWindowMessage(d.WindowId, d.Width, d.Height, d.Title);
                 }
                 case Fb.Message.SetEditMode:
                     return new SetEditModeMessage(e.BodyAsSetEditMode().On);

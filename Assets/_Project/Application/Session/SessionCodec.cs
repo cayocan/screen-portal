@@ -39,6 +39,7 @@ namespace ScreenPortal.App.Session
             sb.Append("next ").Append(ws.NextScreenId).Append('\n');
             foreach (var screen in ws.Screens)
             {
+                if (screen.Source.Kind == ScreenSourceKind.Window) continue; // espelho de janela não volta (ADR 0018)
                 var p = screen.Placement;
                 var pose = p.LoosePose;
                 sb.Append("screen ").Append(screen.Id.Value).Append(' ').Append(screen.Resolution.Width).Append(' ')

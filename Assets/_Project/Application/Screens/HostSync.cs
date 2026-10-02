@@ -119,7 +119,8 @@ namespace ScreenPortal.App.Screens
             {
                 case Phase.Unlinked:
                     _connection.Send(new AcquireScreenMessage(Key(e.Id), KindOf(e.Source), (uint)e.Resolution.Width,
-                        (uint)e.Resolution.Height, e.Source.PhysicalMonitorId));
+                        (uint)e.Resolution.Height, e.Source.Kind == ScreenSourceKind.Mirror ? e.Source.PhysicalMonitorId : 0,
+                        e.Source.WindowId));
                     SetPhase(e, Phase.Requested);
                     break;
                 case Phase.Ready:
@@ -362,7 +363,8 @@ namespace ScreenPortal.App.Screens
         private static uint Key(ScreenId id) => (uint)id.Value;
 
         private static ScreenKind KindOf(ScreenSource source) =>
-            source.Kind == ScreenSourceKind.Mirror ? ScreenKind.Mirror : ScreenKind.Virtual;
+            source.Kind == ScreenSourceKind.Mirror ? ScreenKind.Mirror
+            : source.Kind == ScreenSourceKind.Window ? ScreenKind.Window : ScreenKind.Virtual;
 
         public void Dispose()
         {
