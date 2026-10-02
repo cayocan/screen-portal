@@ -218,6 +218,7 @@ namespace ScreenPortal.App.Connection
                 case AudioStartedMessage _:
                 case HotkeyMessage _:
                 case CursorShapeMessage _:
+                case DetachWindowMessage _:
                     ScreenMessage?.Invoke(message);
                     break;
                 case PingMessage ping:

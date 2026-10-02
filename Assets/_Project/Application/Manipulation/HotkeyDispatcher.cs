@@ -28,11 +28,13 @@ namespace ScreenPortal.App.Manipulation
         private readonly ScreenManipulationController _manipulation;
         private readonly ScreenPortal.App.Cursor.WorldCursor _world;
         private readonly ScreenPortal.App.Cursor.MouseMenu _menu;
+        private readonly ScreenPortal.App.Screens.WindowMirrors _mirrors;
 
         public HotkeyDispatcher(WorkspaceStore store, ICommandBus bus, IHeadPoseSource head, ConnectionStateMachine connection = null,
             EditMode edit = null, ScreenManipulationController manipulation = null, ScreenPortal.App.Cursor.WorldCursor world = null,
-            ScreenPortal.App.Cursor.MouseMenu menu = null)
+            ScreenPortal.App.Cursor.MouseMenu menu = null, ScreenPortal.App.Screens.WindowMirrors mirrors = null)
         {
+            _mirrors = mirrors;
             _menu = menu;
             _world = world;
             _edit = edit;
@@ -93,6 +95,9 @@ namespace ScreenPortal.App.Manipulation
                 case HotkeyAction.CurvatureToggle: _bus.Send(new ToggleScreenCurvature(id)); break;
                 case HotkeyAction.CurvatureLess: Curve(screen, -CurvatureStep); break;
                 case HotkeyAction.CurvatureMore: Curve(screen, CurvatureStep); break;
+                case HotkeyAction.ReattachWindow:
+                    _mirrors?.Reattach(id);
+                    break;
                 case HotkeyAction.CycleFrameRate:
                     if (screen.Source.HasVideo) _bus.Send(new SetFrameRateMode(id, NextFrameRate(screen.FrameRateMode)));
                     break;

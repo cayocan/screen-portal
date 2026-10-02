@@ -59,6 +59,7 @@ namespace ScreenPortal.App.Menu
         public const int ComfortableVideoScreens = 4;
         public const string TooManyNotice = "Mais de 4 telas:\npode haver quedas e travamentos";
         public const string BackLabel = "← Voltar";
+        public const string ReattachLabel = "Reanexar janela";
         public const string RecreateLabel = "Recriar ▸";
         public const string RecreateTitlePrefix = "Recriar: ";
         public const string CurrentSuffix = " · atual";
@@ -217,7 +218,9 @@ namespace ScreenPortal.App.Menu
                 case MenuItemId.AddVirtual: return "+ Monitor virtual";
                 case MenuItemId.AddMirror: return "+ Espelhar monitor";
                 case MenuItemId.ReturnToSurface: return "Voltar à superfície";
-                case MenuItemId.RemoveScreen: return "Remover tela";
+                case MenuItemId.RemoveScreen:
+                    return _store.State.TryGetScreen(_store.State.FocusedScreenId, out var focused)
+                           && focused.Source.Kind == ScreenSourceKind.Window ? ReattachLabel : "Remover tela";
                 case MenuItemId.AddTestScreen: return "+ Tela de teste";
                 case MenuItemId.Curvature: return "Curvatura ▸";
                 case MenuItemId.FrameRate: return "Taxa de quadros ▸";

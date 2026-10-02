@@ -83,8 +83,13 @@ namespace ScreenPortal.Composition
             // 3A: atalhos globais do PC → Commands na tela sob o cursor do mouse
             builder.Register(r => new HotkeyDispatcher(r.Resolve<WorkspaceStore>(), r.Resolve<ICommandBus>(), r.Resolve<IHeadPoseSource>(),
                 r.Resolve<ConnectionStateMachine>(), r.Resolve<EditMode>(), r.Resolve<ScreenManipulationController>(),
-                r.Resolve<ScreenPortal.App.Cursor.WorldCursor>(), r.Resolve<ScreenPortal.App.Cursor.MouseMenu>()), Lifetime.Singleton);
+                r.Resolve<ScreenPortal.App.Cursor.WorldCursor>(), r.Resolve<ScreenPortal.App.Cursor.MouseMenu>(), r.Resolve<WindowMirrors>()),
+                Lifetime.Singleton);
             builder.RegisterBuildCallback(c => c.Resolve<HotkeyDispatcher>());
+            // 3D: janela espelhada (Ctrl+Alt+D no PC → tela-espelho aqui; ADR 0018)
+            builder.Register(r => new WindowMirrors(r.Resolve<ConnectionStateMachine>(), r.Resolve<WorkspaceStore>(), r.Resolve<ICommandBus>(),
+                r.Resolve<IHeadPoseSource>()), Lifetime.Singleton);
+            builder.RegisterBuildCallback(c => c.Resolve<WindowMirrors>()); // assina a conexão já na montagem
             // 3C: menu do app pelo mouse (Ctrl+Alt+M), flutuando onde o cursor está
             builder.Register(r => new ScreenPortal.App.Cursor.MouseMenu(r.Resolve<EditMode>(), r.Resolve<IHeadPoseSource>(),
                 r.Resolve<ScreenPortal.App.Cursor.CursorSync>(), r.Resolve<ScreenPortal.App.Cursor.WorldCursor>(), r.Resolve<WorkspaceStore>()),
