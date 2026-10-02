@@ -35,6 +35,7 @@ public sealed class CursorFeed : ICursorHost, IDisposable
     }
 
     private readonly Func<string, (string DeviceId, uint ScreenKey)?> _screenAt;
+    private readonly Func<string, IReadOnlyList<(uint ScreenKey, IntPtr Window, ScreenPortal.Host.Domain.Display.RectI Bounds)>> _mirrors;
     private readonly MouseHook _hook;
     private readonly Action<bool> _onEditMode;
     private readonly Action<string> _log;
@@ -49,9 +50,12 @@ public sealed class CursorFeed : ICursorHost, IDisposable
     private volatile bool _stop;
 
     /// <param name="onEditMode">modo edição ligou/desligou (o Esc global só vale nele).</param>
-    public CursorFeed(Func<string, (string, uint)?> screenAt, MouseHook hook, Action<bool> onEditMode, Action<string> log)
+    public CursorFeed(Func<string, (string, uint)?> screenAt,
+        Func<string, IReadOnlyList<(uint, IntPtr, ScreenPortal.Host.Domain.Display.RectI)>> mirrors,
+        MouseHook hook, Action<bool> onEditMode, Action<string> log)
     {
         _screenAt = screenAt;
+        _mirrors = mirrors;
         _hook = hook;
         _onEditMode = onEditMode;
         _log = log;
@@ -90,7 +94,20 @@ public sealed class CursorFeed : ICursorHost, IDisposable
 
     public void Enter(string deviceId, object owner, uint screenKey, int x, int y)
     {
-        if (Owns(deviceId, owner)) _hook.Enter(screenKey, x, y);
+        if (!Owns(deviceId, owner)) return;
+        // espelho de janela: a janela vem para a frente para os cliques caírem nela (spec 3D §4)
+        foreach (var m in _mirrors(deviceId))
+            if (m.ScreenKey == screenKey) ScreenPortal.Host.App.Display.WindowMirrorOps.BringToFront(m.Window);
+        _hook.Enter(screenKey, x, y);
+    }
+
+    /// <summary>3D: o espelho em que o cursor está agora (para o Ctrl+Alt+Shift+D).</summary>
+    public (string DeviceId, uint ScreenKey)? ActiveMirror()
+    {
+        string? device;
+        lock (_lock) device = _routerDevice;
+        uint key = _hook.ReadWindow(out _);
+        return device != null && key != 0 ? (device, key) : null;
     }
 
     public void SetEditMode(string deviceId, object owner, bool on)
@@ -131,6 +148,10 @@ public sealed class CursorFeed : ICursorHost, IDisposable
             list.Add(new RouterMonitor(d.DeviceName, d.Bounds, key));
         }
         _hook.SetMonitors(list);
+        var windows = new List<RouterMonitor>();
+        if (device != null)
+            foreach (var m in _mirrors(device)) windows.Add(new RouterMonitor($"janela 0x{m.Window.ToInt64():X}", m.Bounds, m.ScreenKey));
+        _hook.SetWindows(windows);
     }
 
     private void Tick()
@@ -154,6 +175,8 @@ public sealed class CursorFeed : ICursorHost, IDisposable
         _hook.Read(out var mode, out uint epoch, out uint exitKey, out int exitX, out int exitY, out int dx, out int dy,
             out int wheel, out byte buttons);
         bool away = mode is MouseMode.World or MouseMode.Edit; // cursor estacionado: a posição do Windows não vale
+        ScreenPortal.Host.Domain.Display.RectI windowBounds = default;
+        uint windowKey = away ? 0 : _hook.ReadWindow(out windowBounds);
         var (monitor, left, top) = away ? ("", 0, 0) : MonitorAt(x, y);
         var screen = monitor.Length > 0 ? _screenAt(monitor) : null;
         byte flags = (byte)(((GetAsyncKeyState(0x10) & 0x8000) != 0 ? MouseState.FlagShift : 0)
@@ -169,6 +192,22 @@ public sealed class CursorFeed : ICursorHost, IDisposable
                     Mode = mode, Epoch = epoch, ScreenKey = exitKey, X = exitX, Y = exitY, Dx = dx, Dy = dy, Wheel = wheel,
                     Buttons = buttons, Flags = flags, ShapeId = t.LastScreenShape,
                 };
+            }
+            else if (windowKey != 0 && devices[i] == routerDevice)
+            {
+                // dentro de um espelho de janela: posição relativa à janela
+                state = new MouseState
+                {
+                    Mode = MouseMode.Screen, Epoch = epoch, ScreenKey = windowKey, X = x - windowBounds.X, Y = y - windowBounds.Y,
+                    ShapeId = shape?.Id ?? 0, Flags = flags,
+                };
+                if (shape != null)
+                {
+                    t.LastScreenShape = shape.Id;
+                    if (t.SentShapes.Add(shape.Id))
+                        t.Send(new CursorShapeMessage(shape.Id, (ushort)shape.Width, (ushort)shape.Height, (ushort)shape.HotX,
+                            (ushort)shape.HotY, (byte)shape.Scale, shape.Bgra));
+                }
             }
             else
             {

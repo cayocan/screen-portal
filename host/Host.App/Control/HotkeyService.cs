@@ -78,8 +78,21 @@ public sealed class HotkeyService : IDisposable
         if (_threadId != 0) PostThreadMessage(_threadId, WmApp, on ? (IntPtr)1 : IntPtr.Zero, IntPtr.Zero);
     }
 
+    /// <summary>3D: o espelho de janela sob o cursor (o roteador sabe; o monitor não diz).</summary>
+    public Func<(string DeviceId, uint ScreenKey)?>? ActiveMirror { get; set; }
+
     private void OnHotkey(HotkeyAction action)
     {
+        if (action == HotkeyAction.DetachWindow)
+        {
+            Detach();
+            return;
+        }
+        if (action == HotkeyAction.ReattachWindow && ActiveMirror?.Invoke() is { } mirror)
+        {
+            _router.Send(mirror.DeviceId, new HotkeyMessage(action, mirror.ScreenKey));
+            return;
+        }
         var target = GetCursorPos(out var p) ? _screenAt(MonitorName(p)) : null;
         if (target is { } t)
         {
@@ -87,6 +100,28 @@ public sealed class HotkeyService : IDisposable
             return;
         }
         foreach (var device in _router.Devices) _router.Send(device, new HotkeyMessage(action, 0)); // fora das telas: só ações globais
+    }
+
+    /// <summary>Ctrl+Alt+D: a janela ativa vira uma tela-espelho no headset (ADR 0018). Tamanho em múltiplos de 8.</summary>
+    private void Detach()
+    {
+        if (!ScreenPortal.Host.App.Display.WindowMirrorOps.TryForegroundWindow(out var hwnd, out var bounds))
+        {
+            _log("destacar: nenhuma janela ativa que dê para espelhar");
+            return;
+        }
+        uint w = (uint)(bounds.Width / 8 * 8), h = (uint)(bounds.Height / 8 * 8);
+        if (w < 320 || h < 240)
+        {
+            _log($"destacar: janela pequena demais ({bounds.Width}×{bounds.Height})");
+            return;
+        }
+        string title = ScreenPortal.Host.App.Display.WindowMirrorOps.Title(hwnd);
+        var message = new DetachWindowMessage((uint)hwnd.ToInt64(), w, h, title);
+        var target = GetCursorPos(out var p) ? _screenAt(MonitorName(p)) : null;
+        if (target is { } t) _router.Send(t.DeviceId, message);
+        else foreach (var device in _router.Devices) _router.Send(device, message);
+        _log($"destacar: \"{title}\" {w}×{h}");
     }
 
     private static string MonitorName(Point p)

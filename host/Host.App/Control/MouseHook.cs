@@ -56,6 +56,22 @@ public sealed class MouseHook : IDisposable
         lock (_lock) _router.SetMonitors(monitors);
     }
 
+    /// <summary>3D: retângulos das janelas espelhadas.</summary>
+    public void SetWindows(IReadOnlyList<RouterMonitor> windows)
+    {
+        lock (_lock) _router.SetWindows(windows);
+    }
+
+    /// <summary>3D: espelho em que o cursor está (0 = nenhum) e o retângulo da janela.</summary>
+    public uint ReadWindow(out ScreenPortal.Host.Domain.Display.RectI bounds)
+    {
+        lock (_lock)
+        {
+            bounds = _router.WindowBounds;
+            return _router.WindowKey;
+        }
+    }
+
     public void SetConnected(bool connected)
     {
         CursorWarp? warp;

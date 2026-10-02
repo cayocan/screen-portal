@@ -19,6 +19,8 @@ public readonly record struct CursorWarp(int X, int Y);
 public sealed class MouseRouter
 {
     private IReadOnlyList<RouterMonitor> _monitors = Array.Empty<RouterMonitor>();
+    private IReadOnlyList<RouterMonitor> _windows = Array.Empty<RouterMonitor>();
+    private RouterMonitor? _window; // 3D: espelho de janela onde o cursor entrou (só se entra tocando com o cursor 3D)
     private bool _connected;
     private bool _hasLast;
     private int _lastX, _lastY;
@@ -38,12 +40,26 @@ public sealed class MouseRouter
 
     public bool Swallowing => _connected && (Mode == MouseMode.World || Mode == MouseMode.Edit);
 
+    /// <summary>Espelho de janela em que o cursor está (0 = nenhum) e o retângulo dele no desktop.</summary>
+    public uint WindowKey => _window?.ScreenKey ?? 0;
+    public RectI WindowBounds => _window?.Bounds ?? default;
+
+    /// <summary>3D: retângulos das janelas espelhadas (chave = a tela-espelho). Atualiza o espelho ativo.</summary>
+    public void SetWindows(IReadOnlyList<RouterMonitor> windows)
+    {
+        _windows = windows;
+        if (_window is not { } active) return;
+        _window = null;
+        foreach (var w in windows) if (w.ScreenKey == active.ScreenKey) _window = w;
+    }
+
     public void SetMonitors(IReadOnlyList<RouterMonitor> monitors) => _monitors = monitors;
 
     /// <summary>Headset ligado/desligado. Desligar no Mundo/Edição devolve o cursor ao ponto de saída.</summary>
     public CursorWarp? SetConnected(bool connected)
     {
         _connected = connected;
+        if (!connected) _window = null;
         if (connected || Mode == MouseMode.Screen || Mode == MouseMode.Outside) return null;
         var warp = new CursorWarp(_exitBounds.X + ExitX, _exitBounds.Y + ExitY);
         BackToScreen(warp.X, warp.Y);
@@ -65,6 +81,21 @@ public sealed class MouseRouter
         {
             Track(x, y);
             return false;
+        }
+        if (_window is { } mirror && _passedDown == 0)
+        {
+            var wb = mirror.Bounds;
+            if (x >= wb.X && x < wb.Right && y >= wb.Y && y < wb.Bottom)
+            {
+                Track(x, y);
+                return false;
+            }
+            // saiu do retângulo da janela: Mundo, mesmo que o Windows tenha monitor ali (spec 3D §4)
+            int wx = Math.Clamp(x, wb.X, wb.Right - 1), wy = Math.Clamp(y, wb.Y, wb.Bottom - 1);
+            warp = Leave(MouseMode.World, mirror, wx, wy);
+            Dx = x - wx;
+            Dy = y - wy;
+            return true;
         }
         var from = MonitorAt(_lastX, _lastY);
         if (from is not { ScreenKey: not 0 } current || _passedDown != 0)
@@ -105,6 +136,7 @@ public sealed class MouseRouter
 
     private CursorWarp Leave(MouseMode mode, RouterMonitor from, int ex, int ey)
     {
+        _window = null;
         Mode = mode;
         Epoch++;
         ExitScreenKey = from.ScreenKey;
@@ -165,6 +197,7 @@ public sealed class MouseRouter
             Dx = Dy = Wheel = 0;
             return null;
         }
+        if (_window is { } inMirror) return Leave(MouseMode.Edit, inMirror, _lastX, _lastY);
         if (_hasLast && MonitorAt(_lastX, _lastY) is { ScreenKey: not 0 } under)
             return Leave(MouseMode.Edit, under, _lastX, _lastY); // o cursor 3D nasce onde o cursor estava
         if (FirstQuestScreen() is not { } q) return null;
@@ -176,6 +209,15 @@ public sealed class MouseRouter
     public CursorWarp? Enter(uint screenKey, int x, int y)
     {
         if (!_connected || Mode != MouseMode.World) return null;
+        foreach (var w in _windows)
+        {
+            if (w.ScreenKey != screenKey) continue;
+            var wb = w.Bounds;
+            var into = new CursorWarp(wb.X + Math.Clamp(x, 0, wb.Width - 1), wb.Y + Math.Clamp(y, 0, wb.Height - 1));
+            BackToScreen(into.X, into.Y);
+            _window = w;
+            return into;
+        }
         foreach (var m in _monitors)
         {
             if (m.ScreenKey != screenKey) continue;

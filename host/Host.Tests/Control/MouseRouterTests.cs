@@ -187,3 +187,77 @@ public class MouseRouterTests
         Assert.Equal((1u, 1280, 720), (r.ExitScreenKey, r.ExitX, r.ExitY));
     }
 }
+
+public class MouseRouterWindowTests
+{
+    // a janela espelhada (tela 7) fica fisicamente na tela 1 do Quest
+    private static readonly RouterMonitor Q1 = new("DISPLAY60", new RectI(1920, 0, 2560, 1440), 1);
+    private static readonly RouterMonitor Win = new("janela 0x1", new RectI(2200, 200, 1096, 824), 7);
+
+    private static MouseRouter Router()
+    {
+        var r = new MouseRouter();
+        r.SetMonitors(new[] { Q1 });
+        r.SetWindows(new[] { Win });
+        r.SetConnected(true);
+        r.OnMove(4470, 700, out _);
+        r.OnMove(4479, 700, out _); // sai para o mundo pela borda direita da tela 1
+        return r;
+    }
+
+    [Fact]
+    public void MovingOverTheRealWindow_DoesNotJumpToTheMirror()
+    {
+        var r = new MouseRouter();
+        r.SetMonitors(new[] { Q1 });
+        r.SetWindows(new[] { Win });
+        r.SetConnected(true);
+        r.OnMove(2100, 300, out _);
+        Assert.False(r.OnMove(2300, 300, out _));
+        Assert.Equal(0u, r.WindowKey);
+    }
+
+    [Fact]
+    public void TouchingTheMirror_EntersTheWindow_AtThePoint()
+    {
+        var r = Router();
+        var warp = r.Enter(7, 100, 50);
+        Assert.Equal(new CursorWarp(2300, 250), warp);
+        Assert.Equal(MouseMode.Screen, r.Mode);
+        Assert.Equal(7u, r.WindowKey);
+        Assert.False(r.OnMove(2400, 300, out _), "dentro da janela: o Windows recebe");
+    }
+
+    [Fact]
+    public void LeavingTheWindowRectangle_GoesToTheWorld_EvenOverAQuestScreen()
+    {
+        var r = Router();
+        r.Enter(7, 100, 50);
+        r.OnMove(2210, 300, out _);
+        Assert.True(r.OnMove(2190, 300, out _), "à esquerda da janela ainda é a tela 1 no Windows, mas sai do espelho");
+        Assert.Equal(MouseMode.World, r.Mode);
+        Assert.Equal(7u, r.ExitScreenKey);
+        Assert.Equal((0, 100), (r.ExitX, r.ExitY));
+        Assert.Equal(0u, r.WindowKey);
+    }
+
+    [Fact]
+    public void DraggingInsideTheMirror_DoesNotLeave()
+    {
+        var r = Router();
+        r.Enter(7, 100, 50);
+        r.OnButton(MouseState.ButtonLeft, true);
+        Assert.False(r.OnMove(2100, 300, out _), "arraste (seleção) passa da borda sem sair");
+    }
+
+    [Fact]
+    public void WindowMovedOrClosed_UpdatesTheActiveMirror()
+    {
+        var r = Router();
+        r.Enter(7, 100, 50);
+        r.SetWindows(new[] { Win with { Bounds = new RectI(2000, 100, 1096, 824) } });
+        Assert.Equal(2000, r.WindowBounds.X);
+        r.SetWindows(Array.Empty<RouterMonitor>());
+        Assert.Equal(0u, r.WindowKey);
+    }
+}
