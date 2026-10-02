@@ -10,6 +10,8 @@ namespace ScreenPortal.App.Manipulation
         None,
         MoveX,
         MoveY,
+        /// <summary>Perto/longe: alça azul abaixo do centro (uma seta apontando para quem olha seria só um ponto).</summary>
+        MoveZ,
         RotateX,
         RotateY,
         RotateZ,
@@ -71,7 +73,8 @@ namespace ScreenPortal.App.Manipulation
             switch (part)
             {
                 case GizmoPart.MoveX:
-                case GizmoPart.MoveY: return coarse ? WheelMoveCoarseM : WheelMoveFineM;
+                case GizmoPart.MoveY:
+                case GizmoPart.MoveZ: return coarse ? WheelMoveCoarseM : WheelMoveFineM;
                 case GizmoPart.Scale: return coarse ? WheelScaleCoarse : WheelScaleFine;
                 case GizmoPart.None: return 0f;
                 default: return coarse ? WheelRotateCoarseDeg : WheelRotateFineDeg;
@@ -98,6 +101,7 @@ namespace ScreenPortal.App.Manipulation
             if (DistanceToPoint(origin, dir, f.Origin) <= ScaleCube * f.Size) return GizmoPart.Scale;
             if (DistanceToSegment(origin, dir, f.Origin, f.Origin + f.Right * f.Size) <= tol) return GizmoPart.MoveX;
             if (DistanceToSegment(origin, dir, f.Origin, f.Origin + f.Up * f.Size) <= tol) return GizmoPart.MoveY;
+            if (DistanceToSegment(origin, dir, DepthStart(in f), DepthEnd(in f)) <= tol) return GizmoPart.MoveZ;
             var best = GizmoPart.None;
             float bestD = tol;
             for (int k = 0; k < 3; k++)
@@ -140,6 +144,11 @@ namespace ScreenPortal.App.Manipulation
             degrees = (float)(Math.Atan2(Vec3.Dot(v, y), Vec3.Dot(v, x)) * Angles.RadToDeg);
             return true;
         }
+
+        /// <summary>Alça de profundidade: barra vertical abaixo do centro (para cima aproxima, para baixo afasta).</summary>
+        public const float DepthFrom = 0.3f, DepthTo = 1f; // × Size, para baixo
+        public static Vec3 DepthStart(in GizmoFrame f) => f.Origin - f.Up * (DepthFrom * f.Size);
+        public static Vec3 DepthEnd(in GizmoFrame f) => f.Origin - f.Up * (DepthTo * f.Size);
 
         public static float SnapAngle(float degrees) => (float)Math.Round(degrees / RotationStepDeg) * RotationStepDeg;
 

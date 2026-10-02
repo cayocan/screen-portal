@@ -191,6 +191,70 @@ namespace ScreenPortal.Tests
             Assert.That(Screen.Placement.IsLoose, Is.False);
         }
 
+        private float Radius => CylinderMath.HorizontalRadius(Screen.Placement);
+
+        [Test]
+        public void DepthHandle_IsPickedBelowTheCenter()
+        {
+            var f = Frame;
+            var mid = f.Origin - f.Up * (0.65f * f.Size);
+            Assert.That(ScreenGizmo.Pick(in f, _eye, (mid - _eye).Normalized), Is.EqualTo(GizmoPart.MoveZ));
+        }
+
+        [Test]
+        public void DraggingTheDepthHandleUp_BringsTheScreenCloser_DownPushesItAway()
+        {
+            var f = Frame;
+            var grab = f.Origin - f.Up * (0.65f * f.Size);
+            float before = Radius;
+            Step(grab, false);
+            Step(grab, true);
+            Assert.That(_controller.ActiveGizmo, Is.EqualTo(GizmoPart.MoveZ));
+            Step(grab + f.Up * 0.1f, true);
+            Step(grab + f.Up * 0.1f, false);
+            Assert.That(Radius, Is.EqualTo(before - 0.1f).Within(0.01f), "para cima aproxima");
+            Assert.That(Screen.Placement.IsLoose, Is.False, "continua na superfície");
+            Assert.That(Screen.Placement.AzimuthDeg, Is.EqualTo(0f).Within(0.01f));
+
+            f = Frame;
+            grab = f.Origin - f.Up * (0.65f * f.Size);
+            Step(grab, false);
+            Step(grab, true);
+            Step(grab - f.Up * 0.05f, true);
+            Step(grab - f.Up * 0.05f, false);
+            Assert.That(Radius, Is.EqualTo(before - 0.05f).Within(0.01f), "para baixo afasta");
+        }
+
+        [Test]
+        public void WheelOnTheDepthHandle_UpBringsCloser()
+        {
+            var f = Frame;
+            var grab = f.Origin - f.Up * (0.65f * f.Size);
+            float before = Radius;
+            Step(grab, false);
+            Step(grab, true);
+            Wheel(grab, 2, coarse: false);
+            Wheel(grab, -1, coarse: true);
+            Step(grab, false);
+            Assert.That(Radius, Is.EqualTo(before - 0.01f + 0.05f).Within(1e-3f), "2 × 5 mm mais perto, 1 × 5 cm mais longe");
+        }
+
+        [Test]
+        public void DepthOnALooseScreen_MovesAlongItsOwnAxis()
+        {
+            _bus.Send(new SetScreenLoose(Screen.Id, new Pose(new Vec3(0.3f, 1.2f, 1.0f), Quat.AngleAxis(20f, Vec3.Up))));
+            var startPose = Screen.Placement.LoosePose;
+            var f = Frame;
+            var grab = f.Origin - f.Up * (0.65f * f.Size);
+            Step(grab, false);
+            Step(grab, true);
+            Wheel(grab, -2, coarse: true); // 10 cm mais longe
+            Step(grab, false);
+            var moved = Screen.Placement.LoosePose.Position - startPose.Position;
+            Assert.That(moved.Length, Is.EqualTo(0.1f).Within(1e-3f));
+            Assert.That(Vec3.Dot(moved.Normalized, startPose.Rotation * Vec3.Forward), Is.GreaterThan(0.999f), "para longe de quem olha (+Z da tela)");
+        }
+
         [Test]
         public void WithoutEditMode_ThereIsNoGizmo()
         {

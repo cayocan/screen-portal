@@ -23,7 +23,7 @@ namespace ScreenPortal.Presentation.Manipulation
         private readonly ScreenManipulationController _controller;
         private readonly WorkspaceStore _store;
         private readonly GameObject _root;
-        private readonly LineRenderer _arrowX, _arrowY, _ringX, _ringY, _ringZ, _cube;
+        private readonly LineRenderer _arrowX, _arrowY, _depth, _depthCue, _ringX, _ringY, _ringZ, _cube;
         private readonly Vector3[] _ring = new Vector3[RingPoints];
         private readonly Vector3[] _two = new Vector3[2];
         private readonly Vector3[] _square = new Vector3[4];
@@ -36,6 +36,8 @@ namespace ScreenPortal.Presentation.Manipulation
             _root.transform.SetParent(parent, false);
             _arrowX = Line("ArrowX", unlit, 2, false);
             _arrowY = Line("ArrowY", unlit, 2, false);
+            _depth = Line("Depth", unlit, 2, false);
+            _depthCue = Line("DepthCue", unlit, 2, false);
             _ringX = Line("RingX", unlit, RingPoints, true);
             _ringY = Line("RingY", unlit, RingPoints, true);
             _ringZ = Line("RingZ", unlit, RingPoints, true);
@@ -64,6 +66,9 @@ namespace ScreenPortal.Presentation.Manipulation
 
             Segment(_arrowX, o, o + right * frame.Size, width * 1.5f, part == GizmoPart.MoveX ? Hot : RedX);
             Segment(_arrowY, o, o + up * frame.Size, width * 1.5f, part == GizmoPart.MoveY ? Hot : GreenY);
+            var depthColor = part == GizmoPart.MoveZ ? Hot : BlueZ;
+            Segment(_depth, ScreenGizmo.DepthStart(in frame).ToUnity(), ScreenGizmo.DepthEnd(in frame).ToUnity(), width * 2.5f, depthColor);
+            Segment(_depthCue, o, o + back * (frame.Size * 0.5f), width, depthColor); // dica de profundidade
             float r = ScreenGizmo.RingRadius * frame.Size;
             Ring(_ringX, o, up, back, r, width, part == GizmoPart.RotateX ? Hot : RedX);
             Ring(_ringY, o, right, back, r, width, part == GizmoPart.RotateY ? Hot : GreenY);

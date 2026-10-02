@@ -75,6 +75,7 @@ namespace ScreenPortal.App.Manipulation
         private GizmoFrame _gizmo;
         private float _gizmoWheel; // ajuste pela roda: metros, graus ou log do tamanho
         private float _gizmoDrag;  // último valor do arraste (o raio pode ficar de perfil num quadro)
+        private float _gizmoStartDistance; // MoveZ: distância (esfera) ou raio horizontal (cilindro) no início
         private float _gizmoStart;
         private Vec3 _gizmoRef;
 
@@ -162,6 +163,12 @@ namespace ScreenPortal.App.Manipulation
                 case GizmoPart.Scale:
                     ScreenGizmo.AxisParameter(frame.Origin, ScaleAxis(in frame), input.Origin, input.Direction, out _gizmoStart);
                     break;
+                case GizmoPart.MoveZ:
+                    ScreenGizmo.AxisParameter(frame.Origin, -frame.Up, input.Origin, input.Direction, out _gizmoStart);
+                    _gizmoStartDistance = surface.Mode == LayoutMode.Cylinder && !screen.Placement.IsLoose
+                        ? CylinderMath.HorizontalRadius(screen.Placement)
+                        : screen.Placement.DistanceM;
+                    break;
                 default:
                     _gizmoRef = ScreenGizmo.Perpendicular(frame.Axis(part));
                     ScreenGizmo.RingAngle(frame.Origin, frame.Axis(part), _gizmoRef, input.Origin, input.Direction, out _gizmoStart);
@@ -179,8 +186,9 @@ namespace ScreenPortal.App.Manipulation
             if (active.WheelSteps != 0)
             {
                 float step = ScreenGizmo.WheelStep(ActiveGizmo, active.Coarse);
-                // no cubo cada clique multiplica o tamanho (1 % sobre o atual), nos outros soma
-                _gizmoWheel += active.WheelSteps * (ActiveGizmo == GizmoPart.Scale ? (float)Math.Log(1.0 + step) : step);
+                // no cubo cada clique multiplica o tamanho (1 % sobre o atual), nos outros soma; na profundidade, para cima aproxima
+                _gizmoWheel += active.WheelSteps * (ActiveGizmo == GizmoPart.Scale ? (float)Math.Log(1.0 + step)
+                    : ActiveGizmo == GizmoPart.MoveZ ? -step : step);
             }
             switch (ActiveGizmo)
             {
@@ -199,6 +207,25 @@ namespace ScreenPortal.App.Manipulation
                     var candidate = surface.Mode == LayoutMode.Cylinder
                         ? CylinderMath.FromAzimuthHeight(at.AzimuthDeg, CylinderMath.Height(at), CylinderMath.HorizontalRadius(_startPlacement))
                         : Placement.OnSurface(at.AzimuthDeg, at.ElevationDeg, _startPlacement.DistanceM);
+                    Preview.SetPlacement(candidate, surface.ToPose(candidate));
+                    return;
+                }
+                case GizmoPart.MoveZ:
+                {
+                    // arrastar para baixo (s cresce ao longo de −Up) afasta; para cima aproxima
+                    if (ScreenGizmo.AxisParameter(f.Origin, -f.Up, active.Origin, active.Direction, out float s))
+                        _gizmoDrag = s - _gizmoStart;
+                    float farther = _gizmoDrag + _gizmoWheel;
+                    if (_startPlacement.IsLoose)
+                    {
+                        Preview.SetLoose(new Pose(_startPose.Position - f.Back * farther, _startPose.Rotation));
+                        return;
+                    }
+                    float distance = Placement.ClampDistance(_gizmoStartDistance + farther);
+                    var p = _startPlacement;
+                    var candidate = surface.Mode == LayoutMode.Cylinder
+                        ? CylinderMath.WithHorizontalRadius(p, distance)
+                        : Placement.OnSurface(p.AzimuthDeg, p.ElevationDeg, distance);
                     Preview.SetPlacement(candidate, surface.ToPose(candidate));
                     return;
                 }
